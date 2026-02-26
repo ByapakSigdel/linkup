@@ -1,0 +1,28 @@
+{
+  "name": "linkup",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LinkUp - A couples-focused social media platform",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "db:generate": "pnpm --filter @linkup/api db:generate",
+    "db:migrate": "pnpm --filter @linkup/api db:migrate",
+    "db:seed": "pnpm --filter @linkup/api db:seed",
+    "db:studio": "pnpm --filter @linkup/api db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "prettier": "^3.5.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.15.1"
+}

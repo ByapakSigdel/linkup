@@ -1,0 +1,583 @@
+@import 'tailwindcss';
+
+/* ============================================
+   LinkUp Theme System - CSS Custom Properties
+   ============================================
+   Layer 1: Design tokens as CSS variables.
+   Each theme class overrides these variables to
+   produce a completely different visual identity.
+   ============================================ */
+
+@theme {
+  /* Register theme colors as Tailwind utilities.
+     Default values here — overridden by theme classes on :root. */
+  --color-primary: #F43F5E;
+  --color-primary-hover: #E11D48;
+  --color-primary-light: #FFF1F2;
+  --color-secondary: #A855F7;
+  --color-secondary-hover: #9333EA;
+  --color-accent: #F59E0B;
+  --color-accent-hover: #D97706;
+
+  --color-background: #FAFAF9;
+  --color-background-alt: #F5F5F4;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #FAFAF9;
+  --color-surface-active: #F5F5F4;
+
+  --color-text: #1C1917;
+  --color-text-muted: #78716C;
+  --color-text-inverse: #FAFAF9;
+  --color-text-on-primary: #FFFFFF;
+
+  --color-border: #E7E5E4;
+  --color-border-strong: #D6D3D1;
+  --color-border-focus: #F43F5E;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  --color-message-sent: #F43F5E;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #F5F5F4;
+  --color-message-received-text: #1C1917;
+
+  --color-highlight-love: #FB7185;
+  --color-highlight-funny: #FBBF24;
+  --color-highlight-important: #F87171;
+  --color-highlight-celebration: #C084FC;
+  --color-highlight-milestone: #34D399;
+
+  /* Chat-specific tokens */
+  --chat-bubble-sent-radius: 18px 18px 4px 18px;
+  --chat-bubble-received-radius: 18px 18px 18px 4px;
+  --chat-bubble-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --chat-input-radius: 22px;
+  --chat-input-height: 44px;
+  --chat-input-max-height: 200px;
+
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* ============================================
+   Default Theme (warm, clean, modern)
+   ============================================ */
+:root,
+.theme-default {
+  /* Core Colors */
+  --color-primary: #F43F5E;
+  --color-primary-hover: #E11D48;
+  --color-primary-light: #FFF1F2;
+  --color-secondary: #A855F7;
+  --color-secondary-hover: #9333EA;
+  --color-accent: #F59E0B;
+  --color-accent-hover: #D97706;
+
+  /* Backgrounds */
+  --color-background: #FAFAF9;
+  --color-background-alt: #F5F5F4;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #FAFAF9;
+  --color-surface-active: #F5F5F4;
+
+  /* Text */
+  --color-text: #1C1917;
+  --color-text-muted: #78716C;
+  --color-text-inverse: #FAFAF9;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Borders */
+  --color-border: #E7E5E4;
+  --color-border-strong: #D6D3D1;
+  --color-border-focus: #F43F5E;
+
+  /* Semantic */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Message Bubbles */
+  --color-message-sent: #F43F5E;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #F5F5F4;
+  --color-message-received-text: #1C1917;
+
+  /* Highlights */
+  --color-highlight-love: #FB7185;
+  --color-highlight-funny: #FBBF24;
+  --color-highlight-important: #F87171;
+  --color-highlight-celebration: #C084FC;
+  --color-highlight-milestone: #34D399;
+
+  /* Chat */
+  --chat-bubble-sent-radius: 18px 18px 4px 18px;
+  --chat-bubble-received-radius: 18px 18px 18px 4px;
+  --chat-bubble-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --chat-input-radius: 22px;
+  --chat-input-height: 44px;
+  --chat-input-max-height: 200px;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #F43F5E, #E11D48);
+  --gradient-secondary: linear-gradient(135deg, #A855F7, #7C3AED);
+  --gradient-accent: linear-gradient(135deg, #F59E0B, #D97706);
+
+  /* Typography */
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --heading-weight: 700;
+  --body-weight: 400;
+  --letter-spacing-heading: -0.025em;
+  --letter-spacing-body: 0em;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Effects */
+  --blur: 8px;
+  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   Dreamy Theme (whimsical, playful, soft)
+   ============================================ */
+.theme-dreamy {
+  /* Core Colors */
+  --color-primary: #7C3AED;
+  --color-primary-hover: #6D28D9;
+  --color-primary-light: #EDE9FE;
+  --color-secondary: #EC4899;
+  --color-secondary-hover: #DB2777;
+  --color-accent: #F0ABFC;
+  --color-accent-hover: #E879F9;
+
+  /* Backgrounds */
+  --color-background: #F0F4FF;
+  --color-background-alt: #E8EDFB;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F5F3FF;
+  --color-surface-active: #EDE9FE;
+
+  /* Text */
+  --color-text: #1E1B4B;
+  --color-text-muted: #6B7280;
+  --color-text-inverse: #F5F3FF;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Borders */
+  --color-border: #DDD6FE;
+  --color-border-strong: #C4B5FD;
+  --color-border-focus: #7C3AED;
+
+  /* Semantic */
+  --color-success: #34D399;
+  --color-warning: #FBBF24;
+  --color-error: #FB7185;
+  --color-info: #818CF8;
+
+  /* Message Bubbles */
+  --color-message-sent: #7C3AED;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #EDE9FE;
+  --color-message-received-text: #1E1B4B;
+
+  /* Highlights */
+  --color-highlight-love: #F9A8D4;
+  --color-highlight-funny: #FDE68A;
+  --color-highlight-important: #C4B5FD;
+  --color-highlight-celebration: #F0ABFC;
+  --color-highlight-milestone: #A7F3D0;
+
+  /* Chat — rounder, softer bubbles */
+  --chat-bubble-sent-radius: 22px 22px 6px 22px;
+  --chat-bubble-received-radius: 22px 22px 22px 6px;
+  --chat-bubble-shadow: 0 3px 12px rgba(124, 58, 237, 0.12);
+  --chat-input-radius: 26px;
+  --chat-input-height: 46px;
+  --chat-input-max-height: 200px;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #7C3AED, #EC4899);
+  --gradient-secondary: linear-gradient(135deg, #EC4899, #F0ABFC);
+  --gradient-accent: linear-gradient(135deg, #818CF8, #C084FC);
+
+  /* Typography */
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --heading-weight: 700;
+  --body-weight: 400;
+  --letter-spacing-heading: -0.02em;
+  --letter-spacing-body: 0.01em;
+
+  /* Border Radius - larger for dreamy organic feel */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+
+  /* Shadows - softer, tinted */
+  --shadow-sm: 0 1px 3px 0 rgb(124 58 237 / 0.06);
+  --shadow-md: 0 4px 8px -1px rgb(124 58 237 / 0.1), 0 2px 4px -2px rgb(124 58 237 / 0.06);
+  --shadow-lg: 0 12px 20px -4px rgb(124 58 237 / 0.12), 0 4px 8px -4px rgb(124 58 237 / 0.08);
+  --shadow-hover: 0 20px 30px -6px rgb(124 58 237 / 0.15), 0 8px 12px -6px rgb(124 58 237 / 0.08);
+
+  /* Effects */
+  --blur: 12px;
+  --transition: 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================
+   Botanical Theme (earthy, bold, warm)
+   ============================================ */
+.theme-botanical {
+  /* Core Colors */
+  --color-primary: #16A34A;
+  --color-primary-hover: #15803D;
+  --color-primary-light: #F0FDF4;
+  --color-secondary: #E11D48;
+  --color-secondary-hover: #BE123C;
+  --color-accent: #CA8A04;
+  --color-accent-hover: #A16207;
+
+  /* Backgrounds */
+  --color-background: #FEFCE8;
+  --color-background-alt: #FEF9C3;
+  --color-surface: #FFFEF5;
+  --color-surface-hover: #FEFCE8;
+  --color-surface-active: #FEF9C3;
+
+  /* Text */
+  --color-text: #1A2E05;
+  --color-text-muted: #65793D;
+  --color-text-inverse: #F0FDF4;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Borders */
+  --color-border: #D9F99D;
+  --color-border-strong: #BEF264;
+  --color-border-focus: #16A34A;
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-warning: #EAB308;
+  --color-error: #DC2626;
+  --color-info: #0EA5E9;
+
+  /* Message Bubbles */
+  --color-message-sent: #16A34A;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #F0FDF4;
+  --color-message-received-text: #1A2E05;
+
+  /* Highlights */
+  --color-highlight-love: #FDA4AF;
+  --color-highlight-funny: #FDE047;
+  --color-highlight-important: #86EFAC;
+  --color-highlight-celebration: #FCA5A5;
+  --color-highlight-milestone: #A3E635;
+
+  /* Chat — natural, organic feel */
+  --chat-bubble-sent-radius: 16px 16px 4px 16px;
+  --chat-bubble-received-radius: 16px 16px 16px 4px;
+  --chat-bubble-shadow: 0 2px 6px rgba(22, 101, 52, 0.08);
+  --chat-input-radius: 20px;
+  --chat-input-height: 44px;
+  --chat-input-max-height: 200px;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #16A34A, #15803D);
+  --gradient-secondary: linear-gradient(135deg, #E11D48, #BE123C);
+  --gradient-accent: linear-gradient(135deg, #CA8A04, #A16207);
+
+  /* Typography */
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --heading-weight: 800;
+  --body-weight: 400;
+  --letter-spacing-heading: -0.03em;
+  --letter-spacing-body: 0em;
+
+  /* Border Radius - medium, natural feel */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-full: 9999px;
+
+  /* Shadows - warm tinted */
+  --shadow-sm: 0 1px 2px 0 rgb(22 101 52 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(22 101 52 / 0.08), 0 2px 4px -2px rgb(22 101 52 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(22 101 52 / 0.1), 0 4px 6px -4px rgb(22 101 52 / 0.05);
+  --shadow-hover: 0 20px 25px -5px rgb(22 101 52 / 0.12), 0 8px 10px -6px rgb(22 101 52 / 0.05);
+
+  /* Effects */
+  --blur: 8px;
+  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   Midnight Theme (dark, moody, neon accents)
+   ============================================ */
+.theme-midnight {
+  /* Core Colors */
+  --color-primary: #8B5CF6;
+  --color-primary-hover: #7C3AED;
+  --color-primary-light: #1E1B4B;
+  --color-secondary: #06B6D4;
+  --color-secondary-hover: #0891B2;
+  --color-accent: #F472B6;
+  --color-accent-hover: #EC4899;
+
+  /* Backgrounds */
+  --color-background: #0F172A;
+  --color-background-alt: #1E293B;
+  --color-surface: #1E293B;
+  --color-surface-hover: #334155;
+  --color-surface-active: #475569;
+
+  /* Text */
+  --color-text: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #0F172A;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Borders */
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-border-focus: #8B5CF6;
+
+  /* Semantic */
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #38BDF8;
+
+  /* Message Bubbles */
+  --color-message-sent: #8B5CF6;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #1E293B;
+  --color-message-received-text: #F1F5F9;
+
+  /* Highlights */
+  --color-highlight-love: #F472B6;
+  --color-highlight-funny: #FBBF24;
+  --color-highlight-important: #A78BFA;
+  --color-highlight-celebration: #22D3EE;
+  --color-highlight-milestone: #4ADE80;
+
+  /* Chat — sharper, glow effects */
+  --chat-bubble-sent-radius: 14px 14px 2px 14px;
+  --chat-bubble-received-radius: 14px 14px 14px 2px;
+  --chat-bubble-shadow: 0 2px 12px rgba(139, 92, 246, 0.2);
+  --chat-input-radius: 18px;
+  --chat-input-height: 44px;
+  --chat-input-max-height: 200px;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  --gradient-secondary: linear-gradient(135deg, #06B6D4, #0891B2);
+  --gradient-accent: linear-gradient(135deg, #F472B6, #EC4899);
+
+  /* Typography */
+  --font-display: 'Cal Sans', 'Inter', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --heading-weight: 600;
+  --body-weight: 400;
+  --letter-spacing-heading: -0.02em;
+  --letter-spacing-body: 0.01em;
+
+  /* Border Radius - sharper */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows - glow-like */
+  --shadow-sm: 0 1px 3px 0 rgb(139 92 246 / 0.1);
+  --shadow-md: 0 4px 8px -1px rgb(139 92 246 / 0.15), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 20px -4px rgb(139 92 246 / 0.2), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+  --shadow-hover: 0 20px 30px -6px rgb(139 92 246 / 0.25), 0 8px 12px -6px rgb(0 0 0 / 0.3);
+
+  /* Effects */
+  --blur: 16px;
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   Minimal Theme (ultra-clean, monochrome)
+   ============================================ */
+.theme-minimal {
+  /* Core Colors */
+  --color-primary: #18181B;
+  --color-primary-hover: #27272A;
+  --color-primary-light: #F4F4F5;
+  --color-secondary: #71717A;
+  --color-secondary-hover: #52525B;
+  --color-accent: #3B82F6;
+  --color-accent-hover: #2563EB;
+
+  /* Backgrounds */
+  --color-background: #FFFFFF;
+  --color-background-alt: #FAFAFA;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #FAFAFA;
+  --color-surface-active: #F4F4F5;
+
+  /* Text */
+  --color-text: #18181B;
+  --color-text-muted: #A1A1AA;
+  --color-text-inverse: #FAFAFA;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Borders */
+  --color-border: #E4E4E7;
+  --color-border-strong: #D4D4D8;
+  --color-border-focus: #18181B;
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-warning: #EAB308;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Message Bubbles */
+  --color-message-sent: #18181B;
+  --color-message-sent-text: #FFFFFF;
+  --color-message-received: #F4F4F5;
+  --color-message-received-text: #18181B;
+
+  /* Highlights */
+  --color-highlight-love: #FECDD3;
+  --color-highlight-funny: #FEF08A;
+  --color-highlight-important: #D4D4D8;
+  --color-highlight-celebration: #E4E4E7;
+  --color-highlight-milestone: #BBF7D0;
+
+  /* Chat — clean, minimal */
+  --chat-bubble-sent-radius: 12px 12px 2px 12px;
+  --chat-bubble-received-radius: 12px 12px 12px 2px;
+  --chat-bubble-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --chat-input-radius: 16px;
+  --chat-input-height: 42px;
+  --chat-input-max-height: 200px;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #18181B, #3F3F46);
+  --gradient-secondary: linear-gradient(135deg, #71717A, #A1A1AA);
+  --gradient-accent: linear-gradient(135deg, #3B82F6, #2563EB);
+
+  /* Typography */
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --heading-weight: 600;
+  --body-weight: 400;
+  --letter-spacing-heading: -0.03em;
+  --letter-spacing-body: 0em;
+
+  /* Border Radius - clean, moderate */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows - very subtle */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.03);
+  --shadow-lg: 0 6px 10px -2px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+  --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.03);
+
+  /* Effects */
+  --blur: 4px;
+  --transition: 100ms ease;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-weight: var(--body-weight);
+  letter-spacing: var(--letter-spacing-body);
+  transition: background-color var(--transition), color var(--transition);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
+
+/* Focus ring utilities */
+*:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Typing indicator animation */
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--color-primary-light);
+  color: var(--color-text);
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@linkup/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "clean": "rm -rf .next .turbo node_modules"
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.0.0",
+    "zustand": "^5.0.0",
+    "axios": "^1.7.0",
+    "socket.io-client": "^4.8.0",
+    "lucide-react": "^0.469.0",
+    "@linkup/types": "workspace:*",
+    "@linkup/validation": "workspace:*",
+    "@linkup/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@linkup/config": "workspace:*",
+    "typescript": "^5.7.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/node": "^22.0.0",
+    "postcss": "^8.5.0"
+  }
+}
