@@ -254,6 +254,123 @@ export const media = pgTable('media', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// ─── Photo Streaks ──────────────────────────────────────────────────────────────
+
+export const photoStreaks = pgTable('photo_streaks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .unique()
+    .references(() => couples.id),
+  currentStreak: integer('current_streak').default(0).notNull(),
+  longestStreak: integer('longest_streak').default(0).notNull(),
+  lastPhotoDate: date('last_photo_date'),
+  lastPhotoId: uuid('last_photo_id'),
+  freezesAvailable: integer('freezes_available').default(2).notNull(),
+  freezeHistory: jsonb('freeze_history')
+    .$type<Array<{ date: string; reason: string }>>()
+    .default([]),
+  canRecover: boolean('can_recover').default(false),
+  recoveryDeadline: timestamp('recovery_deadline'),
+  totalPhotos: integer('total_photos').default(0).notNull(),
+  totalPoints: integer('total_points').default(0).notNull(),
+  status: varchar('status', { length: 20 }).default('active'), // active, broken, frozen
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ─── Streak History ─────────────────────────────────────────────────────────────
+
+export const streakHistory = pgTable('streak_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  streakId: uuid('streak_id')
+    .notNull()
+    .references(() => photoStreaks.id),
+  eventType: varchar('event_type', { length: 30 }).notNull(), // photo_added, streak_broken, streak_frozen, streak_recovered, milestone
+  streakLength: integer('streak_length').notNull(),
+  photoId: uuid('photo_id'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Achievements ───────────────────────────────────────────────────────────────
+
+export const achievements = pgTable('achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 50 }).notNull().unique(),
+  category: varchar('category', { length: 30 }).notNull(), // time_based, communication, creative, memories, streaks, special_events
+  name: varchar('name', { length: 100 }).notNull(),
+  description: varchar('description', { length: 500 }).notNull(),
+  iconUrl: text('icon_url'),
+  requirements: jsonb('requirements')
+    .$type<{ type: string; threshold: number; metadata?: Record<string, unknown> }>()
+    .notNull(),
+  points: integer('points').notNull().default(10),
+  rarity: varchar('rarity', { length: 20 }).default('common'), // common, uncommon, rare, epic, legendary
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── User Achievements ──────────────────────────────────────────────────────────
+
+export const userAchievements = pgTable('user_achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  achievementId: uuid('achievement_id')
+    .notNull()
+    .references(() => achievements.id),
+  unlockedAt: timestamp('unlocked_at').defaultNow(),
+  progress: integer('progress').default(0),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  isShowcased: boolean('is_showcased').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Notifications ──────────────────────────────────────────────────────────────
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  coupleId: uuid('couple_id').references(() => couples.id),
+  type: varchar('type', { length: 50 }).notNull(), // message, streak, achievement, date_reminder, system
+  priority: varchar('priority', { length: 20 }).default('normal'), // low, normal, high, urgent
+  title: varchar('title', { length: 200 }).notNull(),
+  body: text('body'),
+  imageUrl: text('image_url'),
+  iconUrl: text('icon_url'),
+  actionType: varchar('action_type', { length: 50 }), // navigate, open_url, dismiss
+  actionData: jsonb('action_data').$type<Record<string, unknown>>(),
+  status: varchar('status', { length: 20 }).default('unread'), // unread, read, clicked, dismissed
+  sentAt: timestamp('sent_at').defaultNow(),
+  deliveredAt: timestamp('delivered_at'),
+  readAt: timestamp('read_at'),
+  clickedAt: timestamp('clicked_at'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Date Celebrations ──────────────────────────────────────────────────────────
+
+export const dateCelebrations = pgTable('date_celebrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  dateId: uuid('date_id')
+    .notNull()
+    .references(() => importantDates.id),
+  year: integer('year').notNull(),
+  celebratedAt: timestamp('celebrated_at').defaultNow(),
+  activities: jsonb('activities').$type<string[]>().default([]),
+  photos: json('photos').$type<string[]>().default([]),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // ─── Relations ──────────────────────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -273,6 +390,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   sentInvites: many(coupleInvites, { relationName: 'inviter' }),
   uploadedMedia: many(media),
   createdAlbums: many(mediaAlbums),
+  achievements: many(userAchievements),
+  notifications: many(notifications),
 }));
 
 export const couplesRelations = relations(couples, ({ one, many }) => ({
@@ -291,6 +410,13 @@ export const couplesRelations = relations(couples, ({ one, many }) => ({
   importantDates: many(importantDates),
   media: many(media),
   mediaAlbums: many(mediaAlbums),
+  photoStreak: one(photoStreaks, {
+    fields: [couples.id],
+    references: [photoStreaks.coupleId],
+  }),
+  userAchievements: many(userAchievements),
+  notifications: many(notifications),
+  dateCelebrations: many(dateCelebrations),
 }));
 
 export const messagesRelations = relations(messages, ({ one, many }) => ({
@@ -339,7 +465,7 @@ export const coupleInvitesRelations = relations(coupleInvites, ({ one }) => ({
   }),
 }));
 
-export const importantDatesRelations = relations(importantDates, ({ one }) => ({
+export const importantDatesRelations = relations(importantDates, ({ one, many }) => ({
   couple: one(couples, {
     fields: [importantDates.coupleId],
     references: [couples.id],
@@ -348,6 +474,7 @@ export const importantDatesRelations = relations(importantDates, ({ one }) => ({
     fields: [importantDates.createdBy],
     references: [users.id],
   }),
+  celebrations: many(dateCelebrations),
 }));
 
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
@@ -388,5 +515,59 @@ export const mediaRelations = relations(media, ({ one }) => ({
   album: one(mediaAlbums, {
     fields: [media.albumId],
     references: [mediaAlbums.id],
+  }),
+}));
+
+// ─── Phase 4 Relations ─────────────────────────────────────────────────────────
+
+export const photoStreaksRelations = relations(photoStreaks, ({ one, many }) => ({
+  couple: one(couples, {
+    fields: [photoStreaks.coupleId],
+    references: [couples.id],
+  }),
+  history: many(streakHistory),
+}));
+
+export const streakHistoryRelations = relations(streakHistory, ({ one }) => ({
+  streak: one(photoStreaks, {
+    fields: [streakHistory.streakId],
+    references: [photoStreaks.id],
+  }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  userAchievements: many(userAchievements),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+  couple: one(couples, {
+    fields: [userAchievements.coupleId],
+    references: [couples.id],
+  }),
+  achievement: one(achievements, {
+    fields: [userAchievements.achievementId],
+    references: [achievements.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  couple: one(couples, {
+    fields: [notifications.coupleId],
+    references: [couples.id],
+  }),
+}));
+
+export const dateCelebrationsRelations = relations(dateCelebrations, ({ one }) => ({
+  importantDate: one(importantDates, {
+    fields: [dateCelebrations.dateId],
+    references: [importantDates.id],
   }),
 }));

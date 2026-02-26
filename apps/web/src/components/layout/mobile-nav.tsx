@@ -2,13 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { MessageCircle, Image, Pencil, Flame, User } from 'lucide-react';
+import { Home, MessageCircle, Image, Flame, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 const mobileNavItems = [
+  { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/gallery', label: 'Gallery', icon: Image },
-  { href: '/scribble', label: 'Scribble', icon: Pencil },
   { href: '/streaks', label: 'Streaks', icon: Flame },
   { href: '/profile', label: 'Profile', icon: User },
 ] as const;

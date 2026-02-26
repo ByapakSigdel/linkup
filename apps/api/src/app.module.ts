@@ -6,6 +6,9 @@ import { UsersModule } from './modules/users/users.module';
 import { CouplesModule } from './modules/couples/couples.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { MediaModule } from './modules/media/media.module';
+import { StreaksModule } from './modules/streaks/streaks.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DatesModule } from './modules/dates/dates.module';
 import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
@@ -20,6 +23,9 @@ import { GatewayModule } from './gateway/gateway.module';
     CouplesModule,
     MessagesModule,
     MediaModule,
+    StreaksModule,
+    NotificationsModule,
+    DatesModule,
     GatewayModule,
   ],
 })

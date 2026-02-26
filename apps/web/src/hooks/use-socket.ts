@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useNotificationsStore } from '@/stores/notifications-store';
 import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
 
 const SOCKET_URL =
@@ -88,6 +89,32 @@ export function useSocket(): UseSocketReturn {
         useChatStore.getState().addReaction(data.messageId, data.reaction);
       },
     );
+
+    // Real-time notification
+    socket.on('notification:new', (notification: {
+      id: string;
+      userId: string;
+      coupleId: string | null;
+      type: string;
+      priority: string;
+      title: string;
+      body: string | null;
+      imageUrl: string | null;
+      iconUrl: string | null;
+      actionType: string | null;
+      actionData: Record<string, unknown> | null;
+      status: string;
+      sentAt: string;
+      readAt: string | null;
+      createdAt: string;
+    }) => {
+      const store = useNotificationsStore.getState();
+      // Prepend the new notification and bump unread count
+      useNotificationsStore.setState({
+        notifications: [notification, ...store.notifications],
+        unreadCount: store.unreadCount + 1,
+      });
+    });
 
     return () => {
       socket.removeAllListeners();

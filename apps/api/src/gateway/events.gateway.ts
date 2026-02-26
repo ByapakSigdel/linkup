@@ -491,8 +491,9 @@ export class EventsGateway
 
   /**
    * Emit an event to a specific user if they are online.
+   * Public so other services (e.g. NotificationsService) can push real-time events.
    */
-  private emitToUser(userId: string, event: string, data: unknown): void {
+  emitToUser(userId: string, event: string, data: unknown): void {
     const socketId = this.connectedUsers.get(userId);
     if (socketId) {
       this.server.to(socketId).emit(event, data);

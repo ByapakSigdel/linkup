@@ -15,6 +15,13 @@
       "when": 1772100516015,
       "tag": "0001_mixed_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772102024852,
+      "tag": "0002_phase4_social_engagement",
+      "breakpoints": true
     }
   ]
 }

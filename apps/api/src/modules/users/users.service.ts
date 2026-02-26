@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { eq, and, count, ilike, or } from 'drizzle-orm';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
 
@@ -121,5 +121,157 @@ export class UsersService {
         updatedAt: new Date(),
       })
       .where(eq(schema.users.id, userId));
+  }
+
+  async getProfileWithStats(userId: string) {
+    const user = await this.findById(userId);
+
+    let coupleStats = null;
+    let partner = null;
+
+    if (user.coupleId) {
+      const [couple] = await this.db
+        .select()
+        .from(schema.couples)
+        .where(eq(schema.couples.id, user.coupleId))
+        .limit(1);
+
+      if (couple) {
+        const partnerId =
+          couple.partner1Id === userId ? couple.partner2Id : couple.partner1Id;
+
+        if (partnerId) {
+          const [p] = await this.db
+            .select({
+              id: schema.users.id,
+              username: schema.users.username,
+              displayName: schema.users.displayName,
+              avatarUrl: schema.users.avatarUrl,
+              bio: schema.users.bio,
+              isOnline: schema.users.isOnline,
+              lastSeenAt: schema.users.lastSeenAt,
+            })
+            .from(schema.users)
+            .where(eq(schema.users.id, partnerId))
+            .limit(1);
+          partner = p ?? null;
+        }
+
+        // Get streak info
+        const [streak] = await this.db
+          .select()
+          .from(schema.photoStreaks)
+          .where(eq(schema.photoStreaks.coupleId, user.coupleId))
+          .limit(1);
+
+        // Get achievement count
+        const achievementRows = await this.db
+          .select({ cnt: count() })
+          .from(schema.userAchievements)
+          .where(eq(schema.userAchievements.coupleId, user.coupleId));
+        const achievementCount = achievementRows[0]?.cnt ?? 0;
+
+        // Get showcased achievements
+        const showcased = await this.db
+          .select({
+            id: schema.userAchievements.id,
+            achievementId: schema.userAchievements.achievementId,
+            unlockedAt: schema.userAchievements.unlockedAt,
+          })
+          .from(schema.userAchievements)
+          .where(
+            and(
+              eq(schema.userAchievements.coupleId, user.coupleId),
+              eq(schema.userAchievements.isShowcased, true),
+            ),
+          )
+          .limit(4);
+
+        coupleStats = {
+          couple,
+          messageCount: couple.messageCount ?? 0,
+          mediaCount: couple.mediaCount ?? 0,
+          currentStreak: streak?.currentStreak ?? 0,
+          longestStreak: streak?.longestStreak ?? 0,
+          totalPoints: streak?.totalPoints ?? 0,
+          achievementCount,
+          showcasedAchievements: showcased,
+        };
+      }
+    }
+
+    return { user, partner, coupleStats };
+  }
+
+  async getSettings(userId: string) {
+    const [settings] = await this.db
+      .select()
+      .from(schema.userSettings)
+      .where(eq(schema.userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings) {
+      const [newSettings] = await this.db
+        .insert(schema.userSettings)
+        .values({ userId })
+        .returning();
+      return newSettings;
+    }
+
+    return settings;
+  }
+
+  async updateSettings(
+    userId: string,
+    data: {
+      themeId?: string;
+      pushNotifications?: boolean;
+      messageNotifications?: boolean;
+      callNotifications?: boolean;
+      streakReminders?: boolean;
+      anniversaryReminders?: boolean;
+      showOnlineStatus?: boolean;
+      showReadReceipts?: boolean;
+      showTypingIndicator?: boolean;
+      autoDownloadMedia?: boolean;
+      mediaQuality?: string;
+      fontSize?: string;
+      reduceMotion?: boolean;
+      highContrast?: boolean;
+    },
+  ) {
+    // Ensure settings exist
+    await this.getSettings(userId);
+
+    const [updated] = await this.db
+      .update(schema.userSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.userSettings.userId, userId))
+      .returning();
+
+    return updated;
+  }
+
+  async searchUsers(query: string, limit = 10) {
+    if (!query || query.length < 2) return [];
+
+    const pattern = `%${query}%`;
+
+    return this.db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        displayName: schema.users.displayName,
+        avatarUrl: schema.users.avatarUrl,
+        bio: schema.users.bio,
+      })
+      .from(schema.users)
+      .where(
+        or(
+          ilike(schema.users.username, pattern),
+          ilike(schema.users.displayName, pattern),
+        ),
+      )
+      .limit(limit);
   }
 }
