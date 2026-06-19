@@ -54,20 +54,32 @@ interface Stroke {
   points: Point[];
 }
 
-/** Shape emitted/received over the socket for a freehand stroke. */
+/** Shape emitted/received over the socket for a single stroke. Streamed live:
+ * the same `id` is sent repeatedly as the stroke grows, with `done: true` on
+ * the final emit. Carries the full tool description so the partner reproduces
+ * it exactly (highlighter opacity, eraser, shapes — not just a flat pen). */
 export interface RemoteScribbleStroke {
-  points: NormalizedPoint[];
+  id: string;
+  tool: ScribbleTool;
   color: string;
+  /** Normalized line width (fraction of canvas height) so it scales across sizes. */
   width: number;
+  opacity: number;
+  points: NormalizedPoint[];
+  done: boolean;
 }
 
 export interface ScribbleCanvasHandle {
   /** PNG data URL of the current canvas. */
   toDataURL: () => string | null;
-  /** Apply a stroke received from the partner. */
+  /** Apply a stroke (live or final) received from the partner. */
   applyRemoteStroke: (stroke: RemoteScribbleStroke) => void;
   /** Clear the canvas (local only — does not emit). */
   clearLocal: () => void;
+  /** Paint a snapshot (data URL) as the base layer — used for join sync. */
+  loadImage: (url: string) => void;
+  /** Whether anything has been drawn (used to skip empty sync responses). */
+  hasContent: () => boolean;
   /** The canvas background color currently in use. */
   getBackgroundColor: () => string;
 }
@@ -76,11 +88,15 @@ interface ScribbleCanvasProps {
   width?: number;
   height?: number;
   className?: string;
-  /** Fired when the local user finishes a freehand stroke, with normalized
-   * points so the partner can render it on a differently-sized canvas. */
+  /** Fired continuously as the local user draws (live) and once more when the
+   * stroke is finished (`done: true`), with normalized geometry. */
   onLocalStroke?: (stroke: RemoteScribbleStroke) => void;
   /** Fired when the local user clears the canvas. */
   onClear?: () => void;
+  /** Fired as the local pointer moves (normalized 0..1); {x:-1,y:-1} = hidden. */
+  onCursorMove?: (point: NormalizedPoint) => void;
+  /** Partner's live cursor (normalized 0..1) or null to hide. */
+  partnerCursor?: NormalizedPoint | null;
 }
 
 const COLORS = [
@@ -104,11 +120,24 @@ const TOOL_CONFIG: Record<
   arrow: { opacity: 1, compositeOp: 'source-over' },
 };
 
+const FREEHAND: ScribbleTool[] = ['pen', 'marker', 'highlighter', 'eraser'];
+
+/** Min ms between live stroke broadcasts while drawing. */
+const STREAM_INTERVAL = 45;
+
 export const ScribbleCanvas = forwardRef<
   ScribbleCanvasHandle,
   ScribbleCanvasProps
 >(function ScribbleCanvas(
-  { width = 1280, height = 800, className, onLocalStroke, onClear },
+  {
+    width = 1280,
+    height = 800,
+    className,
+    onLocalStroke,
+    onClear,
+    onCursorMove,
+    partnerCursor,
+  },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -123,9 +152,25 @@ export const ScribbleCanvas = forwardRef<
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
   const isDrawingRef = useRef(false);
 
-  /** Remote strokes are painted directly onto the canvas (they live outside the
-   * local undo history so a local undo never wipes the partner's work). */
+  /** Latest committed local strokes, mirrored for use inside imperative/redraw
+   * callbacks that must not capture stale state. */
+  const strokesRef = useRef<Stroke[]>([]);
+  useEffect(() => {
+    strokesRef.current = strokes;
+  }, [strokes]);
+
+  /** Partner strokes that are finished — they live outside the local undo
+   * history so a local undo never wipes the partner's work. */
   const remoteStrokesRef = useRef<Stroke[]>([]);
+  /** Partner strokes still in progress, keyed by stroke id (live preview). */
+  const liveRemoteRef = useRef<Map<string, Stroke>>(new Map());
+
+  /** A snapshot painted beneath everything — used for join sync. */
+  const baseImageElRef = useRef<HTMLImageElement | null>(null);
+
+  /** Throttling + identity for the local stroke being streamed. */
+  const localStrokeIdRef = useRef<string | null>(null);
+  const lastStreamRef = useRef(0);
 
   const isShapeTool = ['line', 'circle', 'rectangle', 'arrow'].includes(tool);
 
@@ -157,7 +202,7 @@ export const ScribbleCanvas = forwardRef<
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (['pen', 'marker', 'highlighter', 'eraser'].includes(stroke.tool)) {
+    if (FREEHAND.includes(stroke.tool)) {
       if (stroke.points.length < 2) {
         // Single tap — draw a dot.
         const p = stroke.points[0];
@@ -227,12 +272,21 @@ export const ScribbleCanvas = forwardRef<
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, width, height);
 
-      // Partner strokes first, then ours, then the in-progress stroke.
+      // Base snapshot (join sync) under everything.
+      const baseEl = baseImageElRef.current;
+      if (baseEl && baseEl.complete && baseEl.naturalWidth > 0) {
+        ctx.drawImage(baseEl, 0, 0, width, height);
+      }
+
+      // Partner work (finished, then in-progress), then ours, then active.
       for (const s of remoteStrokesRef.current) paintStroke(ctx, s);
+      for (const s of liveRemoteRef.current.values()) paintStroke(ctx, s);
       for (const s of strokeList) paintStroke(ctx, s);
       if (activeStroke) paintStroke(ctx, activeStroke);
 
@@ -241,6 +295,11 @@ export const ScribbleCanvas = forwardRef<
     },
     [width, height, backgroundColor, paintStroke],
   );
+
+  /** Repaint using the latest committed strokes (safe from inside refs/handles). */
+  const redrawAll = useCallback(() => {
+    redraw(strokesRef.current);
+  }, [redraw]);
 
   useEffect(() => {
     redraw(strokes);
@@ -254,30 +313,62 @@ export const ScribbleCanvas = forwardRef<
       toDataURL: () => canvasRef.current?.toDataURL('image/png') ?? null,
       applyRemoteStroke: (remote) => {
         const stroke: Stroke = {
-          id: `remote-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          tool: 'pen',
+          id: remote.id,
+          tool: remote.tool,
           color: remote.color,
-          thickness: remote.width,
-          opacity: 1,
+          thickness: Math.max(remote.width * height, 0.5),
+          opacity: remote.opacity,
           points: remote.points.map((p) => ({ x: p.x * width, y: p.y * height })),
         };
-        remoteStrokesRef.current.push(stroke);
-        // Paint just the new stroke without a full clear (preserves everything).
-        const ctx = canvasRef.current?.getContext('2d');
-        if (ctx) {
-          paintStroke(ctx, stroke);
-          ctx.globalAlpha = 1;
-          ctx.globalCompositeOperation = 'source-over';
+        if (remote.done) {
+          liveRemoteRef.current.delete(remote.id);
+          remoteStrokesRef.current.push(stroke);
+        } else {
+          liveRemoteRef.current.set(remote.id, stroke);
         }
+        redrawAll();
       },
       clearLocal: () => {
         remoteStrokesRef.current = [];
+        liveRemoteRef.current.clear();
+        baseImageElRef.current = null;
         setStrokes([]);
         setUndoneStrokes([]);
       },
+      loadImage: (url) => {
+        const img = new Image();
+        img.onload = () => {
+          baseImageElRef.current = img;
+          redrawAll();
+        };
+        img.src = url;
+      },
+      hasContent: () =>
+        strokesRef.current.length > 0 ||
+        remoteStrokesRef.current.length > 0 ||
+        liveRemoteRef.current.size > 0 ||
+        baseImageElRef.current !== null,
       getBackgroundColor: () => backgroundColor,
     }),
-    [width, height, paintStroke, backgroundColor],
+    [width, height, backgroundColor, redrawAll],
+  );
+
+  // ─── Live broadcast helper ───────────────────────────────────────────────────
+
+  const broadcast = useCallback(
+    (stroke: Stroke, done: boolean) => {
+      if (!onLocalStroke) return;
+      onLocalStroke({
+        id: stroke.id,
+        tool: stroke.tool,
+        color: stroke.tool === 'eraser' ? backgroundColor : stroke.color,
+        width: stroke.thickness / height,
+        opacity: stroke.opacity,
+        points: stroke.points.map((p) => ({ x: p.x / width, y: p.y / height })),
+        done,
+      });
+    },
+    [onLocalStroke, width, height, backgroundColor],
   );
 
   // ─── Pointer handlers ──────────────────────────────────────────────────────
@@ -288,8 +379,11 @@ export const ScribbleCanvas = forwardRef<
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       const point = getCanvasPoint(e);
       const config = TOOL_CONFIG[tool]!;
+      const id = `stroke-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStrokeIdRef.current = id;
+      lastStreamRef.current = 0;
       setCurrentStroke({
-        id: `stroke-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id,
         tool,
         color: tool === 'eraser' ? '#000000' : color,
         thickness: tool === 'highlighter' ? thickness * 3 : thickness,
@@ -303,19 +397,28 @@ export const ScribbleCanvas = forwardRef<
 
   const draw = useCallback(
     (e: React.PointerEvent) => {
+      const point = getCanvasPoint(e);
+      onCursorMove?.({ x: point.x / width, y: point.y / height });
+
       if (!isDrawingRef.current) return;
       e.preventDefault();
-      const point = getCanvasPoint(e);
       setCurrentStroke((prev) => {
         if (!prev) return prev;
         const updated: Stroke = isShapeTool
           ? { ...prev, points: [prev.points[0]!, point] }
           : { ...prev, points: [...prev.points, point] };
         redraw(strokes, updated);
+
+        // Stream the in-progress stroke to the partner, throttled.
+        const now = Date.now();
+        if (now - lastStreamRef.current >= STREAM_INTERVAL) {
+          lastStreamRef.current = now;
+          broadcast(updated, false);
+        }
         return updated;
       });
     },
-    [getCanvasPoint, isShapeTool, strokes, redraw],
+    [getCanvasPoint, onCursorMove, width, height, isShapeTool, strokes, redraw, broadcast],
   );
 
   const stopDrawing = useCallback(() => {
@@ -325,22 +428,18 @@ export const ScribbleCanvas = forwardRef<
       if (prev && prev.points.length >= 1) {
         setStrokes((s) => [...s, prev]);
         setUndoneStrokes([]);
-        // Broadcast freehand strokes to the partner (normalized 0..1).
-        if (
-          onLocalStroke &&
-          ['pen', 'marker', 'highlighter', 'eraser'].includes(prev.tool) &&
-          prev.points.length >= 1
-        ) {
-          onLocalStroke({
-            points: prev.points.map((p) => ({ x: p.x / width, y: p.y / height })),
-            color: prev.tool === 'eraser' ? backgroundColor : prev.color,
-            width: prev.thickness,
-          });
-        }
+        // Final broadcast — commits the stroke on the partner's canvas.
+        broadcast(prev, true);
       }
+      localStrokeIdRef.current = null;
       return null;
     });
-  }, [onLocalStroke, width, height, backgroundColor]);
+  }, [broadcast]);
+
+  const handlePointerLeave = useCallback(() => {
+    stopDrawing();
+    onCursorMove?.({ x: -1, y: -1 });
+  }, [stopDrawing, onCursorMove]);
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
@@ -364,6 +463,8 @@ export const ScribbleCanvas = forwardRef<
 
   const clear = useCallback(() => {
     remoteStrokesRef.current = [];
+    liveRemoteRef.current.clear();
+    baseImageElRef.current = null;
     setStrokes([]);
     setUndoneStrokes([]);
     onClear?.();
@@ -513,8 +614,24 @@ export const ScribbleCanvas = forwardRef<
           onPointerMove={draw}
           onPointerUp={stopDrawing}
           onPointerCancel={stopDrawing}
-          onPointerLeave={stopDrawing}
+          onPointerLeave={handlePointerLeave}
         />
+
+        {/* Partner's live cursor */}
+        {partnerCursor && partnerCursor.x >= 0 && partnerCursor.y >= 0 && (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 transition-[left,top] duration-75 ease-out"
+            style={{
+              left: `${partnerCursor.x * 100}%`,
+              top: `${partnerCursor.y * 100}%`,
+            }}
+          >
+            <div className="h-3 w-3 rounded-full bg-accent shadow-[0_0_0_3px] shadow-accent/30" />
+            <span className="ml-3 whitespace-nowrap rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-text-on-primary">
+              Partner
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

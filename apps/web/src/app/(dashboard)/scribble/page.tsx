@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Pencil, Send, Save, ImageIcon, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
-import { getSocket } from '@/lib/socket';
+import { connectSocket, getSocket } from '@/lib/socket';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { Button, Card, Spinner, Badge } from '@/components/ui';
@@ -15,6 +15,7 @@ import {
   ScribbleCanvas,
   type ScribbleCanvasHandle,
   type RemoteScribbleStroke,
+  type NormalizedPoint,
 } from '@/components/creative';
 
 interface ScribbleItem {
@@ -26,6 +27,7 @@ interface ScribbleItem {
 export default function ScribblePage() {
   const router = useRouter();
   const couple = useAuthStore((s) => s.couple);
+  const token = useAuthStore((s) => s.tokens?.accessToken);
   const pushToast = useToastStore((s) => s.push);
 
   const canvasRef = useRef<ScribbleCanvasHandle>(null);
@@ -35,7 +37,9 @@ export default function ScribblePage() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [partnerDrawing, setPartnerDrawing] = useState(false);
+  const [partnerCursor, setPartnerCursor] = useState<NormalizedPoint | null>(null);
   const partnerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cursorThrottle = useRef(0);
 
   // ─── Gallery ────────────────────────────────────────────────────────────────
 
@@ -59,9 +63,9 @@ export default function ScribblePage() {
   // ─── Realtime collaboration ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!couple?.isPaired) return;
-    const socket = getSocket();
-    if (!socket) return;
+    if (!couple?.isPaired || !token) return;
+    // Ensure a live socket even if we landed here before the provider connected.
+    const socket = getSocket() ?? connectSocket(token);
 
     const flagPartnerDrawing = () => {
       setPartnerDrawing(true);
@@ -71,9 +75,13 @@ export default function ScribblePage() {
 
     const onReceived = (payload: RemoteScribbleStroke & { userId?: string }) => {
       canvasRef.current?.applyRemoteStroke({
-        points: payload.points,
+        id: payload.id,
+        tool: payload.tool,
         color: payload.color,
         width: payload.width,
+        opacity: payload.opacity,
+        points: payload.points,
+        done: payload.done,
       });
       flagPartnerDrawing();
     };
@@ -82,15 +90,41 @@ export default function ScribblePage() {
       canvasRef.current?.clearLocal();
     };
 
+    const onCursor = (payload: { x: number; y: number }) => {
+      setPartnerCursor({ x: payload.x, y: payload.y });
+    };
+
+    // A partner just opened the canvas and wants our current state — send a
+    // snapshot, but only if we actually have something to share.
+    const onSyncRequest = () => {
+      if (!canvasRef.current?.hasContent()) return;
+      const image = canvasRef.current?.toDataURL();
+      if (image) socket.emit('scribble:sync', { image });
+    };
+
+    // We received the partner's snapshot — paint it as our base layer.
+    const onSync = (payload: { image?: string }) => {
+      if (payload.image) canvasRef.current?.loadImage(payload.image);
+    };
+
     socket.on('scribble:received', onReceived);
     socket.on('scribble:cleared', onCleared);
+    socket.on('scribble:cursor', onCursor);
+    socket.on('scribble:sync:request', onSyncRequest);
+    socket.on('scribble:sync', onSync);
+
+    // Ask the partner (if they're already on the canvas) for the current drawing.
+    socket.emit('scribble:sync:request');
 
     return () => {
       socket.off('scribble:received', onReceived);
       socket.off('scribble:cleared', onCleared);
+      socket.off('scribble:cursor', onCursor);
+      socket.off('scribble:sync:request', onSyncRequest);
+      socket.off('scribble:sync', onSync);
       if (partnerTimer.current) clearTimeout(partnerTimer.current);
     };
-  }, [couple?.isPaired]);
+  }, [couple?.isPaired, token]);
 
   const handleLocalStroke = useCallback((stroke: RemoteScribbleStroke) => {
     getSocket()?.emit('scribble:stroke', stroke);
@@ -98,6 +132,15 @@ export default function ScribblePage() {
 
   const handleClear = useCallback(() => {
     getSocket()?.emit('scribble:clear');
+  }, []);
+
+  const handleCursorMove = useCallback((point: NormalizedPoint) => {
+    // Throttle cursor updates to ~30/sec; always send the "hide" sentinel.
+    const now = Date.now();
+    const hiding = point.x < 0;
+    if (!hiding && now - cursorThrottle.current < 33) return;
+    cursorThrottle.current = now;
+    getSocket()?.emit('scribble:cursor', point);
   }, []);
 
   // ─── Save / Send ─────────────────────────────────────────────────────────────
@@ -205,6 +248,8 @@ export default function ScribblePage() {
         height={480}
         onLocalStroke={handleLocalStroke}
         onClear={handleClear}
+        onCursorMove={handleCursorMove}
+        partnerCursor={partnerCursor}
       />
 
       {/* Gallery */}

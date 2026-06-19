@@ -493,6 +493,37 @@ export class EventsGateway
     await this.relayToPartner(client.userId, 'scribble:cleared', { userId: client.userId });
   }
 
+  @SubscribeMessage('scribble:cursor')
+  async handleScribbleCursor(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'scribble:cursor', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  /** A late-joiner asks the partner for the current canvas state. */
+  @SubscribeMessage('scribble:sync:request')
+  async handleScribbleSyncRequest(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'scribble:sync:request', {
+      userId: client.userId,
+    });
+  }
+
+  /** The partner answers a sync request with a snapshot of their canvas. */
+  @SubscribeMessage('scribble:sync')
+  async handleScribbleSync(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'scribble:sync', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
   // ─── Collaborative Painting ──────────────────────────────────────────────────
 
   @SubscribeMessage('painting:stroke')
