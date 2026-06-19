@@ -5,6 +5,11 @@ import {
   Instrument_Serif,
   Space_Mono,
   Caveat,
+  Archivo_Black,
+  Space_Grotesk,
+  Inter,
+  Press_Start_2P,
+  VT323,
 } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme/theme-provider';
 import '@/styles/globals.css';
@@ -48,6 +53,44 @@ const caveat = Caveat({
   variable: '--font-caveat',
 });
 
+// Heavy grotesque display — Neo-Brutalism
+const archivoBlack = Archivo_Black({
+  subsets: ['latin'],
+  weight: '400',
+  display: 'swap',
+  variable: '--font-archivo',
+});
+
+// Geometric grotesque body — Neo-Brutalism
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-grotesk',
+});
+
+// Neutral grotesque — Minimalism
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+// Pixel display — Retro 8-bit
+const pressStart = Press_Start_2P({
+  subsets: ['latin'],
+  weight: '400',
+  display: 'swap',
+  variable: '--font-pixel',
+});
+
+// Readable pixel body — Retro 8-bit
+const vt323 = VT323({
+  subsets: ['latin'],
+  weight: '400',
+  display: 'swap',
+  variable: '--font-vt323',
+});
+
 export const metadata: Metadata = {
   title: 'linkup — your constellation of two',
   description:
@@ -68,6 +111,11 @@ export default function RootLayout({
     instrument.variable,
     spaceMono.variable,
     caveat.variable,
+    archivoBlack.variable,
+    spaceGrotesk.variable,
+    inter.variable,
+    pressStart.variable,
+    vt323.variable,
   ].join(' ');
 
   // Applies the persisted theme class before first paint to avoid a flash and

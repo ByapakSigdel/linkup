@@ -6,7 +6,7 @@
    shadow/glow + background texture + signature decoration. Components stay
    neutral and carry data-lk hooks; the theme owns the personality.
    Themes: Celestial Cartography (default) · Midnight Love-Letter ·
-   Daybreak (light).
+   Daybreak (light) · Neo-Brutalism · Minimal · Retro Arcade (8-bit).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
@@ -158,7 +158,6 @@
   --color-text-inverse: #141009;
   --color-text-on-primary: #2a1c0c;
 
-  --color-border: #petite;
   --color-border: #382c1d;
   --color-border-strong: #4d3d29;
   --color-border-focus: #e0a56a;
@@ -280,6 +279,207 @@
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
+   Neo-Brutalism — loud and raw. Off-white paper, pure-black ink, thick borders,
+   hard offset shadows (no blur), clashing primaries, heavy grotesque type.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-brutalist {
+  --color-primary: #2b4cff;
+  --color-primary-hover: #1a39e6;
+  --color-primary-light: #dfe4ff;
+  --color-secondary: #ff4d8d;
+  --color-secondary-hover: #ff2d77;
+  --color-accent: #ffd400;
+  --color-accent-hover: #f2c800;
+
+  --color-background: #f4f2e7;
+  --color-background-alt: #eceadb;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f2f0e3;
+  --color-surface-active: #e8e5d3;
+
+  --color-text: #0a0a0a;
+  --color-text-muted: #57534a;
+  --color-text-inverse: #ffffff;
+  --color-text-on-primary: #ffffff;
+
+  --color-border: #0a0a0a;
+  --color-border-strong: #000000;
+  --color-border-focus: #2b4cff;
+
+  --color-success: #00a63e;
+  --color-warning: #f59e0b;
+  --color-error: #ff2d2d;
+  --color-info: #2b4cff;
+
+  --color-message-sent: #2b4cff;
+  --color-message-sent-text: #ffffff;
+  --color-message-received: #ffffff;
+  --color-message-received-text: #0a0a0a;
+
+  --color-highlight-love: #ff4d8d;
+  --color-highlight-funny: #ffd400;
+  --color-highlight-important: #ff2d2d;
+  --color-highlight-celebration: #2b4cff;
+  --color-highlight-milestone: #00a63e;
+
+  --font-display: var(--font-archivo), 'Arial Black', sans-serif;
+  --font-body: var(--font-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-archivo), sans-serif;
+  --heading-weight: 400;
+  --heading-tracking: -0.02em;
+  --body-tracking: 0;
+
+  --lk-card-radius: 2px;
+  --lk-btn-radius: 2px;
+  --lk-input-radius: 2px;
+  --lk-card-shadow: 6px 6px 0 0 #0a0a0a;
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 2.5px solid #0a0a0a;
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 0px;
+  --lk-glow: none;
+  --lk-accent-line: linear-gradient(90deg, #0a0a0a, #0a0a0a);
+
+  --chat-bubble-sent-radius: 2px;
+  --chat-bubble-received-radius: 2px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Minimal — pure white, ink black, a single quiet grey. Hairline borders, no
+   shadows, generous calm, neutral grotesque (Inter). Restraint as the statement.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-minimal {
+  --color-primary: #141414;
+  --color-primary-hover: #000000;
+  --color-primary-light: #f0f0f0;
+  --color-secondary: #6b6b6b;
+  --color-secondary-hover: #4d4d4d;
+  --color-accent: #9a9a9a;
+  --color-accent-hover: #7d7d7d;
+
+  --color-background: #ffffff;
+  --color-background-alt: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f5f5f5;
+  --color-surface-active: #ededed;
+
+  --color-text: #161616;
+  --color-text-muted: #8e8e8e;
+  --color-text-inverse: #ffffff;
+  --color-text-on-primary: #ffffff;
+
+  --color-border: #e8e8e8;
+  --color-border-strong: #d2d2d2;
+  --color-border-focus: #161616;
+
+  --color-success: #3f9c6d;
+  --color-warning: #b8902f;
+  --color-error: #c0504d;
+  --color-info: #5a6b7a;
+
+  --color-message-sent: #161616;
+  --color-message-sent-text: #ffffff;
+  --color-message-received: #f2f2f2;
+  --color-message-received-text: #161616;
+
+  --color-highlight-love: #6b6b6b;
+  --color-highlight-funny: #8e8e8e;
+  --color-highlight-important: #c0504d;
+  --color-highlight-celebration: #161616;
+  --color-highlight-milestone: #3f9c6d;
+
+  --font-display: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-inter), sans-serif;
+  --heading-weight: 600;
+  --heading-tracking: -0.025em;
+  --body-tracking: -0.005em;
+
+  --lk-card-radius: 8px;
+  --lk-btn-radius: 8px;
+  --lk-input-radius: 8px;
+  --lk-card-shadow: none;
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 1px solid var(--color-border);
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 0px;
+  --lk-glow: none;
+  --lk-accent-line: linear-gradient(90deg, transparent, var(--color-border-strong), transparent);
+
+  --chat-bubble-sent-radius: 14px;
+  --chat-bubble-received-radius: 14px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Retro Arcade — 8-bit CRT. Deep arcade navy, neon coin-op palette, pixel type
+   (Press Start 2P / VT323), zero radius, hard pixel shadows, scanlines.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-arcade {
+  --color-primary: #ff5277;
+  --color-primary-hover: #ff7593;
+  --color-primary-light: #2a0f1c;
+  --color-secondary: #4de1ff;
+  --color-secondary-hover: #74e9ff;
+  --color-accent: #ffe14d;
+  --color-accent-hover: #ffe974;
+
+  --color-background: #0b0b1a;
+  --color-background-alt: #10102a;
+  --color-surface: #1a1a36;
+  --color-surface-hover: #24244a;
+  --color-surface-active: #2e2e5c;
+
+  --color-text: #f4f4fb;
+  --color-text-muted: #9a9ad0;
+  --color-text-inverse: #0b0b1a;
+  --color-text-on-primary: #1a0010;
+
+  --color-border: #3a3a72;
+  --color-border-strong: #5454a6;
+  --color-border-focus: #ffe14d;
+
+  --color-success: #4dff88;
+  --color-warning: #ffe14d;
+  --color-error: #ff5277;
+  --color-info: #4de1ff;
+
+  --color-message-sent: #ff5277;
+  --color-message-sent-text: #1a0010;
+  --color-message-received: #1a1a36;
+  --color-message-received-text: #f4f4fb;
+
+  --color-highlight-love: #ff5277;
+  --color-highlight-funny: #ffe14d;
+  --color-highlight-important: #ff3b5c;
+  --color-highlight-celebration: #4de1ff;
+  --color-highlight-milestone: #4dff88;
+
+  --font-display: var(--font-pixel), 'Courier New', monospace;
+  --font-body: var(--font-vt323), 'Courier New', monospace;
+  --font-mono: var(--font-vt323), ui-monospace, monospace;
+  --font-script: var(--font-vt323), monospace;
+  --heading-weight: 400;
+  --heading-tracking: 0.02em;
+  --body-tracking: 0.04em;
+
+  --lk-card-radius: 0px;
+  --lk-btn-radius: 0px;
+  --lk-input-radius: 0px;
+  --lk-card-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.6);
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 2px solid var(--color-border-strong);
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 0px;
+  --lk-glow: 0 0 12px -2px color-mix(in srgb, var(--color-primary) 55%, transparent);
+  --lk-accent-line: repeating-linear-gradient(90deg, var(--color-primary) 0 8px, transparent 8px 16px);
+
+  --chat-bubble-sent-radius: 0px;
+  --chat-bubble-received-radius: 0px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
    Base
    ─────────────────────────────────────────────────────────────────────────── */
 body {
@@ -388,6 +588,42 @@ body::after {
   display: none;
 }
 
+/* Neo-Brutalism — bold engineering grid */
+.theme-brutalist body::before {
+  background-image:
+    linear-gradient(to right, rgba(10, 10, 10, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(10, 10, 10, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.theme-brutalist body::after {
+  display: none;
+}
+
+/* Minimal — no texture; the whitespace is the texture */
+.theme-minimal body::before {
+  display: none;
+}
+.theme-minimal body::after {
+  display: none;
+}
+
+/* Retro Arcade — CRT scanlines + soft neon bloom at the edges */
+.theme-arcade body::before {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.28) 0px,
+    rgba(0, 0, 0, 0.28) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
+}
+.theme-arcade body::after {
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, color-mix(in srgb, var(--color-secondary) 8%, transparent), transparent 55%);
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    Themed component skins (driven by data-lk hooks on the primitives)
    ─────────────────────────────────────────────────────────────────────────── */
@@ -434,6 +670,46 @@ body::after {
 /* Buttons (radius comes from the button's own utility class) */
 .theme-loveletter [data-lk='button'] {
   letter-spacing: 0.02em;
+}
+
+/* Neo-Brutalism — chunky bordered buttons with a hard shadow that presses in */
+.theme-brutalist [data-lk='button'] {
+  border: 2.5px solid #0a0a0a;
+  box-shadow: 4px 4px 0 0 #0a0a0a;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  transition: transform 0.06s ease, box-shadow 0.06s ease;
+}
+.theme-brutalist [data-lk='button']:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 0 #0a0a0a;
+}
+.theme-brutalist [data-lk='button']:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 #0a0a0a;
+}
+
+/* Minimal — flat, quiet buttons; cards are pure hairline (shadow already none) */
+.theme-minimal [data-lk='button'] {
+  box-shadow: none;
+  font-weight: 500;
+}
+
+/* Retro Arcade — pixel buttons with a hard step-shadow; primary gets a neon glow */
+.theme-arcade [data-lk='button'] {
+  border: 2px solid var(--color-border-strong);
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: transform 0.06s steps(2), box-shadow 0.06s steps(2);
+}
+.theme-arcade [data-lk='button']:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 rgba(0, 0, 0, 0.6);
+}
+.theme-arcade [data-lk='button'][data-variant='primary'] {
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.6), var(--lk-glow);
 }
 
 /* A reusable hairline "bond line" divider (constellation motif) */

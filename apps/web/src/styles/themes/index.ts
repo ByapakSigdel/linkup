@@ -96,6 +96,89 @@ export const themes: Record<string, ThemeMetadata> = {
       emptyStateStyle: 'minimal',
     },
   },
+
+  brutalist: {
+    id: 'brutalist',
+    name: 'Neo-Brutalism',
+    tagline: 'Loud, raw, unmissable',
+    description:
+      'Off-white paper, pure-black ink, thick borders and hard offset shadows. Clashing primaries and heavy grotesque type. Zero apologies.',
+    swatch: ['#f4f2e7', '#ffffff', '#2b4cff', '#ff4d8d', '#ffd400'],
+    previewFont: "var(--font-archivo), 'Arial Black', sans-serif",
+    variants: {
+      button: 'square',
+      card: 'bordered',
+      input: 'outlined',
+      nav: 'sidebar',
+      messageBubble: 'sharp',
+      avatar: 'squircle',
+      divider: 'line',
+      container: 'textured',
+    },
+    decorations: {
+      backgroundPattern: 'grid',
+      hasSectionDividers: true,
+      hasPageOrnaments: false,
+      animationIntensity: 'subtle',
+      scrollbarStyle: 'default',
+      emptyStateStyle: 'minimal',
+    },
+  },
+
+  minimal: {
+    id: 'minimal',
+    name: 'Minimal',
+    tagline: "Everything you need, nothing you don't",
+    description:
+      'Pure white, ink black, one quiet grey. Hairline borders, no shadows, generous calm. Restraint as the whole statement.',
+    swatch: ['#ffffff', '#fafafa', '#161616', '#6b6b6b', '#9a9a9a'],
+    previewFont: 'var(--font-inter), system-ui, sans-serif',
+    variants: {
+      button: 'rounded',
+      card: 'flat',
+      input: 'underline',
+      nav: 'sidebar',
+      messageBubble: 'rounded',
+      avatar: 'circle',
+      divider: 'line',
+      container: 'clean',
+    },
+    decorations: {
+      hasSectionDividers: false,
+      hasPageOrnaments: false,
+      animationIntensity: 'subtle',
+      scrollbarStyle: 'thin',
+      emptyStateStyle: 'minimal',
+    },
+  },
+
+  arcade: {
+    id: 'arcade',
+    name: 'Retro Arcade',
+    tagline: 'Insert coin to continue',
+    description:
+      'An 8-bit CRT: deep arcade navy, neon coin-op colours, pixel type, zero radius, hard pixel shadows and scanlines. Press start.',
+    swatch: ['#0b0b1a', '#1a1a36', '#ff5277', '#4de1ff', '#ffe14d'],
+    previewFont: "var(--font-pixel), 'Courier New', monospace",
+    variants: {
+      button: 'square',
+      card: 'elevated',
+      input: 'outlined',
+      nav: 'sidebar',
+      messageBubble: 'sharp',
+      avatar: 'squircle',
+      divider: 'dots',
+      container: 'pattern',
+    },
+    decorations: {
+      backgroundPattern: 'scanlines',
+      hasSectionDividers: true,
+      hasPageOrnaments: true,
+      animationIntensity: 'playful',
+      scrollbarStyle: 'default',
+      emptyStateStyle: 'illustrated',
+    },
+  },
 };
 
 export const themeIds = Object.keys(themes);
