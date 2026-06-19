@@ -24,9 +24,9 @@ export function AuthFormWrapper({
 }: AuthFormWrapperProps) {
   return (
     <div className={cn('lk-anim-rise w-full max-w-md', className)}>
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-surface/70 p-8 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.85),0_0_70px_-34px_rgba(196,168,224,0.4)] backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-surface/80 p-8 shadow-[0_28px_64px_-46px_rgba(0,0,0,0.7),0_0_46px_-40px_rgba(196,168,224,0.25)] backdrop-blur-xl">
         {/* Hairline starlight accent across the top edge. */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
         <div className="mb-7">
           <div className="mb-6 flex items-center gap-2.5">

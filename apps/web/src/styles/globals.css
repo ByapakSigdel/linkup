@@ -637,22 +637,25 @@ body::after {
    inside (including themed UI primitives that reference these tokens). */
 .lk-celestial-scope {
   --color-primary: #c4a8e0;
-  --color-primary-hover: #b392d6;
-  --color-primary-light: #1b1726;
+  --color-primary-hover: #d3bce8;
+  --color-primary-light: #211d2e;
   --color-secondary: #d4a574;
-  --color-secondary-hover: #c2925f;
-  --color-accent: #a8bfd4;
-  --color-accent-hover: #93acc6;
-  --color-background: #080b12;
-  --color-background-alt: #0a0e16;
-  --color-surface: #0d1018;
-  --color-surface-hover: #141a26;
-  --color-surface-active: #1a2130;
+  --color-secondary-hover: #e0b78c;
+  --color-accent: #aec5d8;
+  --color-accent-hover: #c4d6e4;
+  /* Softer dark: lifted off pure black to a calm charcoal-navy so bright
+     content no longer haloes against it (much easier on the eyes). */
+  --color-background: #14171f;
+  --color-background-alt: #171b25;
+  --color-surface: #1b202b;
+  --color-surface-hover: #232936;
+  --color-surface-active: #2a3140;
   --color-text: #e8e4dc;
-  --color-text-muted: #8a93a8;
-  --color-text-on-primary: #0b0b14;
-  --color-border: #1c2230;
-  --color-border-strong: #2a3242;
+  /* Lifted muted tone for comfortable readability on the new background. */
+  --color-text-muted: #aab3c4;
+  --color-text-on-primary: #161019;
+  --color-border: #2a313f;
+  --color-border-strong: #39414f;
   --color-border-focus: #c4a8e0;
   --color-success: #7fd1ae;
   --color-warning: #d4a574;
@@ -704,7 +707,15 @@ body::after {
 }
 .lk-anim-rise { animation: lkRise 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .lk-anim-fade { animation: lkFadeIn 1.4s ease both; }
-.lk-drift { animation: lkDrift 9s ease-in-out infinite; }
+.lk-drift { animation: lkDrift 16s ease-in-out infinite; }
+
+/* Gentle star glimmer — opacity-only, slow, and bounded to each star's own
+   range so the field breathes instead of flickering. */
+@keyframes lkGlimmer {
+  0%, 100% { opacity: var(--lk-o, 0.4); }
+  50% { opacity: var(--lk-o-hi, 0.6); }
+}
+.lk-glimmer { animation: lkGlimmer 7s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

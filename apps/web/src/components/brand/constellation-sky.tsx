@@ -16,6 +16,8 @@ interface Star {
   y: number;
   r: number;
   o: number;
+  oHi: number;
+  tw: boolean;
   dur: number;
   delay: number;
 }
@@ -36,20 +38,24 @@ function buildStars(count: number, seed: number): Star[] {
   const stars: Star[] = [];
   for (let i = 0; i < count; i++) {
     const r = rand();
+    // Dim, mostly faint dust — easy on the eyes against the soft-dark sky.
+    const o = +(0.12 + r * 0.34).toFixed(2);
     stars.push({
       x: +(rand() * 100).toFixed(2),
       y: +(rand() * 100).toFixed(2),
-      // Mostly faint dust, a few brighter stars.
-      r: +(0.4 + r * r * 1.9).toFixed(2),
-      o: +(0.25 + rand() * 0.6).toFixed(2),
-      dur: +(2.6 + rand() * 4).toFixed(2),
-      delay: +(rand() * 5).toFixed(2),
+      r: +(0.4 + r * r * 1.3).toFixed(2),
+      o,
+      oHi: +Math.min(o + 0.18, 0.62).toFixed(2),
+      // Only about a third gently breathe; the rest hold steady (less motion).
+      tw: rand() < 0.34,
+      dur: +(6 + rand() * 4).toFixed(2),
+      delay: +(rand() * 6).toFixed(2),
     });
   }
   return stars;
 }
 
-const STARS = buildStars(90, 0x5eed1e);
+const STARS = buildStars(58, 0x5eed1e);
 
 /** RA/Dec-style coordinate lines (percentages of the viewport). */
 const V_LINES = [16, 33, 50, 67, 84];
@@ -60,15 +66,15 @@ export function ConstellationSky({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn('pointer-events-none fixed inset-0 overflow-hidden', className)}
-      style={{ background: '#080b12' }}
+      style={{ background: '#14171f' }}
     >
-      {/* Deep-space depth: a high cool wash + faint lilac nebula off-axis. */}
+      {/* Deep-space depth: a soft cool wash + faint lilac nebula off-axis. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(120% 80% at 78% -10%, rgba(168,191,212,0.10), transparent 55%),' +
-            'radial-gradient(90% 70% at 12% 8%, rgba(196,168,224,0.08), transparent 50%)',
+            'radial-gradient(120% 80% at 78% -10%, rgba(174,197,216,0.06), transparent 55%),' +
+            'radial-gradient(90% 70% at 12% 8%, rgba(196,168,224,0.05), transparent 50%)',
         }}
       />
 
@@ -90,9 +96,9 @@ export function ConstellationSky({ className }: { className?: string }) {
             y1="0"
             x2={`${x}%`}
             y2="100%"
-            stroke="#a8bfd4"
+            stroke="#aec5d8"
             strokeWidth="0.5"
-            strokeOpacity="0.06"
+            strokeOpacity="0.035"
           />
         ))}
         {H_LINES.map((y) => (
@@ -102,28 +108,33 @@ export function ConstellationSky({ className }: { className?: string }) {
             y1={`${y}%`}
             x2="100%"
             y2={`${y}%`}
-            stroke="#a8bfd4"
+            stroke="#aec5d8"
             strokeWidth="0.5"
-            strokeOpacity="0.06"
+            strokeOpacity="0.035"
           />
         ))}
       </svg>
 
-      {/* Star field */}
+      {/* Star field — dim, mostly steady, a third gently breathing. */}
       <div className="absolute inset-0">
         {STARS.map((s, i) => (
           <span
             key={i}
-            className="lk-twinkle absolute rounded-full bg-[#e8e4dc]"
+            className={cn('absolute rounded-full bg-[#dcd8cf]', s.tw && 'lk-glimmer')}
             style={{
               left: `${s.x}%`,
               top: `${s.y}%`,
               width: `${s.r}px`,
               height: `${s.r}px`,
               opacity: s.o,
-              animationDuration: `${s.dur}s`,
-              animationDelay: `${s.delay}s`,
-              boxShadow: s.r > 1.6 ? '0 0 6px 1px rgba(232,228,220,0.5)' : undefined,
+              ...(s.tw
+                ? {
+                    ['--lk-o' as string]: `${s.o}`,
+                    ['--lk-o-hi' as string]: `${s.oHi}`,
+                    animationDuration: `${s.dur}s`,
+                    animationDelay: `${s.delay}s`,
+                  }
+                : {}),
             }}
           />
         ))}
@@ -134,7 +145,7 @@ export function ConstellationSky({ className }: { className?: string }) {
         className="absolute inset-x-0 bottom-0 h-[42vh]"
         style={{
           background:
-            'radial-gradient(120% 100% at 50% 145%, rgba(212,165,116,0.14) 0%, rgba(168,191,212,0.10) 30%, transparent 62%)',
+            'radial-gradient(120% 100% at 50% 150%, rgba(212,165,116,0.09) 0%, rgba(174,197,216,0.06) 32%, transparent 62%)',
         }}
       />
     </div>

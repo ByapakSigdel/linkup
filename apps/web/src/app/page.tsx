@@ -65,7 +65,7 @@ export default function HomePage() {
             >
               <Link
                 href="/register"
-                className="group inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-sm font-medium tracking-wide text-text-on-primary shadow-[0_0_34px_-8px_rgba(196,168,224,0.7)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-[0_0_44px_-6px_rgba(196,168,224,0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="group inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-sm font-medium tracking-wide text-text-on-primary shadow-[0_10px_30px_-16px_rgba(196,168,224,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-[0_14px_32px_-14px_rgba(196,168,224,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 Begin your sky
               </Link>
