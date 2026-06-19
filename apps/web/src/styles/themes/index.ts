@@ -157,8 +157,8 @@ export const themes: Record<string, ThemeMetadata> = {
     name: 'Retro Arcade',
     tagline: 'Insert coin to continue',
     description:
-      'An 8-bit CRT: deep arcade navy, neon coin-op colours, pixel type, zero radius, hard pixel shadows and scanlines. Press start.',
-    swatch: ['#0b0b1a', '#1a1a36', '#ff5277', '#4de1ff', '#ffe14d'],
+      'An 8-bit CRT: green-phosphor glow, neon coin-op colours, pixel type, zero radius, hard pixel shadows and scanlines. Press start.',
+    swatch: ['#07140d', '#0f2417', '#2bff88', '#ffd23f', '#ff5277'],
     previewFont: "var(--font-pixel), 'Courier New', monospace",
     variants: {
       button: 'square',

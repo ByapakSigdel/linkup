@@ -417,44 +417,44 @@
    (Press Start 2P / VT323), zero radius, hard pixel shadows, scanlines.
    ─────────────────────────────────────────────────────────────────────────── */
 .theme-arcade {
-  --color-primary: #ff5277;
-  --color-primary-hover: #ff7593;
-  --color-primary-light: #2a0f1c;
-  --color-secondary: #4de1ff;
-  --color-secondary-hover: #74e9ff;
-  --color-accent: #ffe14d;
-  --color-accent-hover: #ffe974;
+  --color-primary: #2bff88;
+  --color-primary-hover: #57ffa3;
+  --color-primary-light: #0a2415;
+  --color-secondary: #ffd23f;
+  --color-secondary-hover: #ffde6b;
+  --color-accent: #ff5277;
+  --color-accent-hover: #ff7593;
 
-  --color-background: #0b0b1a;
-  --color-background-alt: #10102a;
-  --color-surface: #1a1a36;
-  --color-surface-hover: #24244a;
-  --color-surface-active: #2e2e5c;
+  --color-background: #07140d;
+  --color-background-alt: #0a1a11;
+  --color-surface: #0f2417;
+  --color-surface-hover: #163322;
+  --color-surface-active: #1d422c;
 
-  --color-text: #f4f4fb;
-  --color-text-muted: #9a9ad0;
-  --color-text-inverse: #0b0b1a;
-  --color-text-on-primary: #1a0010;
+  --color-text: #e6fff0;
+  --color-text-muted: #6fae86;
+  --color-text-inverse: #07140d;
+  --color-text-on-primary: #04140a;
 
-  --color-border: #3a3a72;
-  --color-border-strong: #5454a6;
-  --color-border-focus: #ffe14d;
+  --color-border: #1f5a3a;
+  --color-border-strong: #2f8f5a;
+  --color-border-focus: #2bff88;
 
-  --color-success: #4dff88;
-  --color-warning: #ffe14d;
+  --color-success: #2bff88;
+  --color-warning: #ffd23f;
   --color-error: #ff5277;
-  --color-info: #4de1ff;
+  --color-info: #57ffa3;
 
-  --color-message-sent: #ff5277;
-  --color-message-sent-text: #1a0010;
-  --color-message-received: #1a1a36;
-  --color-message-received-text: #f4f4fb;
+  --color-message-sent: #2bff88;
+  --color-message-sent-text: #04140a;
+  --color-message-received: #0f2417;
+  --color-message-received-text: #e6fff0;
 
   --color-highlight-love: #ff5277;
-  --color-highlight-funny: #ffe14d;
-  --color-highlight-important: #ff3b5c;
-  --color-highlight-celebration: #4de1ff;
-  --color-highlight-milestone: #4dff88;
+  --color-highlight-funny: #ffd23f;
+  --color-highlight-important: #ff5277;
+  --color-highlight-celebration: #2bff88;
+  --color-highlight-milestone: #57ffa3;
 
   --font-display: var(--font-pixel), 'Courier New', monospace;
   --font-body: var(--font-vt323), 'Courier New', monospace;
