@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useState, useCallback } from 'react';
+import { forwardRef, useState, useCallback, useEffect } from 'react';
 import {
   Check,
   CheckCheck,
@@ -17,6 +17,10 @@ import { cn } from '@/lib/cn';
 import { Emoji } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import {
+  useCustomEmojiStore,
+  type CustomEmojiEntry,
+} from '@/stores/custom-emoji-store';
 import { MediaMessage } from './media-message';
 import type { Message, MessageStatus, HighlightCategory } from '@linkup/types';
 
@@ -30,6 +34,34 @@ const highlightColorMap: Record<HighlightCategory, string> = {
   milestone: 'var(--color-highlight-milestone)',
   custom: 'var(--color-primary)',
 };
+
+// ─── Custom-emoji shortcode rendering ──────────────────────────────────────────
+
+/** Render message text, swapping `:shortcode:` tokens for custom-emoji images. */
+function renderMessageText(
+  content: string,
+  byName: Record<string, CustomEmojiEntry>,
+): React.ReactNode {
+  if (!content.includes(':')) return content;
+  const parts = content.split(/(:[a-zA-Z0-9_+-]+:)/g);
+  return parts.map((part, i) => {
+    const match = /^:([a-zA-Z0-9_+-]+):$/.exec(part);
+    const emoji = match ? byName[match[1]!] : undefined;
+    if (emoji) {
+      return (
+        <img
+          key={i}
+          src={emoji.imageUrl}
+          alt={part}
+          title={part}
+          className="inline-block h-5 w-5 align-[-0.3em] object-contain"
+          loading="lazy"
+        />
+      );
+    }
+    return part;
+  });
+}
 
 // ─── Status icon ──────────────────────────────────────────────────────────────
 
@@ -109,6 +141,11 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
     const currentUserId = useAuthStore((s) => s.user?.id);
     const isSent = message.senderId === currentUserId;
     const [showActions, setShowActions] = useState(false);
+    const emojiByName = useCustomEmojiStore((s) => s.byName);
+    const loadCustomEmojis = useCustomEmojiStore((s) => s.load);
+    useEffect(() => {
+      void loadCustomEmojis();
+    }, [loadCustomEmojis]);
 
     // Deleted messages
     if (message.isDeleted) {
@@ -258,7 +295,9 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
 
             {/* Content — hidden for voice messages (the player stands alone) */}
             {message.content && message.messageType !== 'voice' && (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap">
+                {renderMessageText(message.content, emojiByName)}
+              </p>
             )}
 
             {/* Edited indicator */}

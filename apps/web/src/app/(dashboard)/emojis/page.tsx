@@ -5,6 +5,7 @@ import { Smile } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
+import { useCustomEmojiStore } from '@/stores/custom-emoji-store';
 import { Spinner } from '@/components/ui';
 import { LinkupMark } from '@/components/brand/logo';
 import {
@@ -47,6 +48,13 @@ export default function EmojisPage() {
       const { data } = await api.post('/creative/emojis', payload);
       const created: CustomEmoji = data.data.emoji;
       setEmojis((prev) => [created, ...prev]);
+      // Make it usable in chat immediately (bubbles render :name: from this store).
+      useCustomEmojiStore.getState().add({
+        id: created.id,
+        name: created.name,
+        imageUrl: created.imageUrl,
+        isAnimated: created.isAnimated,
+      });
       useToastStore.getState().push({
         title: 'Emoji created',
         body: `:${created.name}: is ready to use`,
