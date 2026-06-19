@@ -39,7 +39,6 @@ const pageTitles: Record<string, string> = {
   soundboard: 'SoundBoard',
   watch: 'Watch Party',
   music: 'Music',
-  stream: 'Streaming',
   search: 'Search',
 };
 

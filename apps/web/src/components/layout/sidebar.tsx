@@ -13,7 +13,6 @@ import {
   Volume2,
   Clapperboard,
   Music,
-  Radio,
   Trophy,
   Users,
   Compass,
@@ -55,7 +54,6 @@ const navSections = [
     items: [
       { href: '/watch', label: 'Watch Party', icon: Clapperboard },
       { href: '/music', label: 'Music', icon: Music },
-      { href: '/stream', label: 'Streaming', icon: Radio },
     ],
   },
   {
