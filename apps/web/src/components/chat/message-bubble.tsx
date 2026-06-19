@@ -18,8 +18,12 @@ import { cn } from '@/lib/cn';
 import { Emoji } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
-import { useThemeStore } from '@/stores/theme-store';
-import { reactionPack, ALL_REACTIONS } from '@/lib/reaction-packs';
+import { ALL_REACTIONS } from '@/lib/reaction-packs';
+import {
+  STICKER_REACTIONS,
+  ReactionGlyph,
+  isSticker,
+} from '@/components/reactions/stickers';
 import {
   useCustomEmojiStore,
   type CustomEmojiEntry,
@@ -102,11 +106,21 @@ function ReactionsDisplay({
       {entries.map(([emoji, arr]) => (
         <span
           key={emoji}
-          className="lk-reaction-pop inline-flex items-center gap-0.5 rounded-full bg-surface-hover px-1.5 py-0.5 text-xs border border-border"
+          className={cn(
+            'lk-reaction-pop inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs border border-border',
+            isSticker(emoji) ? 'bg-white/95' : 'bg-surface-hover',
+          )}
         >
-          <Emoji emoji={emoji} size={14} />
+          <ReactionGlyph value={emoji} size={16} />
           {arr.length > 1 && (
-            <span className="font-mono text-text-muted">{arr.length}</span>
+            <span
+              className={cn(
+                'font-mono',
+                isSticker(emoji) ? 'text-[#17171c]' : 'text-text-muted',
+              )}
+            >
+              {arr.length}
+            </span>
           )}
         </span>
       ))}
@@ -146,7 +160,6 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
     const [showActions, setShowActions] = useState(false);
     const emojiByName = useCustomEmojiStore((s) => s.byName);
     const loadCustomEmojis = useCustomEmojiStore((s) => s.load);
-    const currentThemeId = useThemeStore((s) => s.currentThemeId);
     const [showAllReactions, setShowAllReactions] = useState(false);
     useEffect(() => {
       void loadCustomEmojis();
@@ -174,7 +187,6 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
       ? highlightColorMap[message.highlightCategory as HighlightCategory] ?? undefined
       : undefined;
 
-    const quickReactions = reactionPack(currentThemeId);
 
     return (
       <div
@@ -195,16 +207,16 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
               isSent ? 'right-[calc(70%+8px)]' : 'left-[calc(70%+8px)]',
             )}
           >
-            {/* Quick reactions (themed pack + full picker) */}
+            {/* Quick reactions — sticker pack + full picker (stickers + emoji) */}
             <div className="relative flex items-center gap-0.5 rounded-full bg-surface border border-border shadow-md px-1.5 py-0.5">
-              {quickReactions.map((emoji) => (
+              {STICKER_REACTIONS.slice(0, 6).map((val) => (
                 <button
-                  key={emoji}
-                  onClick={() => onReact?.(message.id, emoji)}
-                  className="flex items-center p-0.5 transition-transform hover:scale-150 active:scale-90"
-                  aria-label={`React with ${emoji}`}
+                  key={val}
+                  onClick={() => onReact?.(message.id, val)}
+                  className="flex items-center justify-center rounded-lg bg-white/95 p-0.5 transition-transform hover:scale-125 active:scale-90"
+                  aria-label="React with sticker"
                 >
-                  <Emoji emoji={emoji} size={18} />
+                  <ReactionGlyph value={val} size={22} />
                 </button>
               ))}
               <button
@@ -216,7 +228,28 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
               </button>
 
               {showAllReactions && (
-                <div className="absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-60 -translate-x-1/2 rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+                <div className="absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-64 -translate-x-1/2 rounded-2xl border border-border bg-surface p-2.5 shadow-2xl">
+                  <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Stickers
+                  </p>
+                  <div className="grid grid-cols-6 gap-1">
+                    {STICKER_REACTIONS.map((val) => (
+                      <button
+                        key={val}
+                        onClick={() => {
+                          onReact?.(message.id, val);
+                          setShowAllReactions(false);
+                        }}
+                        className="flex items-center justify-center rounded-lg bg-white/95 p-1 transition-transform hover:scale-110"
+                        aria-label="React with sticker"
+                      >
+                        <ReactionGlyph value={val} size={26} />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mb-1 mt-2.5 px-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Emoji
+                  </p>
                   <div className="grid grid-cols-8 gap-0.5">
                     {ALL_REACTIONS.map((emoji) => (
                       <button
