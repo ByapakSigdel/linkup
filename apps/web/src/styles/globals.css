@@ -5,8 +5,8 @@
    Each theme is a complete visual identity: palette + fonts + shape language +
    shadow/glow + background texture + signature decoration. Components stay
    neutral and carry data-lk hooks; the theme owns the personality.
-   Themes: Celestial Cartography (default) · Dreamy Nebula · Midnight
-   Love-Letter · Daybreak (light).
+   Themes: Celestial Cartography (default) · Midnight Love-Letter ·
+   Daybreak (light).
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
@@ -132,74 +132,6 @@
 
   --chat-bubble-sent-radius: 16px 16px 5px 16px;
   --chat-bubble-received-radius: 16px 16px 16px 5px;
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
-   Dreamy Nebula — maximalist glow. Nebula gradients, frosted glass, pillowy
-   shapes, a bold characterful display.
-   ─────────────────────────────────────────────────────────────────────────── */
-.theme-nebula {
-  --color-primary: #c77dff;
-  --color-primary-hover: #d9a3ff;
-  --color-primary-light: #241439;
-  --color-secondary: #ff7eb6;
-  --color-secondary-hover: #ff9ec8;
-  --color-accent: #7dd3fc;
-  --color-accent-hover: #a6e2ff;
-
-  --color-background: #0a0613;
-  --color-background-alt: #0e0a1d;
-  --color-surface: #160f28;
-  --color-surface-hover: #1f1638;
-  --color-surface-active: #281d47;
-
-  --color-text: #f3ecff;
-  --color-text-muted: #a79bc4;
-  --color-text-inverse: #0a0613;
-  --color-text-on-primary: #1a0b2e;
-
-  --color-border: #2c2148;
-  --color-border-strong: #3d2f63;
-  --color-border-focus: #c77dff;
-
-  --color-success: #6ee7b7;
-  --color-warning: #fcd34d;
-  --color-error: #fb7da0;
-  --color-info: #7dd3fc;
-
-  --color-message-sent: #c77dff;
-  --color-message-sent-text: #1a0b2e;
-  --color-message-received: #1f1638;
-  --color-message-received-text: #f3ecff;
-
-  --color-highlight-love: #ff7eb6;
-  --color-highlight-funny: #fcd34d;
-  --color-highlight-important: #fb7da0;
-  --color-highlight-celebration: #c77dff;
-  --color-highlight-milestone: #6ee7b7;
-
-  --font-display: var(--font-unbounded), system-ui, sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
-  --font-mono: var(--font-space-mono), ui-monospace, monospace;
-  --font-script: var(--font-caveat), cursive;
-  --heading-weight: 700;
-  --heading-tracking: -0.02em;
-  --body-tracking: 0;
-
-  --lk-card-radius: 24px;
-  --lk-btn-radius: 9999px;
-  --lk-input-radius: 18px;
-  --lk-card-shadow: 0 24px 60px -30px rgba(199, 125, 255, 0.5),
-    0 0 0 1px rgba(199, 125, 255, 0.08) inset;
-  --lk-card-bg: color-mix(in srgb, var(--color-surface) 72%, transparent);
-  --lk-card-border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
-  --lk-card-rotate: 0deg;
-  --lk-card-blur: 16px;
-  --lk-glow: 0 0 24px -4px color-mix(in srgb, var(--color-primary) 60%, transparent);
-  --lk-accent-line: linear-gradient(90deg, transparent, var(--color-secondary), var(--color-primary), transparent);
-
-  --chat-bubble-sent-radius: 22px 22px 8px 22px;
-  --chat-bubble-received-radius: 22px 22px 22px 8px;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -423,31 +355,6 @@ body::after {
   );
 }
 
-/* Nebula — drifting coloured clouds + stars */
-.theme-nebula body::before {
-  background-image:
-    radial-gradient(50% 40% at 18% 22%, rgba(199, 125, 255, 0.28), transparent 70%),
-    radial-gradient(45% 45% at 82% 30%, rgba(255, 126, 182, 0.22), transparent 70%),
-    radial-gradient(55% 50% at 60% 85%, rgba(125, 211, 252, 0.18), transparent 70%),
-    radial-gradient(40% 40% at 30% 75%, rgba(199, 125, 255, 0.16), transparent 70%);
-  filter: blur(8px);
-  animation: nebulaDrift 36s ease-in-out infinite alternate;
-}
-.theme-nebula body::after {
-  background-image:
-    radial-gradient(1px 1px at 25% 20%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(1px 1px at 70% 40%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1.5px 1.5px at 45% 70%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 85% 80%, rgba(255, 255, 255, 0.5), transparent);
-  background-size: 480px 480px;
-  background-repeat: repeat;
-  opacity: 0.5;
-}
-@keyframes nebulaDrift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-3%, 2%, 0) scale(1.08); }
-}
-
 /* Love-Letter — warm paper grain + faint ruled lines */
 .theme-loveletter body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
@@ -499,22 +406,11 @@ body::after {
   box-shadow: none;
 }
 
-/* Nebula — frosted glass + glow */
-.theme-nebula [data-lk='card'] {
-  backdrop-filter: blur(var(--lk-card-blur));
-  -webkit-backdrop-filter: blur(var(--lk-card-blur));
-}
-.theme-nebula [data-lk='card'][data-variant='elevated'] {
-  box-shadow: var(--lk-card-shadow), var(--lk-glow);
-}
-
-/* Love-Letter — taped notes */
+/* Love-Letter — taped notes (constant tilt; no hover rotation, which would
+   create a hit-test feedback loop and make the card wobble). */
 .theme-loveletter [data-lk='card'] {
   transform: rotate(var(--lk-card-rotate));
-  transition: transform 0.25s ease;
-}
-.theme-loveletter [data-lk='card']:hover {
-  transform: rotate(0deg);
+  transition: box-shadow 0.25s ease;
 }
 .theme-loveletter [data-lk='card'][data-variant='elevated']::before,
 .theme-loveletter [data-lk='card'][data-variant='sticker']::before {
@@ -536,12 +432,6 @@ body::after {
 }
 
 /* Buttons (radius comes from the button's own utility class) */
-.theme-nebula [data-lk='button'][data-variant='primary'] {
-  box-shadow: var(--lk-glow);
-}
-.theme-nebula [data-lk='button'][data-variant='primary']:hover {
-  box-shadow: var(--lk-glow), var(--lk-glow);
-}
 .theme-loveletter [data-lk='button'] {
   letter-spacing: 0.02em;
 }

@@ -42,34 +42,6 @@ export const themes: Record<string, ThemeMetadata> = {
     },
   },
 
-  nebula: {
-    id: 'nebula',
-    name: 'Dreamy Nebula',
-    tagline: 'Lost in colour together',
-    description:
-      'Glowing nebula clouds, frosted glass, pillowy shapes and a bold display. Vivid and emotional.',
-    swatch: ['#0a0613', '#160f28', '#c77dff', '#ff7eb6', '#7dd3fc'],
-    previewFont: 'var(--font-unbounded), system-ui, sans-serif',
-    variants: {
-      button: 'pill',
-      card: 'elevated',
-      input: 'rounded',
-      nav: 'sidebar',
-      messageBubble: 'cloud',
-      avatar: 'circle',
-      divider: 'wave',
-      container: 'gradient',
-    },
-    decorations: {
-      backgroundPattern: 'stars',
-      hasSectionDividers: true,
-      hasPageOrnaments: true,
-      animationIntensity: 'playful',
-      scrollbarStyle: 'thin',
-      emptyStateStyle: 'illustrated',
-    },
-  },
-
   loveletter: {
     id: 'loveletter',
     name: 'Midnight Love-Letter',

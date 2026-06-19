@@ -3,7 +3,6 @@ import {
   Fraunces,
   Hanken_Grotesk,
   Instrument_Serif,
-  Unbounded,
   Space_Mono,
   Caveat,
 } from 'next/font/google';
@@ -32,13 +31,6 @@ const instrument = Instrument_Serif({
   weight: '400',
   style: ['normal', 'italic'],
   variable: '--font-instrument',
-});
-
-// Bold characterful display — Dreamy Nebula
-const unbounded = Unbounded({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-unbounded',
 });
 
 // Typewriter / data mono
@@ -74,7 +66,6 @@ export default function RootLayout({
     fraunces.variable,
     hanken.variable,
     instrument.variable,
-    unbounded.variable,
     spaceMono.variable,
     caveat.variable,
   ].join(' ');
