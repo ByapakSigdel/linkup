@@ -62,8 +62,9 @@ export default function LoginPage() {
 
   return (
     <AuthFormWrapper
+      eyebrow="sign in"
       title="Welcome back"
-      description="Log in to continue to LinkUp"
+      description="Step back into the sky you share."
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         {apiError && (

@@ -131,8 +131,9 @@ export default function RegisterPage() {
 
   return (
     <AuthFormWrapper
-      title="Create your account"
-      description="Join LinkUp and connect with your partner"
+      eyebrow="new sky"
+      title="Find your other star"
+      description="Create your account, then link up with the one you orbit."
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         {apiError && (

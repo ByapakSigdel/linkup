@@ -1,47 +1,61 @@
 'use client';
 
-import { Card } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { LinkupMark, LinkupWordmark } from '@/components/brand/logo';
 
 interface AuthFormWrapperProps {
   title: string;
   description?: string;
+  /** Small mono kicker above the title (e.g. "sign in"). */
+  eyebrow?: string;
   children: React.ReactNode;
   className?: string;
 }
 
+const mono = { fontFamily: 'var(--font-space-mono), ui-monospace, monospace' };
+const serif = { fontFamily: 'var(--font-instrument), Georgia, serif' };
+
 export function AuthFormWrapper({
   title,
   description,
+  eyebrow,
   children,
   className,
 }: AuthFormWrapperProps) {
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-12">
-      <Card
-        cardStyle="bordered"
-        padding="lg"
-        className={cn('relative z-10 w-full max-w-md', className)}
-      >
-        <div className="mb-7 flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <LinkupMark size={34} />
-            <LinkupWordmark className="text-lg" />
+    <div className={cn('lk-anim-rise w-full max-w-md', className)}>
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-surface/70 p-8 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.85),0_0_70px_-34px_rgba(196,168,224,0.4)] backdrop-blur-xl">
+        {/* Hairline starlight accent across the top edge. */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
+
+        <div className="mb-7">
+          <div className="mb-6 flex items-center gap-2.5">
+            <LinkupMark size={26} />
+            <LinkupWordmark className="text-sm" />
           </div>
-          <div className="mt-2 flex flex-col items-center gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-text">
-              {title}
-            </h1>
-            {description && (
-              <p className="text-center text-sm text-text-muted">
-                {description}
-              </p>
-            )}
-          </div>
+
+          {eyebrow && (
+            <p
+              className="mb-2 text-[0.65rem] uppercase tracking-[0.32em] text-accent/80"
+              style={mono}
+            >
+              {eyebrow}
+            </p>
+          )}
+
+          <h1 className="text-3xl leading-tight text-text" style={serif}>
+            {title}
+          </h1>
+
+          {description && (
+            <p className="mt-2 text-sm leading-relaxed text-text-muted">
+              {description}
+            </p>
+          )}
         </div>
+
         {children}
-      </Card>
+      </div>
     </div>
   );
 }

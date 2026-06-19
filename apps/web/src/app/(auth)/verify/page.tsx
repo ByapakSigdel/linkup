@@ -83,6 +83,7 @@ export default function VerifyPage() {
 
   return (
     <AuthFormWrapper
+      eyebrow="verify email"
       title="Check your email"
       description="We sent a 6-digit verification code to your email address"
     >

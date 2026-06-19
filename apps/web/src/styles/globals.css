@@ -630,6 +630,82 @@ body::after {
 }
 .lk-twinkle { animation: lkTwinkle 3s ease-in-out infinite; }
 
+/* ── Front-door palette lock ─────────────────────────────────────────────────
+   The landing + auth pages are LinkUp's first impression and must always read
+   as the midnight-constellation brand, regardless of whichever theme a returning
+   user last selected. This scope pins the Celestial palette for everything
+   inside (including themed UI primitives that reference these tokens). */
+.lk-celestial-scope {
+  --color-primary: #c4a8e0;
+  --color-primary-hover: #b392d6;
+  --color-primary-light: #1b1726;
+  --color-secondary: #d4a574;
+  --color-secondary-hover: #c2925f;
+  --color-accent: #a8bfd4;
+  --color-accent-hover: #93acc6;
+  --color-background: #080b12;
+  --color-background-alt: #0a0e16;
+  --color-surface: #0d1018;
+  --color-surface-hover: #141a26;
+  --color-surface-active: #1a2130;
+  --color-text: #e8e4dc;
+  --color-text-muted: #8a93a8;
+  --color-text-on-primary: #0b0b14;
+  --color-border: #1c2230;
+  --color-border-strong: #2a3242;
+  --color-border-focus: #c4a8e0;
+  --color-success: #7fd1ae;
+  --color-warning: #d4a574;
+  --color-error: #e08585;
+}
+
+/* ── Constellation front-door animations ─────────────────────────────────────
+   Base (static) state of each element is its FINAL, visible state so that with
+   reduced motion (handled globally below) everything simply appears. */
+@keyframes lkDrawLine {
+  from { stroke-dashoffset: var(--lk-dash, 400); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes lkIgnite {
+  0% { opacity: 0; transform: scale(0); }
+  55% { opacity: 1; transform: scale(1.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes lkStarPop {
+  from { opacity: 0; transform: scale(0.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes lkRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes lkFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lkDrift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+
+.lk-anim-line {
+  stroke-dasharray: var(--lk-dash, 400);
+  animation: lkDrawLine 1.5s cubic-bezier(0.65, 0, 0.35, 1) 0.4s both;
+}
+.lk-anim-ignite {
+  animation: lkIgnite 0.9s cubic-bezier(0.16, 1, 0.3, 1) 1.7s both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lk-anim-pop {
+  animation: lkStarPop 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lk-anim-rise { animation: lkRise 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.lk-anim-fade { animation: lkFadeIn 1.4s ease both; }
+.lk-drift { animation: lkDrift 9s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
