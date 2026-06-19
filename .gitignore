@@ -45,3 +45,9 @@ docker-compose.override.yml
 
 # Misc
 *.tsbuildinfo
+
+# Uploaded media (local dev)
+uploads/
+
+# Scratch
+tmpcrops/

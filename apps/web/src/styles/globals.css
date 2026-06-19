@@ -1,652 +1,610 @@
 @import 'tailwindcss';
 
-/* ============================================
-   LinkUp Theme System - CSS Custom Properties
-   ============================================
-   Layer 1: Design tokens as CSS variables.
-   Each theme class overrides these variables to
-   produce a completely different visual identity.
-   ============================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   LinkUp — Theme System
+   Each theme is a complete visual identity: palette + fonts + shape language +
+   shadow/glow + background texture + signature decoration. Components stay
+   neutral and carry data-lk hooks; the theme owns the personality.
+   Themes: Celestial Cartography (default) · Dreamy Nebula · Midnight
+   Love-Letter · Daybreak (light).
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
-  /* Register theme colors as Tailwind utilities.
-     Default values here — overridden by theme classes on :root. */
-  --color-primary: #F43F5E;
-  --color-primary-hover: #E11D48;
-  --color-primary-light: #FFF1F2;
-  --color-secondary: #A855F7;
-  --color-secondary-hover: #9333EA;
-  --color-accent: #F59E0B;
-  --color-accent-hover: #D97706;
+  /* Colours — registered so bg-primary / text-text / border-border exist.
+     Values here are the Celestial defaults; theme classes override at runtime. */
+  --color-primary: #c4a8e0;
+  --color-primary-hover: #b392d6;
+  --color-primary-light: #1b1726;
+  --color-secondary: #d4a574;
+  --color-secondary-hover: #c2925f;
+  --color-accent: #a8bfd4;
+  --color-accent-hover: #93acc6;
 
-  --color-background: #FAFAF9;
-  --color-background-alt: #F5F5F4;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #FAFAF9;
-  --color-surface-active: #F5F5F4;
+  --color-background: #080b12;
+  --color-background-alt: #0a0e16;
+  --color-surface: #0d1018;
+  --color-surface-hover: #141a26;
+  --color-surface-active: #1a2130;
 
-  --color-text: #1C1917;
-  --color-text-muted: #78716C;
-  --color-text-inverse: #FAFAF9;
-  --color-text-on-primary: #FFFFFF;
+  --color-text: #e8e4dc;
+  --color-text-muted: #8a93a8;
+  --color-text-inverse: #080b12;
+  --color-text-on-primary: #0b0b14;
 
-  --color-border: #E7E5E4;
-  --color-border-strong: #D6D3D1;
-  --color-border-focus: #F43F5E;
+  --color-border: #1c2230;
+  --color-border-strong: #2a3242;
+  --color-border-focus: #c4a8e0;
 
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
-  --color-info: #3B82F6;
+  --color-success: #7fd1ae;
+  --color-warning: #d4a574;
+  --color-error: #e08585;
+  --color-info: #a8bfd4;
 
-  --color-message-sent: #F43F5E;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #F5F5F4;
-  --color-message-received-text: #1C1917;
+  --color-message-sent: #c4a8e0;
+  --color-message-sent-text: #0b0b14;
+  --color-message-received: #141a26;
+  --color-message-received-text: #e8e4dc;
 
-  --color-highlight-love: #FB7185;
-  --color-highlight-funny: #FBBF24;
-  --color-highlight-important: #F87171;
-  --color-highlight-celebration: #C084FC;
-  --color-highlight-milestone: #34D399;
+  --color-highlight-love: #c4a8e0;
+  --color-highlight-funny: #d4a574;
+  --color-highlight-important: #e08585;
+  --color-highlight-celebration: #a8bfd4;
+  --color-highlight-milestone: #7fd1ae;
 
-  /* Chat-specific tokens */
-  --chat-bubble-sent-radius: 18px 18px 4px 18px;
-  --chat-bubble-received-radius: 18px 18px 18px 4px;
-  --chat-bubble-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --chat-input-radius: 22px;
-  --chat-input-height: 44px;
-  --chat-input-max-height: 200px;
-
-  --font-display: 'Cal Sans', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-full: 9999px;
-
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  /* Fonts — registered so font-display / font-body / font-mono exist. */
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-caveat), cursive;
 }
 
-/* ============================================
-   Default Theme (warm, clean, modern)
-   ============================================ */
+/* ───────────────────────────────────────────────────────────────────────────
+   Celestial Cartography — the default identity.
+   A premium star-chart: deep night, hairline registration marks, editorial
+   serif headings, calm negative space.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root,
 .theme-default {
-  /* Core Colors */
-  --color-primary: #F43F5E;
-  --color-primary-hover: #E11D48;
-  --color-primary-light: #FFF1F2;
-  --color-secondary: #A855F7;
-  --color-secondary-hover: #9333EA;
-  --color-accent: #F59E0B;
-  --color-accent-hover: #D97706;
+  --color-primary: #c4a8e0;
+  --color-primary-hover: #d8c2ef;
+  --color-primary-light: #181527;
+  --color-secondary: #d4a574;
+  --color-secondary-hover: #e2b888;
+  --color-accent: #a8bfd4;
+  --color-accent-hover: #c0d3e3;
 
-  /* Backgrounds */
-  --color-background: #FAFAF9;
-  --color-background-alt: #F5F5F4;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #FAFAF9;
-  --color-surface-active: #F5F5F4;
+  --color-background: #070a11;
+  --color-background-alt: #0a0e17;
+  --color-surface: #0d1119;
+  --color-surface-hover: #131a26;
+  --color-surface-active: #1a2233;
 
-  /* Text */
-  --color-text: #1C1917;
-  --color-text-muted: #78716C;
-  --color-text-inverse: #FAFAF9;
-  --color-text-on-primary: #FFFFFF;
+  --color-text: #ece8e0;
+  --color-text-muted: #828ca3;
+  --color-text-inverse: #070a11;
+  --color-text-on-primary: #0b0b14;
 
-  /* Borders */
-  --color-border: #E7E5E4;
-  --color-border-strong: #D6D3D1;
-  --color-border-focus: #F43F5E;
+  --color-border: #1a2130;
+  --color-border-strong: #2a3445;
+  --color-border-focus: #c4a8e0;
 
-  /* Semantic */
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
-  --color-info: #3B82F6;
+  --color-success: #7fd1ae;
+  --color-warning: #d4a574;
+  --color-error: #e08585;
+  --color-info: #a8bfd4;
 
-  /* Message Bubbles */
-  --color-message-sent: #F43F5E;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #F5F5F4;
-  --color-message-received-text: #1C1917;
+  --color-message-sent: #c4a8e0;
+  --color-message-sent-text: #0b0b14;
+  --color-message-received: #131a26;
+  --color-message-received-text: #ece8e0;
 
-  /* Highlights */
-  --color-highlight-love: #FB7185;
-  --color-highlight-funny: #FBBF24;
-  --color-highlight-important: #F87171;
-  --color-highlight-celebration: #C084FC;
-  --color-highlight-milestone: #34D399;
+  --color-highlight-love: #c4a8e0;
+  --color-highlight-funny: #d4a574;
+  --color-highlight-important: #e08585;
+  --color-highlight-celebration: #a8bfd4;
+  --color-highlight-milestone: #7fd1ae;
 
-  /* Chat */
-  --chat-bubble-sent-radius: 18px 18px 4px 18px;
-  --chat-bubble-received-radius: 18px 18px 18px 4px;
-  --chat-bubble-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --chat-input-radius: 22px;
-  --chat-input-height: 44px;
-  --chat-input-max-height: 200px;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-caveat), cursive;
+  --heading-weight: 500;
+  --heading-tracking: -0.01em;
+  --body-tracking: 0;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #F43F5E, #E11D48);
-  --gradient-secondary: linear-gradient(135deg, #A855F7, #7C3AED);
-  --gradient-accent: linear-gradient(135deg, #F59E0B, #D97706);
+  /* Shape language — crisp, chart-like */
+  --lk-card-radius: 14px;
+  --lk-btn-radius: 11px;
+  --lk-input-radius: 11px;
+  --lk-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 18px 40px -28px rgba(0, 0, 0, 0.9);
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 1px solid var(--color-border);
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 0px;
+  --lk-glow: none;
+  --lk-accent-line: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-primary) 55%, transparent),
+    transparent
+  );
 
-  /* Typography */
-  --font-display: 'Cal Sans', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --chat-bubble-sent-radius: 16px 16px 5px 16px;
+  --chat-bubble-received-radius: 16px 16px 16px 5px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Dreamy Nebula — maximalist glow. Nebula gradients, frosted glass, pillowy
+   shapes, a bold characterful display.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-nebula {
+  --color-primary: #c77dff;
+  --color-primary-hover: #d9a3ff;
+  --color-primary-light: #241439;
+  --color-secondary: #ff7eb6;
+  --color-secondary-hover: #ff9ec8;
+  --color-accent: #7dd3fc;
+  --color-accent-hover: #a6e2ff;
+
+  --color-background: #0a0613;
+  --color-background-alt: #0e0a1d;
+  --color-surface: #160f28;
+  --color-surface-hover: #1f1638;
+  --color-surface-active: #281d47;
+
+  --color-text: #f3ecff;
+  --color-text-muted: #a79bc4;
+  --color-text-inverse: #0a0613;
+  --color-text-on-primary: #1a0b2e;
+
+  --color-border: #2c2148;
+  --color-border-strong: #3d2f63;
+  --color-border-focus: #c77dff;
+
+  --color-success: #6ee7b7;
+  --color-warning: #fcd34d;
+  --color-error: #fb7da0;
+  --color-info: #7dd3fc;
+
+  --color-message-sent: #c77dff;
+  --color-message-sent-text: #1a0b2e;
+  --color-message-received: #1f1638;
+  --color-message-received-text: #f3ecff;
+
+  --color-highlight-love: #ff7eb6;
+  --color-highlight-funny: #fcd34d;
+  --color-highlight-important: #fb7da0;
+  --color-highlight-celebration: #c77dff;
+  --color-highlight-milestone: #6ee7b7;
+
+  --font-display: var(--font-unbounded), system-ui, sans-serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-caveat), cursive;
   --heading-weight: 700;
-  --body-weight: 400;
-  --letter-spacing-heading: -0.025em;
-  --letter-spacing-body: 0em;
+  --heading-tracking: -0.02em;
+  --body-tracking: 0;
 
-  /* Border Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-full: 9999px;
+  --lk-card-radius: 24px;
+  --lk-btn-radius: 9999px;
+  --lk-input-radius: 18px;
+  --lk-card-shadow: 0 24px 60px -30px rgba(199, 125, 255, 0.5),
+    0 0 0 1px rgba(199, 125, 255, 0.08) inset;
+  --lk-card-bg: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  --lk-card-border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 16px;
+  --lk-glow: 0 0 24px -4px color-mix(in srgb, var(--color-primary) 60%, transparent);
+  --lk-accent-line: linear-gradient(90deg, transparent, var(--color-secondary), var(--color-primary), transparent);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-
-  /* Effects */
-  --blur: 8px;
-  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --chat-bubble-sent-radius: 22px 22px 8px 22px;
+  --chat-bubble-received-radius: 22px 22px 22px 8px;
 }
 
-/* ============================================
-   Dreamy Theme (whimsical, playful, soft)
-   ============================================ */
-.theme-dreamy {
-  /* Core Colors */
-  --color-primary: #7C3AED;
-  --color-primary-hover: #6D28D9;
-  --color-primary-light: #EDE9FE;
-  --color-secondary: #EC4899;
-  --color-secondary-hover: #DB2777;
-  --color-accent: #F0ABFC;
-  --color-accent-hover: #E879F9;
+/* ───────────────────────────────────────────────────────────────────────────
+   Midnight Love-Letter — tactile, handcrafted. Warm ink-on-dark-paper, taped
+   notes, romantic serif, typewriter + handwriting accents.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-loveletter {
+  --color-primary: #e0a56a;
+  --color-primary-hover: #ecb87f;
+  --color-primary-light: #241c12;
+  --color-secondary: #d98c9a;
+  --color-secondary-hover: #e6a3af;
+  --color-accent: #9db0a0;
+  --color-accent-hover: #b3c4b6;
 
-  /* Backgrounds */
-  --color-background: #F0F4FF;
-  --color-background-alt: #E8EDFB;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #F5F3FF;
-  --color-surface-active: #EDE9FE;
+  --color-background: #141009;
+  --color-background-alt: #181308;
+  --color-surface: #1f1810;
+  --color-surface-hover: #271f15;
+  --color-surface-active: #30271a;
 
-  /* Text */
-  --color-text: #1E1B4B;
-  --color-text-muted: #6B7280;
-  --color-text-inverse: #F5F3FF;
-  --color-text-on-primary: #FFFFFF;
+  --color-text: #efe4ce;
+  --color-text-muted: #a8967a;
+  --color-text-inverse: #141009;
+  --color-text-on-primary: #2a1c0c;
 
-  /* Borders */
-  --color-border: #DDD6FE;
-  --color-border-strong: #C4B5FD;
-  --color-border-focus: #7C3AED;
+  --color-border: #petite;
+  --color-border: #382c1d;
+  --color-border-strong: #4d3d29;
+  --color-border-focus: #e0a56a;
 
-  /* Semantic */
-  --color-success: #34D399;
-  --color-warning: #FBBF24;
-  --color-error: #FB7185;
-  --color-info: #818CF8;
+  --color-success: #a3b58c;
+  --color-warning: #e0a56a;
+  --color-error: #d98c8c;
+  --color-info: #9db0a0;
 
-  /* Message Bubbles */
-  --color-message-sent: #7C3AED;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #EDE9FE;
-  --color-message-received-text: #1E1B4B;
+  --color-message-sent: #e0a56a;
+  --color-message-sent-text: #2a1c0c;
+  --color-message-received: #271f15;
+  --color-message-received-text: #efe4ce;
 
-  /* Highlights */
-  --color-highlight-love: #F9A8D4;
-  --color-highlight-funny: #FDE68A;
-  --color-highlight-important: #C4B5FD;
-  --color-highlight-celebration: #F0ABFC;
-  --color-highlight-milestone: #A7F3D0;
+  --color-highlight-love: #d98c9a;
+  --color-highlight-funny: #e0a56a;
+  --color-highlight-important: #d98c8c;
+  --color-highlight-celebration: #c9a9d4;
+  --color-highlight-milestone: #a3b58c;
 
-  /* Chat — rounder, softer bubbles */
-  --chat-bubble-sent-radius: 22px 22px 6px 22px;
-  --chat-bubble-received-radius: 22px 22px 22px 6px;
-  --chat-bubble-shadow: 0 3px 12px rgba(124, 58, 237, 0.12);
-  --chat-input-radius: 26px;
-  --chat-input-height: 46px;
-  --chat-input-max-height: 200px;
+  --font-display: var(--font-instrument), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-caveat), cursive;
+  --heading-weight: 400;
+  --heading-tracking: 0.005em;
+  --body-tracking: 0.005em;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #7C3AED, #EC4899);
-  --gradient-secondary: linear-gradient(135deg, #EC4899, #F0ABFC);
-  --gradient-accent: linear-gradient(135deg, #818CF8, #C084FC);
+  --lk-card-radius: 5px;
+  --lk-btn-radius: 6px;
+  --lk-input-radius: 6px;
+  --lk-card-shadow: 4px 6px 0 -1px rgba(0, 0, 0, 0.4),
+    0 14px 30px -22px rgba(0, 0, 0, 0.9);
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 1px solid var(--color-border);
+  --lk-card-rotate: -0.5deg;
+  --lk-card-blur: 0px;
+  --lk-glow: none;
+  --lk-accent-line: repeating-linear-gradient(
+    90deg,
+    var(--color-border-strong) 0 6px,
+    transparent 6px 12px
+  );
 
-  /* Typography */
-  --font-display: 'Cal Sans', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --heading-weight: 700;
-  --body-weight: 400;
-  --letter-spacing-heading: -0.02em;
-  --letter-spacing-body: 0.01em;
-
-  /* Border Radius - larger for dreamy organic feel */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
-  --radius-full: 9999px;
-
-  /* Shadows - softer, tinted */
-  --shadow-sm: 0 1px 3px 0 rgb(124 58 237 / 0.06);
-  --shadow-md: 0 4px 8px -1px rgb(124 58 237 / 0.1), 0 2px 4px -2px rgb(124 58 237 / 0.06);
-  --shadow-lg: 0 12px 20px -4px rgb(124 58 237 / 0.12), 0 4px 8px -4px rgb(124 58 237 / 0.08);
-  --shadow-hover: 0 20px 30px -6px rgb(124 58 237 / 0.15), 0 8px 12px -6px rgb(124 58 237 / 0.08);
-
-  /* Effects */
-  --blur: 12px;
-  --transition: 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --chat-bubble-sent-radius: 4px;
+  --chat-bubble-received-radius: 4px;
 }
 
-/* ============================================
-   Botanical Theme (earthy, bold, warm)
-   ============================================ */
-.theme-botanical {
-  /* Core Colors */
-  --color-primary: #16A34A;
-  --color-primary-hover: #15803D;
-  --color-primary-light: #F0FDF4;
-  --color-secondary: #E11D48;
-  --color-secondary-hover: #BE123C;
-  --color-accent: #CA8A04;
-  --color-accent-hover: #A16207;
+/* ───────────────────────────────────────────────────────────────────────────
+   Daybreak — a pale dawn (light theme) for daylight hours.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-daybreak {
+  --color-primary: #b07cd6;
+  --color-primary-hover: #9a64c4;
+  --color-primary-light: #f3ecfa;
+  --color-secondary: #d99a5b;
+  --color-secondary-hover: #c4863f;
+  --color-accent: #7c9cc4;
+  --color-accent-hover: #6688b5;
 
-  /* Backgrounds */
-  --color-background: #FEFCE8;
-  --color-background-alt: #FEF9C3;
-  --color-surface: #FFFEF5;
-  --color-surface-hover: #FEFCE8;
-  --color-surface-active: #FEF9C3;
+  --color-background: #fbf7f1;
+  --color-background-alt: #f4eee5;
+  --color-surface: #ffffff;
+  --color-surface-hover: #faf6ef;
+  --color-surface-active: #f2ebe0;
 
-  /* Text */
-  --color-text: #1A2E05;
-  --color-text-muted: #65793D;
-  --color-text-inverse: #F0FDF4;
-  --color-text-on-primary: #FFFFFF;
+  --color-text: #2a2420;
+  --color-text-muted: #8a7f72;
+  --color-text-inverse: #fbf7f1;
+  --color-text-on-primary: #ffffff;
 
-  /* Borders */
-  --color-border: #D9F99D;
-  --color-border-strong: #BEF264;
-  --color-border-focus: #16A34A;
+  --color-border: #ece3d6;
+  --color-border-strong: #ddd0bd;
+  --color-border-focus: #b07cd6;
 
-  /* Semantic */
-  --color-success: #22C55E;
-  --color-warning: #EAB308;
-  --color-error: #DC2626;
-  --color-info: #0EA5E9;
+  --color-success: #4faa84;
+  --color-warning: #d99a5b;
+  --color-error: #d56b6b;
+  --color-info: #7c9cc4;
 
-  /* Message Bubbles */
-  --color-message-sent: #16A34A;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #F0FDF4;
-  --color-message-received-text: #1A2E05;
+  --color-message-sent: #b07cd6;
+  --color-message-sent-text: #ffffff;
+  --color-message-received: #f2ebe0;
+  --color-message-received-text: #2a2420;
 
-  /* Highlights */
-  --color-highlight-love: #FDA4AF;
-  --color-highlight-funny: #FDE047;
-  --color-highlight-important: #86EFAC;
-  --color-highlight-celebration: #FCA5A5;
-  --color-highlight-milestone: #A3E635;
+  --color-highlight-love: #d98aa8;
+  --color-highlight-funny: #e0b15b;
+  --color-highlight-important: #d56b6b;
+  --color-highlight-celebration: #b07cd6;
+  --color-highlight-milestone: #4faa84;
 
-  /* Chat — natural, organic feel */
-  --chat-bubble-sent-radius: 16px 16px 4px 16px;
-  --chat-bubble-received-radius: 16px 16px 16px 4px;
-  --chat-bubble-shadow: 0 2px 6px rgba(22, 101, 52, 0.08);
-  --chat-input-radius: 20px;
-  --chat-input-height: 44px;
-  --chat-input-max-height: 200px;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+  --font-script: var(--font-caveat), cursive;
+  --heading-weight: 500;
+  --heading-tracking: -0.01em;
+  --body-tracking: 0;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #16A34A, #15803D);
-  --gradient-secondary: linear-gradient(135deg, #E11D48, #BE123C);
-  --gradient-accent: linear-gradient(135deg, #CA8A04, #A16207);
+  --lk-card-radius: 16px;
+  --lk-btn-radius: 12px;
+  --lk-input-radius: 12px;
+  --lk-card-shadow: 0 1px 2px rgba(42, 36, 32, 0.04),
+    0 12px 30px -20px rgba(42, 36, 32, 0.18);
+  --lk-card-bg: var(--color-surface);
+  --lk-card-border: 1px solid var(--color-border);
+  --lk-card-rotate: 0deg;
+  --lk-card-blur: 0px;
+  --lk-glow: none;
+  --lk-accent-line: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-primary) 45%, transparent),
+    transparent
+  );
 
-  /* Typography */
-  --font-display: 'Cal Sans', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --heading-weight: 800;
-  --body-weight: 400;
-  --letter-spacing-heading: -0.03em;
-  --letter-spacing-body: 0em;
-
-  /* Border Radius - medium, natural feel */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
-  --radius-full: 9999px;
-
-  /* Shadows - warm tinted */
-  --shadow-sm: 0 1px 2px 0 rgb(22 101 52 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(22 101 52 / 0.08), 0 2px 4px -2px rgb(22 101 52 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(22 101 52 / 0.1), 0 4px 6px -4px rgb(22 101 52 / 0.05);
-  --shadow-hover: 0 20px 25px -5px rgb(22 101 52 / 0.12), 0 8px 10px -6px rgb(22 101 52 / 0.05);
-
-  /* Effects */
-  --blur: 8px;
-  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --chat-bubble-sent-radius: 16px 16px 5px 16px;
+  --chat-bubble-received-radius: 16px 16px 16px 5px;
 }
 
-/* ============================================
-   Midnight Theme (dark, moody, neon accents)
-   ============================================ */
-.theme-midnight {
-  /* Core Colors */
-  --color-primary: #8B5CF6;
-  --color-primary-hover: #7C3AED;
-  --color-primary-light: #1E1B4B;
-  --color-secondary: #06B6D4;
-  --color-secondary-hover: #0891B2;
-  --color-accent: #F472B6;
-  --color-accent-hover: #EC4899;
-
-  /* Backgrounds */
-  --color-background: #0F172A;
-  --color-background-alt: #1E293B;
-  --color-surface: #1E293B;
-  --color-surface-hover: #334155;
-  --color-surface-active: #475569;
-
-  /* Text */
-  --color-text: #F1F5F9;
-  --color-text-muted: #94A3B8;
-  --color-text-inverse: #0F172A;
-  --color-text-on-primary: #FFFFFF;
-
-  /* Borders */
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-border-focus: #8B5CF6;
-
-  /* Semantic */
-  --color-success: #4ADE80;
-  --color-warning: #FBBF24;
-  --color-error: #F87171;
-  --color-info: #38BDF8;
-
-  /* Message Bubbles */
-  --color-message-sent: #8B5CF6;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #1E293B;
-  --color-message-received-text: #F1F5F9;
-
-  /* Highlights */
-  --color-highlight-love: #F472B6;
-  --color-highlight-funny: #FBBF24;
-  --color-highlight-important: #A78BFA;
-  --color-highlight-celebration: #22D3EE;
-  --color-highlight-milestone: #4ADE80;
-
-  /* Chat — sharper, glow effects */
-  --chat-bubble-sent-radius: 14px 14px 2px 14px;
-  --chat-bubble-received-radius: 14px 14px 14px 2px;
-  --chat-bubble-shadow: 0 2px 12px rgba(139, 92, 246, 0.2);
-  --chat-input-radius: 18px;
-  --chat-input-height: 44px;
-  --chat-input-max-height: 200px;
-
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9);
-  --gradient-secondary: linear-gradient(135deg, #06B6D4, #0891B2);
-  --gradient-accent: linear-gradient(135deg, #F472B6, #EC4899);
-
-  /* Typography */
-  --font-display: 'Cal Sans', 'Inter', sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --heading-weight: 600;
-  --body-weight: 400;
-  --letter-spacing-heading: -0.02em;
-  --letter-spacing-body: 0.01em;
-
-  /* Border Radius - sharper */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-full: 9999px;
-
-  /* Shadows - glow-like */
-  --shadow-sm: 0 1px 3px 0 rgb(139 92 246 / 0.1);
-  --shadow-md: 0 4px 8px -1px rgb(139 92 246 / 0.15), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 20px -4px rgb(139 92 246 / 0.2), 0 4px 8px -4px rgb(0 0 0 / 0.4);
-  --shadow-hover: 0 20px 30px -6px rgb(139 92 246 / 0.25), 0 8px 12px -6px rgb(0 0 0 / 0.3);
-
-  /* Effects */
-  --blur: 16px;
-  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ============================================
-   Minimal Theme (ultra-clean, monochrome)
-   ============================================ */
-.theme-minimal {
-  /* Core Colors */
-  --color-primary: #18181B;
-  --color-primary-hover: #27272A;
-  --color-primary-light: #F4F4F5;
-  --color-secondary: #71717A;
-  --color-secondary-hover: #52525B;
-  --color-accent: #3B82F6;
-  --color-accent-hover: #2563EB;
-
-  /* Backgrounds */
-  --color-background: #FFFFFF;
-  --color-background-alt: #FAFAFA;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #FAFAFA;
-  --color-surface-active: #F4F4F5;
-
-  /* Text */
-  --color-text: #18181B;
-  --color-text-muted: #A1A1AA;
-  --color-text-inverse: #FAFAFA;
-  --color-text-on-primary: #FFFFFF;
-
-  /* Borders */
-  --color-border: #E4E4E7;
-  --color-border-strong: #D4D4D8;
-  --color-border-focus: #18181B;
-
-  /* Semantic */
-  --color-success: #22C55E;
-  --color-warning: #EAB308;
-  --color-error: #EF4444;
-  --color-info: #3B82F6;
-
-  /* Message Bubbles */
-  --color-message-sent: #18181B;
-  --color-message-sent-text: #FFFFFF;
-  --color-message-received: #F4F4F5;
-  --color-message-received-text: #18181B;
-
-  /* Highlights */
-  --color-highlight-love: #FECDD3;
-  --color-highlight-funny: #FEF08A;
-  --color-highlight-important: #D4D4D8;
-  --color-highlight-celebration: #E4E4E7;
-  --color-highlight-milestone: #BBF7D0;
-
-  /* Chat — clean, minimal */
-  --chat-bubble-sent-radius: 12px 12px 2px 12px;
-  --chat-bubble-received-radius: 12px 12px 12px 2px;
-  --chat-bubble-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  --chat-input-radius: 16px;
-  --chat-input-height: 42px;
-  --chat-input-max-height: 200px;
-
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #18181B, #3F3F46);
-  --gradient-secondary: linear-gradient(135deg, #71717A, #A1A1AA);
-  --gradient-accent: linear-gradient(135deg, #3B82F6, #2563EB);
-
-  /* Typography */
-  --font-display: 'Inter', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --heading-weight: 600;
-  --body-weight: 400;
-  --letter-spacing-heading: -0.03em;
-  --letter-spacing-body: 0em;
-
-  /* Border Radius - clean, moderate */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-full: 9999px;
-
-  /* Shadows - very subtle */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.03);
-  --shadow-lg: 0 6px 10px -2px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.03);
-  --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.03);
-
-  /* Effects */
-  --blur: 4px;
-  --transition: 100ms ease;
-}
-
-/* ============================================
-   Base Styles
-   ============================================ */
+/* ───────────────────────────────────────────────────────────────────────────
+   Base
+   ─────────────────────────────────────────────────────────────────────────── */
 body {
   background-color: var(--color-background);
   color: var(--color-text);
   font-family: var(--font-body);
-  font-weight: var(--body-weight);
-  letter-spacing: var(--letter-spacing-body);
-  transition: background-color var(--transition), color var(--transition);
+  letter-spacing: var(--body-tracking, 0);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  position: relative;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: var(--heading-weight);
-  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--heading-weight, 500);
+  letter-spacing: var(--heading-tracking, -0.01em);
 }
 
 code, pre, kbd, samp {
   font-family: var(--font-mono);
 }
 
-/* Focus ring utilities */
+.font-script {
+  font-family: var(--font-script);
+}
+
 *:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
 
-/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
 }
 
-/* Typing indicator animation */
-@keyframes typing {
-  0%, 60%, 100% {
-    opacity: 0.3;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-
-/* Selection color */
 ::selection {
-  background-color: var(--color-primary-light);
+  background-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
   color: var(--color-text);
 }
 
-/* ============================================
+/* ───────────────────────────────────────────────────────────────────────────
+   Background texture per theme (fixed, behind everything)
+   ─────────────────────────────────────────────────────────────────────────── */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Celestial — fine starfield + deep vignette */
+:root body::before,
+.theme-default body::before {
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(236, 232, 224, 0.7), transparent),
+    radial-gradient(1px 1px at 75% 15%, rgba(168, 191, 212, 0.6), transparent),
+    radial-gradient(1.4px 1.4px at 50% 60%, rgba(196, 168, 224, 0.55), transparent),
+    radial-gradient(1px 1px at 88% 72%, rgba(236, 232, 224, 0.5), transparent),
+    radial-gradient(1px 1px at 33% 85%, rgba(212, 165, 116, 0.5), transparent),
+    radial-gradient(1px 1px at 12% 65%, rgba(236, 232, 224, 0.4), transparent),
+    radial-gradient(1.4px 1.4px at 65% 42%, rgba(168, 191, 212, 0.45), transparent),
+    radial-gradient(1px 1px at 5% 18%, rgba(236, 232, 224, 0.35), transparent);
+  background-repeat: repeat;
+  background-size: 520px 520px;
+  opacity: 0.55;
+}
+.theme-default body::after {
+  background: radial-gradient(
+    120% 90% at 50% -10%,
+    color-mix(in srgb, var(--color-primary) 8%, transparent),
+    transparent 60%
+  );
+}
+
+/* Nebula — drifting coloured clouds + stars */
+.theme-nebula body::before {
+  background-image:
+    radial-gradient(50% 40% at 18% 22%, rgba(199, 125, 255, 0.28), transparent 70%),
+    radial-gradient(45% 45% at 82% 30%, rgba(255, 126, 182, 0.22), transparent 70%),
+    radial-gradient(55% 50% at 60% 85%, rgba(125, 211, 252, 0.18), transparent 70%),
+    radial-gradient(40% 40% at 30% 75%, rgba(199, 125, 255, 0.16), transparent 70%);
+  filter: blur(8px);
+  animation: nebulaDrift 36s ease-in-out infinite alternate;
+}
+.theme-nebula body::after {
+  background-image:
+    radial-gradient(1px 1px at 25% 20%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 70% 40%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 45% 70%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 85% 80%, rgba(255, 255, 255, 0.5), transparent);
+  background-size: 480px 480px;
+  background-repeat: repeat;
+  opacity: 0.5;
+}
+@keyframes nebulaDrift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-3%, 2%, 0) scale(1.08); }
+}
+
+/* Love-Letter — warm paper grain + faint ruled lines */
+.theme-loveletter body::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+.theme-loveletter body::after {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    color-mix(in srgb, var(--color-primary) 7%, transparent) 31px,
+    color-mix(in srgb, var(--color-primary) 7%, transparent) 32px
+  );
+  opacity: 0.4;
+}
+
+/* Daybreak — soft dawn wash, no dark texture */
+.theme-daybreak body::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-primary) 10%, transparent),
+    transparent 32%
+  ),
+  radial-gradient(
+    90% 50% at 80% 0%,
+    color-mix(in srgb, var(--color-secondary) 12%, transparent),
+    transparent 55%
+  );
+}
+.theme-daybreak body::after {
+  display: none;
+}
+
+/* Keep app content above the texture layers */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Themed component skins (driven by data-lk hooks on the primitives)
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-lk='card'] {
+  border-radius: var(--lk-card-radius);
+  box-shadow: var(--lk-card-shadow);
+  background: var(--lk-card-bg);
+  border: var(--lk-card-border);
+}
+[data-lk='card'][data-variant='flat'] {
+  box-shadow: none;
+  border: none;
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+}
+[data-lk='card'][data-variant='bordered'] {
+  box-shadow: none;
+}
+
+/* Nebula — frosted glass + glow */
+.theme-nebula [data-lk='card'] {
+  backdrop-filter: blur(var(--lk-card-blur));
+  -webkit-backdrop-filter: blur(var(--lk-card-blur));
+}
+.theme-nebula [data-lk='card'][data-variant='elevated'] {
+  box-shadow: var(--lk-card-shadow), var(--lk-glow);
+}
+
+/* Love-Letter — taped notes */
+.theme-loveletter [data-lk='card'] {
+  transform: rotate(var(--lk-card-rotate));
+  transition: transform 0.25s ease;
+}
+.theme-loveletter [data-lk='card']:hover {
+  transform: rotate(0deg);
+}
+.theme-loveletter [data-lk='card'][data-variant='elevated']::before,
+.theme-loveletter [data-lk='card'][data-variant='sticker']::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 76px;
+  height: 22px;
+  transform: translateX(-50%) rotate(-2deg);
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border-radius: 2px;
+}
+/* sticker/elevated cards need a positioning context for the tape */
+[data-lk='card'][data-variant='elevated'],
+[data-lk='card'][data-variant='sticker'] {
+  position: relative;
+}
+
+/* Buttons (radius comes from the button's own utility class) */
+.theme-nebula [data-lk='button'][data-variant='primary'] {
+  box-shadow: var(--lk-glow);
+}
+.theme-nebula [data-lk='button'][data-variant='primary']:hover {
+  box-shadow: var(--lk-glow), var(--lk-glow);
+}
+.theme-loveletter [data-lk='button'] {
+  letter-spacing: 0.02em;
+}
+
+/* A reusable hairline "bond line" divider (constellation motif) */
+.lk-hairline {
+  height: 1px;
+  width: 100%;
+  background: var(--lk-accent-line);
+  border: 0;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Scrollbars
+   ─────────────────────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 35%, transparent) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
    Animations
-   ============================================ */
+   ─────────────────────────────────────────────────────────────────────────── */
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
 
-/* Streak Flame */
 @keyframes flameFlicker {
-  0%, 100% {
-    transform: scale(1) translateY(0);
-  }
-  50% {
-    transform: scale(1.05) translateY(-2px);
-  }
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.05) translateY(-2px); }
 }
+.streak-flame { animation: flameFlicker 2s ease-in-out infinite; }
 
-.streak-flame {
-  animation: flameFlicker 2s ease-in-out infinite;
-}
-
-/* Achievement Unlock Toast */
 @keyframes achievementUnlock {
-  0% {
-    transform: translateY(100px) scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: translateY(-10px) scale(1.1);
-  }
-  75% {
-    transform: translateY(5px) scale(0.95);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
+  0% { transform: translateY(100px) scale(0); opacity: 0; }
+  50% { transform: translateY(-10px) scale(1.1); }
+  75% { transform: translateY(5px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
-
 .achievement-toast {
   animation: achievementUnlock 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* Heart Beat (reactions, profile) */
-@keyframes heartBeat {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.3);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Skeleton Loading */
 @keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
-
 .skeleton {
   background: linear-gradient(
     90deg,
@@ -658,16 +616,30 @@ html {
   animation: shimmer 2s infinite;
 }
 
-/* Notification badge pulse */
 @keyframes badgePulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.15);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+.badge-pulse { animation: badgePulse 2s ease-in-out infinite; }
+
+@keyframes toastIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-in.slide-in-from-right {
+  animation: toastIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.badge-pulse {
-  animation: badgePulse 2s ease-in-out infinite;
+@keyframes lkTwinkle {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.lk-twinkle { animation: lkTwinkle 3s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

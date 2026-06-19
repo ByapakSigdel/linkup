@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { themes, themeIds } from '@/styles/themes/index';
 import {
   Card,
   CardHeader,
@@ -53,13 +54,9 @@ interface UserSettings {
   highContrast: boolean;
 }
 
-const THEMES = [
-  { id: 'default', name: 'Default', desc: 'Warm & clean' },
-  { id: 'dreamy', name: 'Dreamy', desc: 'Whimsical & playful' },
-  { id: 'botanical', name: 'Botanical', desc: 'Earthy & bold' },
-  { id: 'midnight', name: 'Midnight', desc: 'Dark & moody' },
-  { id: 'minimal', name: 'Minimal', desc: 'Ultra-clean' },
-] as const;
+const THEMES = themeIds
+  .map((id) => themes[id])
+  .filter((t): t is NonNullable<typeof t> => Boolean(t));
 
 function Toggle({
   checked,
@@ -198,22 +195,47 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => handleThemeChange(t.id)}
-                className={cn(
-                  'rounded-xl border-2 p-3 text-left transition-all',
-                  currentThemeId === t.id
-                    ? 'border-primary bg-primary-light shadow-sm'
-                    : 'border-border hover:border-primary/50',
-                )}
-              >
-                <p className="text-sm font-semibold text-text">{t.name}</p>
-                <p className="text-xs text-text-muted">{t.desc}</p>
-              </button>
-            ))}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {THEMES.map((t) => {
+              const [bg, surface, primary, secondary, accent] = t.swatch;
+              const active = currentThemeId === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => handleThemeChange(t.id)}
+                  className={cn(
+                    'flex items-stretch gap-3 overflow-hidden rounded-xl border-2 p-2.5 text-left transition-all',
+                    active
+                      ? 'border-primary bg-primary-light'
+                      : 'border-border hover:border-primary/50',
+                  )}
+                >
+                  {/* live mini preview */}
+                  <div
+                    className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border border-black/20"
+                    style={{ background: bg }}
+                  >
+                    <span className="absolute h-2.5 w-2.5 rounded-full" style={{ background: secondary, top: 10, left: 12 }} />
+                    <span className="absolute h-2 w-2 rounded-full" style={{ background: accent, top: 40, left: 50 }} />
+                    <span className="absolute h-1 w-1 rotate-45" style={{ background: primary, top: 24, left: 32 }} />
+                    <div className="absolute inset-x-2 bottom-2 h-5 rounded" style={{ background: surface }}>
+                      <span
+                        className="absolute left-1.5 top-1 text-[10px] font-semibold leading-none"
+                        style={{ color: primary, fontFamily: t.previewFont }}
+                      >
+                        Aa
+                      </span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    <p className={cn('truncate text-sm font-semibold', active ? 'text-primary' : 'text-text')}>
+                      {t.name}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{t.description}</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

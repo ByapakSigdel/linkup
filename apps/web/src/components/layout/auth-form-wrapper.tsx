@@ -1,8 +1,8 @@
 'use client';
 
-import { Heart } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { LinkupMark, LinkupWordmark } from '@/components/brand/logo';
 
 interface AuthFormWrapperProps {
   title: string;
@@ -18,22 +18,27 @@ export function AuthFormWrapper({
   className,
 }: AuthFormWrapperProps) {
   return (
-    <div className="flex min-h-screen w-full items-center justify-center px-4 py-12">
+    <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-12">
       <Card
         cardStyle="bordered"
         padding="lg"
-        className={cn('w-full max-w-md', className)}
+        className={cn('relative z-10 w-full max-w-md', className)}
       >
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Heart className="h-6 w-6 text-primary" />
+        <div className="mb-7 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <LinkupMark size={34} />
+            <LinkupWordmark className="text-lg" />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-text">
-            {title}
-          </h1>
-          {description && (
-            <p className="text-center text-sm text-text-muted">{description}</p>
-          )}
+          <div className="mt-2 flex flex-col items-center gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-text">
+              {title}
+            </h1>
+            {description && (
+              <p className="text-center text-sm text-text-muted">
+                {description}
+              </p>
+            )}
+          </div>
         </div>
         {children}
       </Card>

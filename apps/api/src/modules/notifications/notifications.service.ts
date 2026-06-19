@@ -152,6 +152,13 @@ export class NotificationsService {
       callNotifications?: boolean;
       streakReminders?: boolean;
       anniversaryReminders?: boolean;
+      emailNotifications?: boolean;
+      reactionNotifications?: boolean;
+      achievementNotifications?: boolean;
+      circleNotifications?: boolean;
+      quietHoursEnabled?: boolean;
+      quietHoursStart?: string;
+      quietHoursEnd?: string;
     },
   ) {
     const settings = await this.getPreferences(userId);

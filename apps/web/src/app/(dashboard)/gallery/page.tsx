@@ -99,10 +99,14 @@ export default function GalleryPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
+        <div className="space-y-1">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+            Shared Memories
+          </p>
           <h1 className="text-2xl font-bold text-text">Gallery</h1>
           <p className="text-sm text-text-muted">
-            {total} photo{total !== 1 ? 's' : ''} · {albums.length} album{albums.length !== 1 ? 's' : ''}
+            <span className="font-mono tabular-nums">{total}</span> photo{total !== 1 ? 's' : ''} ·{' '}
+            <span className="font-mono tabular-nums">{albums.length}</span> album{albums.length !== 1 ? 's' : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -144,7 +148,7 @@ export default function GalleryPage() {
         >
           <ImageIcon className="h-4 w-4" />
           All Photos
-          <span className="text-xs text-text-muted">({total})</span>
+          <span className="font-mono text-xs tabular-nums text-text-muted">({total})</span>
         </button>
         <button
           onClick={() => setActiveTab('albums')}
@@ -157,7 +161,7 @@ export default function GalleryPage() {
         >
           <Folder className="h-4 w-4" />
           Albums
-          <span className="text-xs text-text-muted">({albums.length})</span>
+          <span className="font-mono text-xs tabular-nums text-text-muted">({albums.length})</span>
         </button>
       </div>
 
@@ -235,7 +239,7 @@ export default function GalleryPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-text-muted">
-              {albums.length} album{albums.length !== 1 ? 's' : ''}
+              <span className="font-mono tabular-nums">{albums.length}</span> album{albums.length !== 1 ? 's' : ''}
             </p>
             <Button
               variant="outline"

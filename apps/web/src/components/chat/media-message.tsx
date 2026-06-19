@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Play, Download, ExternalLink } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { Play } from 'lucide-react';
+import type { MessageType } from '@linkup/types';
 
 interface MediaMessageProps {
   /** Array of media URLs attached to a message */
@@ -11,24 +10,79 @@ interface MediaMessageProps {
   isSent: boolean;
   /** Click handler to open full viewer */
   onImageClick?: (url: string, index: number) => void;
+  /** The message type — used to render voice / scribble specially */
+  messageType?: MessageType;
+}
+
+const AUDIO_EXTS = ['webm', 'mp3', 'wav', 'ogg', 'm4a', 'oga'];
+
+function getExt(url: string): string {
+  // Strip query string before reading extension
+  return url.split('?')[0]?.split('.').pop()?.toLowerCase() ?? '';
+}
+
+function isAudio(url: string): boolean {
+  return AUDIO_EXTS.includes(getExt(url));
+}
+
+function isVideoFile(url: string): boolean {
+  const ext = getExt(url);
+  return ext === 'mp4' || ext === 'mov' || ext === 'avi' || ext === 'mkv';
 }
 
 /**
- * Renders media attachments (images/videos) within a chat message bubble.
- * Supports single image, 2-image side-by-side, and 3+ grid layouts.
+ * Renders media attachments (images/videos/voice/scribble) within a chat
+ * message bubble. Supports single image, 2-image side-by-side, and 3+ grid
+ * layouts for photos/videos.
  */
-export function MediaMessage({ mediaUrls, isSent, onImageClick }: MediaMessageProps) {
+export function MediaMessage({
+  mediaUrls,
+  isSent,
+  onImageClick,
+  messageType,
+}: MediaMessageProps) {
   if (!mediaUrls || mediaUrls.length === 0) return null;
 
-  const isVideo = (url: string) => {
-    const ext = url.split('.').pop()?.toLowerCase();
-    return ext === 'mp4' || ext === 'webm' || ext === 'mov';
-  };
+  // ─── Voice message ──────────────────────────────────────────────────────
+  // Render as an audio player when the message is explicitly a voice message
+  // or the (single) media URL is an audio file.
+  if (messageType === 'voice' || (mediaUrls.length === 1 && isAudio(mediaUrls[0]!))) {
+    const url = mediaUrls[0]!;
+    return (
+      <div className="max-w-[260px] min-w-[200px]">
+        <audio
+          src={url}
+          controls
+          preload="metadata"
+          className="w-full h-10 rounded-full"
+        />
+      </div>
+    );
+  }
 
-  // Single media
+  // ─── Scribble message ───────────────────────────────────────────────────
+  // Render the drawing as an inline image.
+  if (messageType === 'scribble') {
+    const url = mediaUrls[0]!;
+    return (
+      <div
+        className="relative max-w-xs cursor-pointer rounded-lg overflow-hidden bg-white/5"
+        onClick={() => onImageClick?.(url, 0)}
+      >
+        <img
+          src={url}
+          alt="Scribble"
+          className="w-full rounded-lg transition-opacity hover:opacity-90"
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  // Single media (photo / video)
   if (mediaUrls.length === 1) {
     const url = mediaUrls[0]!;
-    if (isVideo(url)) {
+    if (isVideoFile(url)) {
       return (
         <div className="relative max-w-xs rounded-lg overflow-hidden">
           <video
@@ -64,7 +118,7 @@ export function MediaMessage({ mediaUrls, isSent, onImageClick }: MediaMessagePr
           <MediaThumb
             key={url}
             url={url}
-            isVideoFile={isVideo(url)}
+            isVideoFile={isVideoFile(url)}
             onClick={() => onImageClick?.(url, index)}
           />
         ))}
@@ -79,7 +133,7 @@ export function MediaMessage({ mediaUrls, isSent, onImageClick }: MediaMessagePr
         <div key={url} className="relative">
           <MediaThumb
             url={url}
-            isVideoFile={isVideo(url)}
+            isVideoFile={isVideoFile(url)}
             onClick={() => onImageClick?.(url, index)}
           />
           {/* "+N more" overlay on last tile */}

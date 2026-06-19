@@ -1,13 +1,16 @@
 'use client';
 
-import { Phone, Video, MoreVertical, ChevronLeft } from 'lucide-react';
+import { Phone, Video, MonitorUp, MoreVertical, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Avatar } from '@/components/ui';
 import { timeAgo } from '@linkup/utils';
+import { useCall } from '@/hooks/use-call';
 
 interface ChatHeaderProps {
   partnerName: string;
   partnerAvatar?: string | null;
+  /** Partner user id — used to initiate calls */
+  partnerId?: string | null;
   isOnline: boolean;
   lastSeenAt?: string;
   className?: string;
@@ -17,16 +20,27 @@ interface ChatHeaderProps {
 export function ChatHeader({
   partnerName,
   partnerAvatar,
+  partnerId,
   isOnline,
   lastSeenAt,
   className,
   onBack,
 }: ChatHeaderProps) {
+  const { startCall } = useCall();
+
   const statusText = isOnline
     ? 'Online'
     : lastSeenAt
       ? `Last seen ${timeAgo(lastSeenAt)}`
       : 'Offline';
+
+  const peer = {
+    id: partnerId ?? undefined,
+    displayName: partnerName,
+    avatarUrl: partnerAvatar ?? undefined,
+  };
+
+  const callDisabled = !partnerId;
 
   return (
     <div
@@ -70,16 +84,31 @@ export function ChatHeader({
       {/* Action buttons */}
       <div className="flex items-center gap-1">
         <button
-          className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+          onClick={() => startCall('voice', peer)}
+          disabled={callDisabled}
+          className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-text-muted"
           aria-label="Voice call"
+          title="Voice call"
         >
           <Phone className="h-5 w-5" />
         </button>
         <button
-          className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+          onClick={() => startCall('video', peer)}
+          disabled={callDisabled}
+          className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-text-muted"
           aria-label="Video call"
+          title="Video call"
         >
           <Video className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => startCall('screen', peer)}
+          disabled={callDisabled}
+          className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-text-muted"
+          aria-label="Share screen"
+          title="Share screen"
+        >
+          <MonitorUp className="h-5 w-5" />
         </button>
         <button
           className="p-2 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"

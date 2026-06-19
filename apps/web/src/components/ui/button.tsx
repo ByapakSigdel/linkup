@@ -29,7 +29,7 @@ const buttonVariants = cva(
         icon: 'h-10 w-10 p-0',
       },
       shape: {
-        rounded: 'rounded-lg',
+        rounded: 'rounded-[var(--lk-btn-radius)]',
         pill: 'rounded-full',
         square: 'rounded-none',
         organic: 'rounded-[1.25rem_0.5rem_1.25rem_0.5rem]',
@@ -55,6 +55,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        data-lk="button"
+        data-variant={variant ?? 'primary'}
         className={cn(buttonVariants({ variant, size, shape }), className)}
         disabled={disabled || loading}
         aria-busy={loading || undefined}

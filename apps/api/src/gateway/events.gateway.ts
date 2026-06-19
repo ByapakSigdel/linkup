@@ -66,6 +66,7 @@ export class EventsGateway
       const userId = await this.authenticateClient(client);
       (client as AuthenticatedSocket).userId = userId;
       this.connectedUsers.set(userId, client.id);
+      await client.join(`user:${userId}`);
 
       this.logger.log(`Client connected: ${client.id} (user: ${userId})`);
 
@@ -409,6 +410,257 @@ export class EventsGateway
     return { event: 'presence:status', data: presenceUpdate };
   }
 
+  // ─── WebRTC Call Signaling ───────────────────────────────────────────────────
+
+  @SubscribeMessage('call:initiate')
+  async handleCallInitiate(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { callType: string; sessionId?: string },
+  ) {
+    const partnerId = await this.getPartnerId(client.userId);
+    if (!partnerId) return { error: 'No partner found' };
+    const [caller] = await this.db
+      .select({
+        id: schema.users.id,
+        displayName: schema.users.displayName,
+        avatarUrl: schema.users.avatarUrl,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, client.userId))
+      .limit(1);
+    this.emitToUser(partnerId, 'call:incoming', {
+      callType: payload.callType,
+      sessionId: payload.sessionId,
+      from: caller,
+    });
+    return { event: 'call:ringing', data: { partnerOnline: this.connectedUsers.has(partnerId) } };
+  }
+
+  @SubscribeMessage('call:accept')
+  async handleCallAccept(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'call:accepted', { by: client.userId });
+  }
+
+  @SubscribeMessage('call:decline')
+  async handleCallDecline(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'call:declined', { by: client.userId });
+  }
+
+  @SubscribeMessage('call:end')
+  async handleCallEnd(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'call:ended', { by: client.userId });
+  }
+
+  @SubscribeMessage('call:offer')
+  async handleCallOffer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { sdp: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'call:offer', payload);
+  }
+
+  @SubscribeMessage('call:answer')
+  async handleCallAnswer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { sdp: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'call:answer', payload);
+  }
+
+  @SubscribeMessage('call:ice')
+  async handleCallIce(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { candidate: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'call:ice', payload);
+  }
+
+  // ─── Scribble (real-time) ────────────────────────────────────────────────────
+
+  @SubscribeMessage('scribble:stroke')
+  async handleScribbleStroke(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'scribble:received', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  @SubscribeMessage('scribble:clear')
+  async handleScribbleClear(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'scribble:cleared', { userId: client.userId });
+  }
+
+  // ─── Collaborative Painting ──────────────────────────────────────────────────
+
+  @SubscribeMessage('painting:stroke')
+  async handlePaintingStroke(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'painting:stroke:added', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  @SubscribeMessage('painting:undo')
+  async handlePaintingUndo(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'painting:undone', { userId: client.userId });
+  }
+
+  @SubscribeMessage('painting:clear')
+  async handlePaintingClear(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'painting:cleared', { userId: client.userId });
+  }
+
+  @SubscribeMessage('painting:cursor')
+  async handlePaintingCursor(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'painting:cursor', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  // ─── Watch Party (synchronized playback) ─────────────────────────────────────
+
+  @SubscribeMessage('watch:state')
+  async handleWatchState(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'watch:state', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  @SubscribeMessage('watch:load')
+  async handleWatchLoad(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'watch:load', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  @SubscribeMessage('watch:chat')
+  async handleWatchChat(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { text: string },
+  ) {
+    await this.relayToPartner(client.userId, 'watch:chat', {
+      userId: client.userId,
+      text: payload.text,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  @SubscribeMessage('watch:reaction')
+  async handleWatchReaction(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { emoji: string },
+  ) {
+    await this.relayToPartner(client.userId, 'watch:reaction', {
+      userId: client.userId,
+      emoji: payload.emoji,
+    });
+  }
+
+  // ─── Listen Together (music sync) ────────────────────────────────────────────
+
+  @SubscribeMessage('music:state')
+  async handleMusicState(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'music:state', {
+      userId: client.userId,
+      ...(payload as object),
+    });
+  }
+
+  // ─── SoundBoard (play sound on partner's device) ─────────────────────────────
+
+  @SubscribeMessage('soundboard:play')
+  async handleSoundboardPlay(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { soundId: string; audioUrl: string; name?: string },
+  ) {
+    await this.relayToPartner(client.userId, 'soundboard:play', {
+      userId: client.userId,
+      ...payload,
+    });
+  }
+
+  // ─── Shared couple theme ─────────────────────────────────────────────────────
+
+  @SubscribeMessage('theme:change')
+  async handleThemeChange(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { themeId: string },
+  ) {
+    if (!payload?.themeId) return;
+    // Persist on the couple so it's authoritative for both partners.
+    const [user] = await this.db
+      .select({ coupleId: schema.users.coupleId })
+      .from(schema.users)
+      .where(eq(schema.users.id, client.userId))
+      .limit(1);
+    if (user?.coupleId) {
+      await this.db
+        .update(schema.couples)
+        .set({ sharedThemeId: payload.themeId, updatedAt: new Date() })
+        .where(eq(schema.couples.id, user.coupleId));
+    }
+    await this.relayToPartner(client.userId, 'theme:changed', {
+      themeId: payload.themeId,
+    });
+  }
+
+  // ─── Live Streaming to partner ───────────────────────────────────────────────
+
+  @SubscribeMessage('stream:offer')
+  async handleStreamOffer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { sdp: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'stream:offer', payload);
+  }
+
+  @SubscribeMessage('stream:answer')
+  async handleStreamAnswer(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { sdp: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'stream:answer', payload);
+  }
+
+  @SubscribeMessage('stream:ice')
+  async handleStreamIce(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { candidate: unknown },
+  ) {
+    await this.relayToPartner(client.userId, 'stream:ice', payload);
+  }
+
+  @SubscribeMessage('stream:start')
+  async handleStreamStart(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'stream:started', { by: client.userId });
+  }
+
+  @SubscribeMessage('stream:stop')
+  async handleStreamStop(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'stream:stopped', { by: client.userId });
+  }
+
   // ─── Helper Methods ─────────────────────────────────────────────────────────
 
   /**
@@ -512,6 +764,24 @@ export class EventsGateway
     if (socketId) {
       this.server.to(socketId).emit(event, data);
     }
+  }
+
+  /**
+   * Public relay: forward an event from a user to their partner.
+   * Used by real-time feature handlers (calls, scribble, painting, watch, music).
+   */
+  async relayToPartner(userId: string, event: string, data: unknown): Promise<void> {
+    return this.emitToPartner(userId, event, data);
+  }
+
+  /** Resolve a user's partner id (public for services). */
+  async resolvePartnerId(userId: string): Promise<string | null> {
+    return this.getPartnerId(userId);
+  }
+
+  /** Whether a user currently has an active socket connection. */
+  isUserOnline(userId: string): boolean {
+    return this.connectedUsers.has(userId);
   }
 
   /**

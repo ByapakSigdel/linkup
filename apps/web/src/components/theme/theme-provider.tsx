@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useThemeStore } from '@/stores/theme-store';
+import { useThemeStore, applyThemeClass } from '@/stores/theme-store';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
-  const setTheme = useThemeStore((state) => state.setTheme);
 
-  // Apply persisted theme on mount
+  // Keep the <html> class in sync with the store for live theme changes.
+  // Persistence + first-paint application are handled by the store's
+  // onRehydrateStorage hook and the inline script in the root layout.
   useEffect(() => {
-    setTheme(currentThemeId);
-  }, [currentThemeId, setTheme]);
+    applyThemeClass(currentThemeId);
+  }, [currentThemeId]);
 
   return <>{children}</>;
 }

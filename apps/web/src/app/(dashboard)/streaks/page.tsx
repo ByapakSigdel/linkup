@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useStreaksStore } from '@/stores/streaks-store';
-import { Card, CardHeader, CardTitle, CardContent, Button, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Spinner, Emoji } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 const MILESTONE_LABELS: Record<number, string> = {
@@ -84,14 +84,17 @@ export default function StreaksPage() {
       {milestoneToast && (
         <div className="achievement-toast fixed top-4 right-4 z-50 rounded-xl bg-accent px-6 py-4 text-text-on-primary shadow-lg">
           <div className="flex items-center gap-3">
-            <Trophy className="h-6 w-6" />
+            <Emoji emoji="🏆" size={24} />
             <span className="font-semibold">{milestoneToast}</span>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div>
+      <div className="space-y-1">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+          Daily Ritual
+        </p>
         <h1 className="font-display text-2xl font-bold text-text">
           Photo Streak
         </h1>
@@ -129,10 +132,10 @@ export default function StreaksPage() {
             )}
           </div>
 
-          <h2 className="text-5xl font-bold text-text">
+          <span className="font-mono text-5xl font-bold tabular-nums text-text">
             {streak?.currentStreak ?? 0}
-          </h2>
-          <p className="mt-1 text-lg text-text-muted">
+          </span>
+          <p className="mt-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
             {(streak?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'} Streak
           </p>
 
@@ -157,7 +160,10 @@ export default function StreaksPage() {
               <div className="flex items-center gap-2 text-text-muted">
                 <Clock className="h-5 w-5" />
                 <span>
-                  {hoursRemaining}h {minutesRemaining}m remaining
+                  <span className="font-mono tabular-nums">
+                    {hoursRemaining}h {minutesRemaining}m
+                  </span>{' '}
+                  remaining
                 </span>
               </div>
             )}
@@ -188,7 +194,7 @@ export default function StreaksPage() {
               streak.freezesAvailable > 0 && (
                 <Button onClick={freezeStreak} variant="outline" size="md">
                   <Snowflake className="mr-2 h-4 w-4" />
-                  Freeze ({streak.freezesAvailable})
+                  Freeze (<span className="font-mono tabular-nums">{streak.freezesAvailable}</span>)
                 </Button>
               )}
 
@@ -211,37 +217,37 @@ export default function StreaksPage() {
         <Card cardStyle="bordered" padding="sm">
           <div className="flex flex-col items-center gap-1 py-2 text-center">
             <TrendingUp className="h-5 w-5 text-primary" />
-            <span className="text-2xl font-bold text-text">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text">
               {streak?.longestStreak ?? 0}
             </span>
-            <span className="text-xs text-text-muted">Longest Streak</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-text-muted">Longest Streak</span>
           </div>
         </Card>
         <Card cardStyle="bordered" padding="sm">
           <div className="flex flex-col items-center gap-1 py-2 text-center">
             <Camera className="h-5 w-5 text-secondary" />
-            <span className="text-2xl font-bold text-text">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text">
               {streak?.totalPhotos ?? 0}
             </span>
-            <span className="text-xs text-text-muted">Total Photos</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-text-muted">Total Photos</span>
           </div>
         </Card>
         <Card cardStyle="bordered" padding="sm">
           <div className="flex flex-col items-center gap-1 py-2 text-center">
             <Star className="h-5 w-5 text-accent" />
-            <span className="text-2xl font-bold text-text">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text">
               {streak?.totalPoints ?? 0}
             </span>
-            <span className="text-xs text-text-muted">Total Points</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-text-muted">Total Points</span>
           </div>
         </Card>
         <Card cardStyle="bordered" padding="sm">
           <div className="flex flex-col items-center gap-1 py-2 text-center">
             <Snowflake className="h-5 w-5 text-info" />
-            <span className="text-2xl font-bold text-text">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text">
               {streak?.freezesAvailable ?? 0}
             </span>
-            <span className="text-xs text-text-muted">Freezes Left</span>
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-text-muted">Freezes Left</span>
           </div>
         </Card>
       </div>
@@ -266,9 +272,9 @@ export default function StreaksPage() {
                       : 'bg-surface-hover text-text-muted',
                   )}
                 >
-                  <Trophy className="h-4 w-4" />
+                  <Emoji emoji={achieved ? '🏆' : '🔒'} size={16} />
                   <span>{label}</span>
-                  <span className="opacity-70">({days}d)</span>
+                  <span className="font-mono tabular-nums opacity-70">({days}d)</span>
                 </div>
               );
             })}
@@ -329,11 +335,11 @@ export default function StreaksPage() {
                         {entry.eventType === 'streak_recovered' && 'Streak recovered'}
                       </p>
                       <p className="text-xs text-text-muted">
-                        Day {entry.streakLength}
+                        Day <span className="font-mono tabular-nums">{entry.streakLength}</span>
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-text-muted">
+                  <span className="font-mono text-xs tabular-nums text-text-muted">
                     {new Date(entry.createdAt).toLocaleDateString()}
                   </span>
                 </div>

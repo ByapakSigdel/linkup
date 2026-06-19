@@ -28,6 +28,8 @@ import {
   Spinner,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { LinkupMark } from '@/components/brand/logo';
+import { PairingCard } from '@/components/couple/pairing-card';
 import api from '@/lib/api';
 
 interface DashboardData {
@@ -152,6 +154,26 @@ export default function DashboardPage() {
 
   const { coupleStats, partner } = dashboardData;
 
+  // Not linked up yet — surface the pairing flow front and centre.
+  if (!couple?.isPaired) {
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 p-4 md:p-6">
+        <div className="mt-6 flex flex-col items-center gap-3 text-center">
+          <LinkupMark size={56} />
+          <h2 className="text-2xl font-semibold text-text">
+            Welcome to linkup, {user?.displayName}
+          </h2>
+          <p className="max-w-md text-text-muted">
+            You&apos;re one step away. Create your private couple space or join
+            with your partner&apos;s code to unlock chat, streaks, watch parties
+            and more.
+          </p>
+        </div>
+        <PairingCard />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       {/* Couple Header */}
@@ -185,7 +207,11 @@ export default function DashboardPage() {
               : `Hey, ${user?.displayName}`}
           </h2>
           <p className="text-text-muted">
-            {partner ? `Together for ${daysTogether} days` : 'Invite your partner to get started'}
+            {partner ? (
+              <>Together for <span className="font-mono text-text">{daysTogether}</span> days</>
+            ) : (
+              'Invite your partner to get started'
+            )}
           </p>
 
           {/* Quick Stats */}
@@ -193,33 +219,33 @@ export default function DashboardPage() {
             <div className="mt-4 grid w-full max-w-md grid-cols-4 gap-3">
               <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
                 <Flame className="h-4 w-4 text-accent" />
-                <span className="mt-1 text-lg font-bold text-text">
+                <span className="mt-1 font-mono text-lg font-bold text-text">
                   {coupleStats.currentStreak}
                 </span>
-                <span className="text-[10px] text-text-muted">Streak</span>
+                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Streak</span>
               </div>
               <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
                 <MessageCircle className="h-4 w-4 text-primary" />
-                <span className="mt-1 text-lg font-bold text-text">
+                <span className="mt-1 font-mono text-lg font-bold text-text">
                   {coupleStats.messageCount > 999
                     ? `${Math.floor(coupleStats.messageCount / 1000)}k`
                     : coupleStats.messageCount}
                 </span>
-                <span className="text-[10px] text-text-muted">Messages</span>
+                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Messages</span>
               </div>
               <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
                 <ImageIcon className="h-4 w-4 text-secondary" />
-                <span className="mt-1 text-lg font-bold text-text">
+                <span className="mt-1 font-mono text-lg font-bold text-text">
                   {coupleStats.mediaCount}
                 </span>
-                <span className="text-[10px] text-text-muted">Photos</span>
+                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Photos</span>
               </div>
               <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
                 <Trophy className="h-4 w-4 text-accent" />
-                <span className="mt-1 text-lg font-bold text-text">
+                <span className="mt-1 font-mono text-lg font-bold text-text">
                   {coupleStats.achievementCount}
                 </span>
-                <span className="text-[10px] text-text-muted">Awards</span>
+                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Awards</span>
               </div>
             </div>
           )}
@@ -230,10 +256,13 @@ export default function DashboardPage() {
       <Card cardStyle="bordered" padding="md">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-accent" />
-              Photo Streak
-            </CardTitle>
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Daily ritual</p>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-accent" />
+                Photo Streak
+              </CardTitle>
+            </div>
             <Link href="/streaks" className="text-sm font-medium text-primary hover:underline">
               View
             </Link>
@@ -261,7 +290,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-text">
-                  {streak?.currentStreak ?? 0} {(streak?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
+                  <span className="font-mono">{streak?.currentStreak ?? 0}</span> {(streak?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
                 </p>
                 {hasContributedToday ? (
                   <p className="flex items-center gap-1 text-sm text-success">
@@ -292,10 +321,13 @@ export default function DashboardPage() {
       <Card cardStyle="bordered" padding="md">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Upcoming Dates
-            </CardTitle>
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">On the calendar</p>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Upcoming Dates
+              </CardTitle>
+            </div>
             <Link href="/profile" className="text-sm font-medium text-primary hover:underline">
               Manage
             </Link>
@@ -350,10 +382,13 @@ export default function DashboardPage() {
       <Card cardStyle="bordered" padding="md">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-accent" />
-              Recent Achievements
-            </CardTitle>
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Milestones</p>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-accent" />
+                Recent Achievements
+              </CardTitle>
+            </div>
             <Link href="/hall-of-fame" className="text-sm font-medium text-primary hover:underline">
               View
             </Link>
@@ -376,7 +411,7 @@ export default function DashboardPage() {
                       {a.name || 'Achievement'}
                     </p>
                   </div>
-                  <span className="text-xs font-medium text-accent">
+                  <span className="font-mono text-xs font-medium text-accent">
                     {a.points} pts
                   </span>
                 </div>
@@ -389,6 +424,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <Card cardStyle="bordered" padding="md">
         <CardHeader>
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Jump back in</p>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>

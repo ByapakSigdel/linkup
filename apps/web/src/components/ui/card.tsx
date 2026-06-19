@@ -4,15 +4,11 @@ import { forwardRef } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
 
-const cardVariants = cva('bg-surface text-text transition-all', {
+// Visual identity (radius / shadow / background / border / decoration) is owned
+// by the active theme via the `[data-lk="card"]` CSS hooks in globals.css.
+// The component only handles layout (text colour + padding).
+const cardVariants = cva('text-text transition-all', {
   variants: {
-    cardStyle: {
-      flat: 'rounded-lg',
-      elevated: 'rounded-lg shadow-md hover:shadow-lg',
-      bordered: 'rounded-lg border border-border',
-      sticker:
-        'rounded-2xl border-2 border-border-strong shadow-md rotate-[-0.5deg] hover:rotate-0 hover:shadow-lg',
-    },
     padding: {
       none: 'p-0',
       sm: 'p-3',
@@ -21,21 +17,23 @@ const cardVariants = cva('bg-surface text-text transition-all', {
     },
   },
   defaultVariants: {
-    cardStyle: 'flat',
     padding: 'md',
   },
 });
 
-export interface CardProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof cardVariants> {}
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  cardStyle?: 'flat' | 'elevated' | 'bordered' | 'sticker';
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+}
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, cardStyle, padding, ...props }, ref) => {
+  ({ className, cardStyle = 'flat', padding, ...props }, ref) => {
     return (
       <div
         ref={ref}
-        className={cn(cardVariants({ cardStyle, padding }), className)}
+        data-lk="card"
+        data-variant={cardStyle}
+        className={cn(cardVariants({ padding }), className)}
         {...props}
       />
     );

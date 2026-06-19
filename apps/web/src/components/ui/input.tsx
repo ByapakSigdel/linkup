@@ -10,9 +10,9 @@ const inputVariants = cva(
     variants: {
       inputStyle: {
         outlined:
-          'border border-border rounded-lg px-3 focus:border-border-focus focus:ring-2 focus:ring-border-focus/20',
+          'border border-border rounded-[var(--lk-input-radius)] px-3.5 focus:border-border-focus focus:ring-2 focus:ring-border-focus/20',
         filled:
-          'bg-surface-hover border border-transparent rounded-lg px-3 focus:bg-surface focus:border-border-focus focus:ring-2 focus:ring-border-focus/20',
+          'bg-surface-hover border border-transparent rounded-[var(--lk-input-radius)] px-3.5 focus:bg-surface focus:border-border-focus focus:ring-2 focus:ring-border-focus/20',
         underline:
           'border-b-2 border-border rounded-none px-1 focus:border-border-focus',
         rounded:

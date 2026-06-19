@@ -180,7 +180,7 @@ export default function ProfilePage() {
                 `${user.displayName} & ${partner.displayName}`}
             </h2>
             <p className="text-text-muted">
-              Together for {daysTogether} days
+              Together for <span className="font-mono text-text">{daysTogether}</span> days
             </p>
             {coupleStats.couple.anniversaryDate && (
               <p className="text-xs text-text-muted">
@@ -307,6 +307,7 @@ export default function ProfilePage() {
       {coupleStats && (
         <Card cardStyle="bordered" padding="md">
           <CardHeader>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">By the numbers</p>
             <CardTitle>Relationship Stats</CardTitle>
           </CardHeader>
           <CardContent>
@@ -316,7 +317,7 @@ export default function ProfilePage() {
                   <MessageCircle className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-text">
+                  <p className="font-mono text-lg font-bold text-text">
                     {coupleStats.messageCount.toLocaleString()}
                   </p>
                   <p className="text-xs text-text-muted">Messages Sent</p>
@@ -327,7 +328,7 @@ export default function ProfilePage() {
                   <ImageIcon className="h-5 w-5 text-secondary" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-text">
+                  <p className="font-mono text-lg font-bold text-text">
                     {coupleStats.mediaCount.toLocaleString()}
                   </p>
                   <p className="text-xs text-text-muted">Photos Shared</p>
@@ -339,7 +340,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="text-lg font-bold text-text">
-                    {coupleStats.currentStreak} days
+                    <span className="font-mono">{coupleStats.currentStreak}</span> days
                   </p>
                   <p className="text-xs text-text-muted">Current Streak</p>
                 </div>
@@ -349,7 +350,7 @@ export default function ProfilePage() {
                   <Trophy className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-text">
+                  <p className="font-mono text-lg font-bold text-text">
                     {coupleStats.achievementCount}
                   </p>
                   <p className="text-xs text-text-muted">Achievements</p>
@@ -360,7 +361,7 @@ export default function ProfilePage() {
                   <Star className="h-5 w-5 text-secondary" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-text">
+                  <p className="font-mono text-lg font-bold text-text">
                     {coupleStats.totalPoints.toLocaleString()}
                   </p>
                   <p className="text-xs text-text-muted">Total Points</p>
@@ -371,7 +372,7 @@ export default function ProfilePage() {
                   <Calendar className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-text">{daysTogether}</p>
+                  <p className="font-mono text-lg font-bold text-text">{daysTogether}</p>
                   <p className="text-xs text-text-muted">Days Together</p>
                 </div>
               </div>
@@ -384,6 +385,7 @@ export default function ProfilePage() {
       {coupleStats && coupleStats.showcasedAchievements.length > 0 && (
         <Card cardStyle="bordered" padding="md">
           <CardHeader>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">On display</p>
             <CardTitle>Showcased Achievements</CardTitle>
           </CardHeader>
           <CardContent>

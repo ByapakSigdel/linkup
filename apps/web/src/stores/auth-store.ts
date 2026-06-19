@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, Couple, AuthTokens, AuthResponse } from '@linkup/types';
+import type { User, Couple, AuthTokens } from '@linkup/types';
 import api from '@/lib/api';
+import { disconnectSocket } from '@/lib/socket';
 
 interface AuthState {
   user: User | null;
@@ -18,9 +19,10 @@ interface AuthState {
     displayName: string;
     password: string;
     dateOfBirth?: string;
-  }) => Promise<void>;
+  }) => Promise<{ verificationCode?: string }>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  hydrate: () => Promise<void>;
   setUser: (user: User) => void;
   setCouple: (couple: Couple | null) => void;
   reset: () => void;
@@ -42,17 +44,18 @@ export const useAuthStore = create<AuthState>()(
       login: async (email, password) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<AuthResponse>('/auth/login', {
+          const { data: body } = await api.post('/auth/login', {
             email,
             password,
           });
+          const d = body.data;
           set({
-            user: data.user,
-            tokens: data.tokens,
-            couple: data.couple ?? null,
+            user: d.user,
+            tokens: { accessToken: d.accessToken, refreshToken: d.refreshToken, expiresIn: d.expiresIn ?? 900 },
             isAuthenticated: true,
             isLoading: false,
           });
+          await get().hydrate();
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -62,20 +65,38 @@ export const useAuthStore = create<AuthState>()(
       register: async (registerData) => {
         set({ isLoading: true });
         try {
-          const { data } = await api.post<AuthResponse>(
-            '/auth/register',
-            registerData,
-          );
+          const { data: body } = await api.post('/auth/register', registerData);
+          const d = body.data;
           set({
-            user: data.user,
-            tokens: data.tokens,
-            couple: data.couple ?? null,
+            user: d.user,
+            tokens: { accessToken: d.accessToken, refreshToken: d.refreshToken, expiresIn: d.expiresIn ?? 900 },
             isAuthenticated: true,
             isLoading: false,
           });
+          await get().hydrate();
+          return { verificationCode: d.verificationCode };
         } catch (error) {
           set({ isLoading: false });
           throw error;
+        }
+      },
+
+      /** Load the full user record (with coupleId) and the couple object. */
+      hydrate: async () => {
+        try {
+          const { data: meBody } = await api.post('/auth/me');
+          const fullUser: User = meBody.data.user;
+          set({ user: fullUser });
+          if (fullUser.coupleId) {
+            const { data: cBody } = await api.get(
+              `/couples/${fullUser.coupleId}`,
+            );
+            set({ couple: cBody.data.couple ?? null });
+          } else {
+            set({ couple: null });
+          }
+        } catch {
+          // Non-fatal: keep whatever we have
         }
       },
 
@@ -90,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Logout endpoint failure is not critical
         } finally {
+          disconnectSocket();
           set(initialState);
         }
       },
@@ -97,15 +119,16 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: async () => {
         const { tokens } = get();
         if (!tokens?.refreshToken) return;
-
         try {
-          const { data } = await api.post<{ tokens: AuthTokens }>(
-            '/auth/refresh',
-            { refreshToken: tokens.refreshToken },
-          );
-          set({ tokens: data.tokens });
+          const { data: body } = await api.post('/auth/refresh', {
+            refreshToken: tokens.refreshToken,
+          });
+          const d = body.data;
+          set({
+            tokens: { accessToken: d.accessToken, refreshToken: d.refreshToken, expiresIn: d.expiresIn ?? 900 },
+          });
         } catch {
-          // Refresh failed — force logout
+          disconnectSocket();
           set(initialState);
         }
       },

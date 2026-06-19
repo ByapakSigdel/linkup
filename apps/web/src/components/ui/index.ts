@@ -13,3 +13,4 @@ export {
 export { Avatar, avatarVariants, type AvatarProps } from './avatar';
 export { Badge, badgeVariants, type BadgeProps } from './badge';
 export { Spinner, spinnerVariants, type SpinnerProps } from './spinner';
+export { Emoji, REACTION_EMOJIS, QUICK_EMOJIS } from './emoji';

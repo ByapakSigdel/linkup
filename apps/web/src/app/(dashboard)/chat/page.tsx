@@ -201,6 +201,8 @@ export default function ChatPage() {
       {/* Header */}
       <ChatHeader
         partnerName={partnerName}
+        partnerAvatar={couple?.coupleAvatarUrl}
+        partnerId={partnerId}
         isOnline={isPartnerOnline}
         lastSeenAt={partnerLastSeenAt}
         onBack={() => router.back()}

@@ -63,6 +63,13 @@ export class NotificationsController {
       callNotifications?: boolean;
       streakReminders?: boolean;
       anniversaryReminders?: boolean;
+      emailNotifications?: boolean;
+      reactionNotifications?: boolean;
+      achievementNotifications?: boolean;
+      circleNotifications?: boolean;
+      quietHoursEnabled?: boolean;
+      quietHoursStart?: string;
+      quietHoursEnd?: string;
     },
   ) {
     const preferences = await this.notificationsService.updatePreferences(

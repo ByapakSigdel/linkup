@@ -73,6 +73,65 @@ export class StorageService implements StorageProvider {
     };
   }
 
+  /**
+   * Store a raw buffer (e.g. decoded base64 canvas/audio data) directly.
+   */
+  async storeBuffer(
+    buffer: Buffer,
+    coupleId: string,
+    type: string,
+    ext: string,
+  ): Promise<StorageResult> {
+    const safeExt = ext.startsWith('.') ? ext : `.${ext}`;
+    const hash = crypto.randomBytes(8).toString('hex');
+    const timestamp = Date.now();
+    const filename = `${timestamp}-${hash}${safeExt}`;
+    const storageKey = `${coupleId}/${type}/${filename}`;
+
+    const dirPath = path.join(this.uploadDir, coupleId, type);
+    this.ensureDir(dirPath);
+
+    const filePath = path.join(dirPath, filename);
+    await fs.promises.writeFile(filePath, buffer);
+
+    this.logger.log(`Stored buffer: ${storageKey} (${buffer.length} bytes)`);
+
+    return {
+      storageKey,
+      storageBucket: 'local',
+      cdnUrl: this.getUrl(storageKey),
+      filename,
+    };
+  }
+
+  /**
+   * Decode a data URL (e.g. "data:image/png;base64,...") into a stored file.
+   */
+  async storeDataUrl(
+    dataUrl: string,
+    coupleId: string,
+    type: string,
+  ): Promise<StorageResult> {
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!match) {
+      throw new Error('Invalid data URL');
+    }
+    const mime = match[1]!;
+    const buffer = Buffer.from(match[2]!, 'base64');
+    const extMap: Record<string, string> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'audio/webm': '.webm',
+      'audio/wav': '.wav',
+      'audio/mpeg': '.mp3',
+      'audio/ogg': '.ogg',
+    };
+    const ext = extMap[mime] || '.bin';
+    return this.storeBuffer(buffer, coupleId, type, ext);
+  }
+
   async delete(storageKey: string): Promise<void> {
     const filePath = path.join(this.uploadDir, storageKey);
     try {

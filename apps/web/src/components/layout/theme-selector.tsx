@@ -6,14 +6,45 @@ import { cn } from '@/lib/cn';
 import { useThemeStore } from '@/stores/theme-store';
 import { themes, themeIds } from '@/styles/themes/index';
 
-/** The primary / secondary / accent colours for each theme, used for swatch previews. */
-const themeSwatches: Record<string, [string, string, string]> = {
-  default: ['#F43F5E', '#A855F7', '#F59E0B'],
-  dreamy: ['#7C3AED', '#EC4899', '#F0ABFC'],
-  botanical: ['#16A34A', '#E11D48', '#CA8A04'],
-  midnight: ['#8B5CF6', '#06B6D4', '#F472B6'],
-  minimal: ['#18181B', '#71717A', '#3B82F6'],
-};
+function ThemePreview({
+  swatch,
+  previewFont,
+}: {
+  swatch: [string, string, string, string, string];
+  previewFont: string;
+}) {
+  const [bg, surface, primary, secondary, accent] = swatch;
+  return (
+    <div
+      className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-black/20"
+      style={{ background: bg }}
+    >
+      <span
+        className="absolute h-2 w-2 rounded-full"
+        style={{ background: secondary, top: 8, left: 8 }}
+      />
+      <span
+        className="absolute h-1.5 w-1.5 rounded-full"
+        style={{ background: accent, top: 30, left: 34 }}
+      />
+      <span
+        className="absolute h-[3px] w-[3px] rotate-45"
+        style={{ background: primary, top: 17, left: 22 }}
+      />
+      <div
+        className="absolute inset-x-1.5 bottom-1.5 h-3 rounded"
+        style={{ background: surface }}
+      >
+        <span
+          className="absolute left-1 top-0.5 text-[7px] font-semibold leading-none"
+          style={{ color: primary, fontFamily: previewFont }}
+        >
+          Aa
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export function ThemeSelector() {
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
@@ -21,7 +52,6 @@ export function ThemeSelector() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -30,40 +60,38 @@ export function ThemeSelector() {
     }
     if (open) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () =>
-        document.removeEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [open]);
 
-  const currentTheme = (themes[currentThemeId] ?? themes['default'])!;
+  const currentTheme = themes[currentThemeId] ?? themes['default']!;
 
   return (
     <div ref={menuRef} className="relative">
-      {/* Trigger */}
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
+        className="inline-flex h-9 items-center gap-2 rounded-[var(--lk-btn-radius)] px-2.5 text-sm text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
         aria-label="Change theme"
         aria-expanded={open}
         aria-haspopup="true"
       >
         <Palette className="h-4 w-4" />
-        <span className="hidden sm:inline">{currentTheme.name}</span>
+        <span className="hidden max-w-[8rem] truncate sm:inline">
+          {currentTheme.name}
+        </span>
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-xl border border-border bg-surface p-2 shadow-lg">
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
-            Theme
+        <div className="absolute right-0 z-50 mt-2 w-80 origin-top-right overflow-hidden rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+          <p className="px-2 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+            Choose your sky
           </p>
 
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {themeIds.map((id) => {
               const theme = themes[id];
               if (!theme) return null;
               const isSelected = id === currentThemeId;
-              const swatches = themeSwatches[id] ?? ['#888', '#888', '#888'];
 
               return (
                 <button
@@ -73,39 +101,27 @@ export function ThemeSelector() {
                     setOpen(false);
                   }}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
-                    isSelected
-                      ? 'bg-primary-light'
-                      : 'hover:bg-surface-hover',
+                    'flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors',
+                    isSelected ? 'bg-primary-light' : 'hover:bg-surface-hover',
                   )}
                 >
-                  {/* Colour swatches */}
-                  <div className="flex -space-x-1">
-                    {swatches.map((color, i) => (
-                      <span
-                        key={i}
-                        className="inline-block h-5 w-5 rounded-full border-2 border-surface shadow-sm"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Name + description */}
-                  <div className="flex-1 min-w-0">
+                  <ThemePreview
+                    swatch={theme.swatch}
+                    previewFont={theme.previewFont}
+                  />
+                  <div className="min-w-0 flex-1">
                     <p
                       className={cn(
-                        'text-sm font-medium',
+                        'truncate text-sm font-semibold',
                         isSelected ? 'text-primary' : 'text-text',
                       )}
                     >
                       {theme.name}
                     </p>
                     <p className="truncate text-xs text-text-muted">
-                      {theme.description}
+                      {theme.tagline}
                     </p>
                   </div>
-
-                  {/* Check mark */}
                   {isSelected && (
                     <Check className="h-4 w-4 shrink-0 text-primary" />
                   )}

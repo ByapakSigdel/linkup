@@ -14,8 +14,10 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Emoji } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import { MediaMessage } from './media-message';
 import type { Message, MessageStatus, HighlightCategory } from '@linkup/types';
 
 // ─── Highlight color map ──────────────────────────────────────────────────────
@@ -67,9 +69,9 @@ function ReactionsDisplay({
           key={emoji}
           className="inline-flex items-center gap-0.5 rounded-full bg-surface-hover px-1.5 py-0.5 text-xs border border-border"
         >
-          <span>{emoji}</span>
+          <Emoji emoji={emoji} size={14} />
           {arr.length > 1 && (
-            <span className="text-text-muted">{arr.length}</span>
+            <span className="font-mono text-text-muted">{arr.length}</span>
           )}
         </span>
       ))}
@@ -157,10 +159,10 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
                 <button
                   key={emoji}
                   onClick={() => onReact?.(message.id, emoji)}
-                  className="hover:scale-125 transition-transform text-sm p-0.5"
+                  className="flex items-center hover:scale-125 transition-transform p-0.5"
                   aria-label={`React with ${emoji}`}
                 >
-                  {emoji}
+                  <Emoji emoji={emoji} size={18} />
                 </button>
               ))}
             </div>
@@ -246,8 +248,21 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
               </div>
             )}
 
-            {/* Content */}
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            {/* Media (photos / videos / voice / scribble) */}
+            {message.mediaUrls && message.mediaUrls.length > 0 && (
+              <div className={cn(message.content && message.messageType !== 'voice' && 'mb-1.5')}>
+                <MediaMessage
+                  mediaUrls={message.mediaUrls}
+                  isSent={isSent}
+                  messageType={message.messageType}
+                />
+              </div>
+            )}
+
+            {/* Content — hidden for voice messages (the player stands alone) */}
+            {message.content && message.messageType !== 'voice' && (
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            )}
 
             {/* Edited indicator */}
             {message.isEdited && (

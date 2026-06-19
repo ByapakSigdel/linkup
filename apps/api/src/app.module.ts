@@ -10,6 +10,13 @@ import { StreaksModule } from './modules/streaks/streaks.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DatesModule } from './modules/dates/dates.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { FriendsModule } from './modules/friends/friends.module';
+import { CirclesModule } from './modules/circles/circles.module';
+import { CreativeModule } from './modules/creative/creative.module';
+import { MusicModule } from './modules/music/music.module';
+import { SearchModule } from './modules/search/search.module';
+import { EntertainmentModule } from './modules/entertainment/entertainment.module';
+import { AchievementsModule } from './modules/achievements/achievements.module';
 
 @Module({
   imports: [
@@ -18,15 +25,22 @@ import { GatewayModule } from './gateway/gateway.module';
       envFilePath: '../../.env',
     }),
     DatabaseModule,
+    GatewayModule,
+    NotificationsModule,
     AuthModule,
     UsersModule,
     CouplesModule,
     MessagesModule,
     MediaModule,
     StreaksModule,
-    NotificationsModule,
     DatesModule,
-    GatewayModule,
+    FriendsModule,
+    CirclesModule,
+    CreativeModule,
+    MusicModule,
+    SearchModule,
+    EntertainmentModule,
+    AchievementsModule,
   ],
 })
 export class AppModule {}

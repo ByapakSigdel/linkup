@@ -1,6 +1,13 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import {
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   Pen,
   Highlighter,
@@ -12,12 +19,8 @@ import {
   Undo,
   Redo,
   Trash2,
-  Download,
-  Send,
-  Type,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui';
 
 export type ScribbleTool =
   | 'pen'
@@ -29,20 +32,55 @@ export type ScribbleTool =
   | 'rectangle'
   | 'arrow';
 
+/** A point in canvas pixel space. */
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** A point normalized to 0..1 of the canvas size — used over the wire so it
+ * renders correctly on a partner's differently-sized canvas. */
+export interface NormalizedPoint {
+  x: number;
+  y: number;
+}
+
 interface Stroke {
   id: string;
   tool: ScribbleTool;
   color: string;
   thickness: number;
   opacity: number;
-  points: { x: number; y: number; pressure?: number }[];
+  points: Point[];
+}
+
+/** Shape emitted/received over the socket for a freehand stroke. */
+export interface RemoteScribbleStroke {
+  points: NormalizedPoint[];
+  color: string;
+  width: number;
+}
+
+export interface ScribbleCanvasHandle {
+  /** PNG data URL of the current canvas. */
+  toDataURL: () => string | null;
+  /** Apply a stroke received from the partner. */
+  applyRemoteStroke: (stroke: RemoteScribbleStroke) => void;
+  /** Clear the canvas (local only — does not emit). */
+  clearLocal: () => void;
+  /** The canvas background color currently in use. */
+  getBackgroundColor: () => string;
 }
 
 interface ScribbleCanvasProps {
   width?: number;
   height?: number;
-  onSend?: (dataUrl: string) => void;
   className?: string;
+  /** Fired when the local user finishes a freehand stroke, with normalized
+   * points so the partner can render it on a differently-sized canvas. */
+  onLocalStroke?: (stroke: RemoteScribbleStroke) => void;
+  /** Fired when the local user clears the canvas. */
+  onClear?: () => void;
 }
 
 const COLORS = [
@@ -52,7 +90,10 @@ const COLORS = [
   '#F06595', '#FF6B9D', '#868E96', '#495057',
 ];
 
-const TOOL_CONFIG: Record<ScribbleTool, { opacity: number; compositeOp: GlobalCompositeOperation }> = {
+const TOOL_CONFIG: Record<
+  ScribbleTool,
+  { opacity: number; compositeOp: GlobalCompositeOperation }
+> = {
   pen: { opacity: 1, compositeOp: 'source-over' },
   marker: { opacity: 0.8, compositeOp: 'source-over' },
   highlighter: { opacity: 0.3, compositeOp: 'source-over' },
@@ -63,60 +104,122 @@ const TOOL_CONFIG: Record<ScribbleTool, { opacity: number; compositeOp: GlobalCo
   arrow: { opacity: 1, compositeOp: 'source-over' },
 };
 
-export function ScribbleCanvas({
-  width = 1920,
-  height = 1080,
-  onSend,
-  className,
-}: ScribbleCanvasProps) {
+export const ScribbleCanvas = forwardRef<
+  ScribbleCanvasHandle,
+  ScribbleCanvasProps
+>(function ScribbleCanvas(
+  { width = 1280, height = 800, className, onLocalStroke, onClear },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const [tool, setTool] = useState<ScribbleTool>('pen');
   const [color, setColor] = useState('#000000');
-  const [thickness, setThickness] = useState(3);
+  const [thickness, setThickness] = useState(4);
   const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [undoneStrokes, setUndoneStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);
 
-  // Shape start point for line/circle/rect/arrow tools
-  const shapeStart = useRef<{ x: number; y: number } | null>(null);
+  /** Remote strokes are painted directly onto the canvas (they live outside the
+   * local undo history so a local undo never wipes the partner's work). */
+  const remoteStrokesRef = useRef<Stroke[]>([]);
 
   const isShapeTool = ['line', 'circle', 'rectangle', 'arrow'].includes(tool);
 
-  // Get canvas-relative coordinates
   const getCanvasPoint = useCallback(
-    (e: React.MouseEvent | React.TouchEvent): { x: number; y: number } => {
+    (e: React.PointerEvent): Point => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
-
       const rect = canvas.getBoundingClientRect();
       const scaleX = width / rect.width;
       const scaleY = height / rect.height;
-
-      let clientX: number, clientY: number;
-      if ('touches' in e) {
-        const touch = e.touches[0];
-        if (!touch) return { x: 0, y: 0 };
-        clientX = touch.clientX;
-        clientY = touch.clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-
       return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY,
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
       };
     },
     [width, height],
   );
 
-  // Redraw all strokes
+  // ─── Drawing primitives ────────────────────────────────────────────────────
+
+  const paintStroke = useCallback((ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    const config = TOOL_CONFIG[stroke.tool];
+    if (!config) return;
+    ctx.globalAlpha = stroke.opacity;
+    ctx.globalCompositeOperation = config.compositeOp;
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+    ctx.lineWidth = stroke.thickness;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (['pen', 'marker', 'highlighter', 'eraser'].includes(stroke.tool)) {
+      if (stroke.points.length < 2) {
+        // Single tap — draw a dot.
+        const p = stroke.points[0];
+        if (p) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(stroke.thickness / 2, 0.5), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        return;
+      }
+      ctx.beginPath();
+      const first = stroke.points[0]!;
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < stroke.points.length - 1; i++) {
+        const cur = stroke.points[i]!;
+        const next = stroke.points[i + 1]!;
+        ctx.quadraticCurveTo(cur.x, cur.y, (cur.x + next.x) / 2, (cur.y + next.y) / 2);
+      }
+      const last = stroke.points[stroke.points.length - 1]!;
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
+    } else if (stroke.points.length >= 2) {
+      const start = stroke.points[0]!;
+      const end = stroke.points[stroke.points.length - 1]!;
+      if (stroke.tool === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+      } else if (stroke.tool === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        const headLen = Math.max(stroke.thickness * 3, 12);
+        ctx.beginPath();
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(
+          end.x - headLen * Math.cos(angle - Math.PI / 6),
+          end.y - headLen * Math.sin(angle - Math.PI / 6),
+        );
+        ctx.moveTo(end.x, end.y);
+        ctx.lineTo(
+          end.x - headLen * Math.cos(angle + Math.PI / 6),
+          end.y - headLen * Math.sin(angle + Math.PI / 6),
+        );
+        ctx.stroke();
+      } else if (stroke.tool === 'rectangle') {
+        ctx.beginPath();
+        ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+        ctx.stroke();
+      } else if (stroke.tool === 'circle') {
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        ctx.beginPath();
+        ctx.ellipse((start.x + end.x) / 2, (start.y + end.y) / 2, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }, []);
+
   const redraw = useCallback(
     (strokeList: Stroke[], activeStroke?: Stroke | null) => {
       const canvas = canvasRef.current;
@@ -124,163 +227,122 @@ export function ScribbleCanvas({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Clear and fill background
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, width, height);
 
-      const allStrokes = activeStroke
-        ? [...strokeList, activeStroke]
-        : strokeList;
-
-      for (const stroke of allStrokes) {
-        const config = TOOL_CONFIG[stroke.tool];
-        if (!config) continue;
-        ctx.globalAlpha = stroke.opacity;
-        ctx.globalCompositeOperation = config.compositeOp;
-        ctx.strokeStyle = stroke.color;
-        ctx.fillStyle = stroke.color;
-        ctx.lineWidth = stroke.thickness;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        if (['pen', 'marker', 'highlighter', 'eraser'].includes(stroke.tool)) {
-          // Freehand stroke
-          if (stroke.points.length < 2) continue;
-          ctx.beginPath();
-          const first = stroke.points[0]!;
-          ctx.moveTo(first.x, first.y);
-          for (let i = 1; i < stroke.points.length; i++) {
-            const pt = stroke.points[i]!;
-            ctx.lineTo(pt.x, pt.y);
-          }
-          ctx.stroke();
-        } else if (stroke.tool === 'line' && stroke.points.length >= 2) {
-          const start = stroke.points[0]!;
-          const end = stroke.points[stroke.points.length - 1]!;
-          ctx.beginPath();
-          ctx.moveTo(start.x, start.y);
-          ctx.lineTo(end.x, end.y);
-          ctx.stroke();
-        } else if (stroke.tool === 'arrow' && stroke.points.length >= 2) {
-          const start = stroke.points[0]!;
-          const end = stroke.points[stroke.points.length - 1]!;
-          ctx.beginPath();
-          ctx.moveTo(start.x, start.y);
-          ctx.lineTo(end.x, end.y);
-          ctx.stroke();
-
-          // Arrowhead
-          const angle = Math.atan2(end.y - start.y, end.x - start.x);
-          const headLen = Math.max(stroke.thickness * 3, 10);
-          ctx.beginPath();
-          ctx.moveTo(end.x, end.y);
-          ctx.lineTo(
-            end.x - headLen * Math.cos(angle - Math.PI / 6),
-            end.y - headLen * Math.sin(angle - Math.PI / 6),
-          );
-          ctx.moveTo(end.x, end.y);
-          ctx.lineTo(
-            end.x - headLen * Math.cos(angle + Math.PI / 6),
-            end.y - headLen * Math.sin(angle + Math.PI / 6),
-          );
-          ctx.stroke();
-        } else if (stroke.tool === 'rectangle' && stroke.points.length >= 2) {
-          const start = stroke.points[0]!;
-          const end = stroke.points[stroke.points.length - 1]!;
-          ctx.beginPath();
-          ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
-          ctx.stroke();
-        } else if (stroke.tool === 'circle' && stroke.points.length >= 2) {
-          const start = stroke.points[0]!;
-          const end = stroke.points[stroke.points.length - 1]!;
-          const rx = Math.abs(end.x - start.x) / 2;
-          const ry = Math.abs(end.y - start.y) / 2;
-          const cx = (start.x + end.x) / 2;
-          const cy = (start.y + end.y) / 2;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      }
+      // Partner strokes first, then ours, then the in-progress stroke.
+      for (const s of remoteStrokesRef.current) paintStroke(ctx, s);
+      for (const s of strokeList) paintStroke(ctx, s);
+      if (activeStroke) paintStroke(ctx, activeStroke);
 
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     },
-    [width, height, backgroundColor],
+    [width, height, backgroundColor, paintStroke],
   );
 
-  // Redraw when strokes change
   useEffect(() => {
     redraw(strokes);
   }, [strokes, redraw]);
 
-  // ─── Mouse/Touch Handlers ─────────────────────────────────────────────────
+  // ─── Imperative handle ─────────────────────────────────────────────────────
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toDataURL: () => canvasRef.current?.toDataURL('image/png') ?? null,
+      applyRemoteStroke: (remote) => {
+        const stroke: Stroke = {
+          id: `remote-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          tool: 'pen',
+          color: remote.color,
+          thickness: remote.width,
+          opacity: 1,
+          points: remote.points.map((p) => ({ x: p.x * width, y: p.y * height })),
+        };
+        remoteStrokesRef.current.push(stroke);
+        // Paint just the new stroke without a full clear (preserves everything).
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx) {
+          paintStroke(ctx, stroke);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      },
+      clearLocal: () => {
+        remoteStrokesRef.current = [];
+        setStrokes([]);
+        setUndoneStrokes([]);
+      },
+      getBackgroundColor: () => backgroundColor,
+    }),
+    [width, height, paintStroke, backgroundColor],
+  );
+
+  // ─── Pointer handlers ──────────────────────────────────────────────────────
 
   const startDrawing = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    (e: React.PointerEvent) => {
       e.preventDefault();
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       const point = getCanvasPoint(e);
       const config = TOOL_CONFIG[tool]!;
-
-      const newStroke: Stroke = {
+      setCurrentStroke({
         id: `stroke-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         tool,
         color: tool === 'eraser' ? '#000000' : color,
         thickness: tool === 'highlighter' ? thickness * 3 : thickness,
         opacity: config.opacity,
         points: [point],
-      };
-
-      setCurrentStroke(newStroke);
-      setIsDrawing(true);
-      if (isShapeTool) {
-        shapeStart.current = point;
-      }
+      });
+      isDrawingRef.current = true;
     },
-    [tool, color, thickness, getCanvasPoint, isShapeTool],
+    [tool, color, thickness, getCanvasPoint],
   );
 
   const draw = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    (e: React.PointerEvent) => {
+      if (!isDrawingRef.current) return;
       e.preventDefault();
-      if (!isDrawing || !currentStroke) return;
-
       const point = getCanvasPoint(e);
-
-      if (isShapeTool) {
-        // For shapes, replace the last point with the current position
-        const updated = {
-          ...currentStroke,
-          points: [currentStroke.points[0]!, point],
-        };
-        setCurrentStroke(updated);
+      setCurrentStroke((prev) => {
+        if (!prev) return prev;
+        const updated: Stroke = isShapeTool
+          ? { ...prev, points: [prev.points[0]!, point] }
+          : { ...prev, points: [...prev.points, point] };
         redraw(strokes, updated);
-      } else {
-        const updated = {
-          ...currentStroke,
-          points: [...currentStroke.points, point],
-        };
-        setCurrentStroke(updated);
-        redraw(strokes, updated);
-      }
+        return updated;
+      });
     },
-    [isDrawing, currentStroke, getCanvasPoint, isShapeTool, strokes, redraw],
+    [getCanvasPoint, isShapeTool, strokes, redraw],
   );
 
   const stopDrawing = useCallback(() => {
-    if (!isDrawing || !currentStroke) return;
-    setIsDrawing(false);
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    setCurrentStroke((prev) => {
+      if (prev && prev.points.length >= 1) {
+        setStrokes((s) => [...s, prev]);
+        setUndoneStrokes([]);
+        // Broadcast freehand strokes to the partner (normalized 0..1).
+        if (
+          onLocalStroke &&
+          ['pen', 'marker', 'highlighter', 'eraser'].includes(prev.tool) &&
+          prev.points.length >= 1
+        ) {
+          onLocalStroke({
+            points: prev.points.map((p) => ({ x: p.x / width, y: p.y / height })),
+            color: prev.tool === 'eraser' ? backgroundColor : prev.color,
+            width: prev.thickness,
+          });
+        }
+      }
+      return null;
+    });
+  }, [onLocalStroke, width, height, backgroundColor]);
 
-    if (currentStroke.points.length >= 1) {
-      setStrokes((prev) => [...prev, currentStroke]);
-      setUndoneStrokes([]);
-    }
-    setCurrentStroke(null);
-    shapeStart.current = null;
-  }, [isDrawing, currentStroke]);
-
-  // ─── Actions ──────────────────────────────────────────────────────────────
+  // ─── Actions ───────────────────────────────────────────────────────────────
 
   const undo = useCallback(() => {
     setStrokes((prev) => {
@@ -301,28 +363,11 @@ export function ScribbleCanvas({
   }, []);
 
   const clear = useCallback(() => {
+    remoteStrokesRef.current = [];
     setStrokes([]);
     setUndoneStrokes([]);
-  }, []);
-
-  const exportAsPng = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `scribble-${Date.now()}.png`;
-    a.click();
-  }, []);
-
-  const handleSend = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !onSend) return;
-    const dataUrl = canvas.toDataURL('image/png');
-    onSend(dataUrl);
-  }, [onSend]);
-
-  // ─── Keyboard shortcuts ──────────────────────────────────────────────────
+    onClear?.();
+  }, [onClear]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -340,11 +385,8 @@ export function ScribbleCanvas({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // ─── Tool buttons config ──────────────────────────────────────────────────
-
   const tools: { id: ScribbleTool; icon: typeof Pen; label: string }[] = [
     { id: 'pen', icon: Pen, label: 'Pen' },
-    { id: 'marker', icon: Type, label: 'Marker' },
     { id: 'highlighter', icon: Highlighter, label: 'Highlighter' },
     { id: 'eraser', icon: Eraser, label: 'Eraser' },
     { id: 'line', icon: Minus, label: 'Line' },
@@ -357,7 +399,7 @@ export function ScribbleCanvas({
     <div className={cn('flex flex-col gap-3', className)}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-2">
-        {/* Tool buttons */}
+        {/* Tools */}
         <div className="flex items-center gap-0.5 border-r border-border pr-2">
           {tools.map(({ id, icon: Icon, label }) => (
             <button
@@ -376,7 +418,7 @@ export function ScribbleCanvas({
           ))}
         </div>
 
-        {/* Color palette */}
+        {/* Colors */}
         <div className="flex items-center gap-1 border-r border-border pr-2">
           {COLORS.map((c) => (
             <button
@@ -385,35 +427,58 @@ export function ScribbleCanvas({
               className={cn(
                 'h-6 w-6 rounded-full border-2 transition-all',
                 color === c
-                  ? 'border-primary scale-110'
+                  ? 'scale-110 border-primary'
                   : 'border-border hover:border-primary/50',
               )}
               style={{ backgroundColor: c }}
               title={c}
             />
           ))}
+          <label
+            className="ml-1 flex h-6 w-6 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-border"
+            title="Custom color"
+          >
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-8 w-8 cursor-pointer border-0 bg-transparent p-0"
+            />
+          </label>
         </div>
 
-        {/* Thickness slider */}
+        {/* Size */}
         <div className="flex items-center gap-2 border-r border-border pr-2">
           <span className="text-xs text-text-muted">Size</span>
           <input
             type="range"
             min="1"
-            max="20"
+            max="30"
             value={thickness}
             onChange={(e) => setThickness(Number(e.target.value))}
             className="w-20 accent-primary"
           />
-          <span className="text-xs text-text-muted w-4">{thickness}</span>
+          <span className="w-5 text-xs text-text-muted">{thickness}</span>
         </div>
 
-        {/* Action buttons */}
+        {/* Background */}
+        <div className="flex items-center gap-2 border-r border-border pr-2">
+          <span className="text-xs text-text-muted">BG</span>
+          <input
+            type="color"
+            value={backgroundColor}
+            onChange={(e) => setBackgroundColor(e.target.value)}
+            className="h-7 w-7 cursor-pointer rounded border border-border"
+            title="Background color"
+          />
+        </div>
+
+        {/* History / clear */}
         <div className="flex items-center gap-1">
           <button
             onClick={undo}
             disabled={strokes.length === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:pointer-events-none disabled:opacity-30"
             title="Undo (Ctrl+Z)"
           >
             <Undo className="h-4 w-4" />
@@ -421,61 +486,36 @@ export function ScribbleCanvas({
           <button
             onClick={redo}
             disabled={undoneStrokes.length === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:pointer-events-none disabled:opacity-30"
             title="Redo (Ctrl+Shift+Z)"
           >
             <Redo className="h-4 w-4" />
           </button>
           <button
             onClick={clear}
-            disabled={strokes.length === 0}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-error disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-error"
             title="Clear all"
           >
             <Trash2 className="h-4 w-4" />
           </button>
-          <button
-            onClick={exportAsPng}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-hover hover:text-text transition-colors"
-            title="Download as PNG"
-          >
-            <Download className="h-4 w-4" />
-          </button>
-
-          {onSend && (
-            <Button
-              size="sm"
-              onClick={handleSend}
-              disabled={strokes.length === 0}
-              className="ml-2"
-            >
-              <Send className="h-3.5 w-3.5" />
-              Send
-            </Button>
-          )}
         </div>
       </div>
 
       {/* Canvas */}
-      <div
-        ref={containerRef}
-        className="relative rounded-xl border border-border overflow-hidden bg-white"
-      >
+      <div className="relative overflow-hidden rounded-xl border border-border bg-white">
         <canvas
           ref={canvasRef}
           width={width}
           height={height}
           className="w-full cursor-crosshair touch-none"
           style={{ aspectRatio: `${width}/${height}` }}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
+          onPointerDown={startDrawing}
+          onPointerMove={draw}
+          onPointerUp={stopDrawing}
+          onPointerCancel={stopDrawing}
+          onPointerLeave={stopDrawing}
         />
       </div>
     </div>
   );
-}
+});

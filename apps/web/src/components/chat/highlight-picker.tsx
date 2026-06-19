@@ -2,6 +2,7 @@
 
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Emoji } from '@/components/ui';
 import type { HighlightCategory } from '@linkup/types';
 
 const highlights: {
@@ -49,7 +50,7 @@ export function HighlightPicker({ onSelect, onClose, className }: HighlightPicke
               className="h-3 w-3 rounded-full shrink-0"
               style={{ backgroundColor: h.color }}
             />
-            <span>{h.emoji}</span>
+            <Emoji emoji={h.emoji} size={18} />
             <span>{h.label}</span>
           </button>
         ))}

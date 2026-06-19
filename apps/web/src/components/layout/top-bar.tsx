@@ -11,6 +11,7 @@ import {
   User,
   ChevronDown,
   Check,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth-store';
@@ -35,6 +36,12 @@ const pageTitles: Record<string, string> = {
   friends: 'Friends',
   profile: 'Profile',
   settings: 'Settings',
+  emojis: 'Custom Emojis',
+  soundboard: 'SoundBoard',
+  watch: 'Watch Party',
+  music: 'Music',
+  stream: 'Streaming',
+  search: 'Search',
 };
 
 function getPageTitle(pathname: string): string {
@@ -114,6 +121,15 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
 
       {/* Right actions */}
       <div className="flex items-center gap-2">
+        {/* Global search */}
+        <Link
+          href="/search"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
+          aria-label="Search"
+        >
+          <Search className="h-5 w-5" />
+        </Link>
+
         {/* Theme selector */}
         <ThemeSelector />
 

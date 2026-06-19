@@ -167,6 +167,13 @@ export const userSettings = pgTable('user_settings', {
   callNotifications: boolean('call_notifications').default(true),
   streakReminders: boolean('streak_reminders').default(true),
   anniversaryReminders: boolean('anniversary_reminders').default(true),
+  emailNotifications: boolean('email_notifications').default(false),
+  reactionNotifications: boolean('reaction_notifications').default(true),
+  achievementNotifications: boolean('achievement_notifications').default(true),
+  circleNotifications: boolean('circle_notifications').default(true),
+  quietHoursEnabled: boolean('quiet_hours_enabled').default(false),
+  quietHoursStart: varchar('quiet_hours_start', { length: 5 }).default('22:00'),
+  quietHoursEnd: varchar('quiet_hours_end', { length: 5 }).default('08:00'),
   showOnlineStatus: boolean('show_online_status').default(true),
   showReadReceipts: boolean('show_read_receipts').default(true),
   showTypingIndicator: boolean('show_typing_indicator').default(true),
@@ -371,6 +378,322 @@ export const dateCelebrations = pgTable('date_celebrations', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 5+ — Social, Creative, Entertainment & Communication features
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Single Friends ─────────────────────────────────────────────────────────────
+
+export const friendships = pgTable('friendships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  friendUserId: uuid('friend_user_id').references(() => users.id),
+  friendCoupleId: uuid('friend_couple_id').references((): AnyPgColumn => couples.id),
+  initiatedBy: uuid('initiated_by')
+    .notNull()
+    .references(() => users.id),
+  status: varchar('status', { length: 20 }).default('active'), // active, blocked
+  permissions: jsonb('permissions')
+    .$type<{
+      viewPhotos: boolean;
+      viewVideos: boolean;
+      viewMessages: boolean;
+      viewAchievements: boolean;
+      commentOnPosts: boolean;
+    }>()
+    .default({
+      viewPhotos: true,
+      viewVideos: false,
+      viewMessages: false,
+      viewAchievements: true,
+      commentOnPosts: true,
+    }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const friendInvitations = pgTable('friend_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fromCoupleId: uuid('from_couple_id')
+    .notNull()
+    .references(() => couples.id),
+  fromUserId: uuid('from_user_id')
+    .notNull()
+    .references(() => users.id),
+  toUserId: uuid('to_user_id').references(() => users.id),
+  toEmail: varchar('to_email', { length: 255 }),
+  inviteCode: varchar('invite_code', { length: 30 }).notNull().unique(),
+  permissions: jsonb('permissions').$type<Record<string, boolean>>(),
+  status: varchar('status', { length: 20 }).default('pending'), // pending, accepted, declined, expired
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedBy: uuid('accepted_by').references(() => users.id),
+  acceptedAt: timestamp('accepted_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Couple Circles ─────────────────────────────────────────────────────────────
+
+export const circles = pgTable('circles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: varchar('description', { length: 1000 }),
+  coverImageUrl: text('cover_image_url'),
+  createdByCoupleId: uuid('created_by_couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdByUserId: uuid('created_by_user_id')
+    .notNull()
+    .references(() => users.id),
+  isPrivate: boolean('is_private').default(true),
+  maxMembers: integer('max_members').default(10),
+  inviteCode: varchar('invite_code', { length: 30 }).unique(),
+  memberCount: integer('member_count').default(1),
+  postCount: integer('post_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const circleMembers = pgTable('circle_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  circleId: uuid('circle_id')
+    .notNull()
+    .references(() => circles.id, { onDelete: 'cascade' }),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  role: varchar('role', { length: 20 }).default('member'), // admin, member
+  joinedAt: timestamp('joined_at').defaultNow(),
+});
+
+export const circlePosts = pgTable('circle_posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  circleId: uuid('circle_id')
+    .notNull()
+    .references(() => circles.id, { onDelete: 'cascade' }),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => users.id),
+  content: text('content').notNull(),
+  type: varchar('type', { length: 20 }).default('post'), // post, poll, event, announcement
+  mediaUrls: json('media_urls').$type<string[]>().default([]),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  likeCount: integer('like_count').default(0),
+  commentCount: integer('comment_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const postLikes = pgTable('post_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id')
+    .notNull()
+    .references(() => circlePosts.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const postComments = pgTable('post_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id')
+    .notNull()
+    .references(() => circlePosts.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Custom Emojis ──────────────────────────────────────────────────────────────
+
+export const customEmojis = pgTable('custom_emojis', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  name: varchar('name', { length: 50 }).notNull(),
+  imageUrl: text('image_url').notNull(),
+  category: varchar('category', { length: 30 }).default('custom'),
+  isAnimated: boolean('is_animated').default(false),
+  useCount: integer('use_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── SoundBoard ─────────────────────────────────────────────────────────────────
+
+export const soundboardSounds = pgTable('soundboard_sounds', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  name: varchar('name', { length: 50 }).notNull(),
+  audioUrl: text('audio_url').notNull(),
+  emoji: varchar('emoji', { length: 20 }),
+  category: varchar('category', { length: 30 }).default('custom'),
+  duration: integer('duration'),
+  color: varchar('color', { length: 20 }),
+  useCount: integer('use_count').default(0),
+  isBuiltIn: boolean('is_built_in').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Paintings (collaborative) ──────────────────────────────────────────────────
+
+export const paintings = pgTable('paintings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  title: varchar('title', { length: 100 }),
+  width: integer('width').default(1024),
+  height: integer('height').default(768),
+  backgroundColor: varchar('background_color', { length: 20 }).default('#ffffff'),
+  thumbnailUrl: text('thumbnail_url'),
+  imageUrl: text('image_url'),
+  strokes: jsonb('strokes').$type<unknown[]>().default([]),
+  status: varchar('status', { length: 20 }).default('active'), // active, completed
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ─── Scribbles ──────────────────────────────────────────────────────────────────
+
+export const scribbles = pgTable('scribbles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  imageUrl: text('image_url').notNull(),
+  strokes: jsonb('strokes').$type<unknown[]>().default([]),
+  backgroundColor: varchar('background_color', { length: 20 }).default('#ffffff'),
+  messageId: uuid('message_id'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Music (shared playlists) ───────────────────────────────────────────────────
+
+export const playlists = pgTable('playlists', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: varchar('description', { length: 500 }),
+  coverUrl: text('cover_url'),
+  trackCount: integer('track_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const playlistTracks = pgTable('playlist_tracks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  playlistId: uuid('playlist_id')
+    .notNull()
+    .references(() => playlists.id, { onDelete: 'cascade' }),
+  addedBy: uuid('added_by')
+    .notNull()
+    .references(() => users.id),
+  title: varchar('title', { length: 200 }).notNull(),
+  artist: varchar('artist', { length: 200 }),
+  album: varchar('album', { length: 200 }),
+  coverUrl: text('cover_url'),
+  source: varchar('source', { length: 20 }).default('youtube'), // youtube, spotify, url
+  sourceId: varchar('source_id', { length: 200 }),
+  url: text('url'),
+  duration: integer('duration'),
+  position: integer('position').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Watch Party sessions ───────────────────────────────────────────────────────
+
+export const watchParties = pgTable('watch_parties', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  hostId: uuid('host_id')
+    .notNull()
+    .references(() => users.id),
+  source: varchar('source', { length: 20 }).default('youtube'), // youtube, url
+  videoId: varchar('video_id', { length: 200 }),
+  videoUrl: text('video_url'),
+  title: varchar('title', { length: 300 }),
+  status: varchar('status', { length: 20 }).default('active'), // active, ended
+  createdAt: timestamp('created_at').defaultNow(),
+  endedAt: timestamp('ended_at'),
+});
+
+// ─── Call sessions ──────────────────────────────────────────────────────────────
+
+export const callSessions = pgTable('call_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references(() => couples.id),
+  callerId: uuid('caller_id')
+    .notNull()
+    .references(() => users.id),
+  calleeId: uuid('callee_id')
+    .notNull()
+    .references(() => users.id),
+  type: varchar('type', { length: 20 }).default('voice'), // voice, video, screen
+  status: varchar('status', { length: 20 }).default('ringing'), // ringing, ongoing, ended, missed, declined
+  startedAt: timestamp('started_at'),
+  endedAt: timestamp('ended_at'),
+  durationSec: integer('duration_sec').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Push Devices ───────────────────────────────────────────────────────────────
+
+export const devices = pgTable('devices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  deviceType: varchar('device_type', { length: 20 }).notNull(), // ios, android, web
+  deviceToken: varchar('device_token', { length: 500 }).notNull(),
+  deviceName: varchar('device_name', { length: 100 }),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─── Email Verification Codes ───────────────────────────────────────────────────
+
+export const verificationCodes = pgTable('verification_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  code: varchar('code', { length: 10 }).notNull(),
+  purpose: varchar('purpose', { length: 30 }).default('email_verification'),
+  expiresAt: timestamp('expires_at').notNull(),
+  consumedAt: timestamp('consumed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // ─── Relations ──────────────────────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -570,4 +893,139 @@ export const dateCelebrationsRelations = relations(dateCelebrations, ({ one }) =
     fields: [dateCelebrations.dateId],
     references: [importantDates.id],
   }),
+}));
+
+// ─── Phase 5+ Relations ──────────────────────────────────────────────────────────
+
+export const friendshipsRelations = relations(friendships, ({ one }) => ({
+  couple: one(couples, {
+    fields: [friendships.coupleId],
+    references: [couples.id],
+    relationName: 'ownerCouple',
+  }),
+  friendUser: one(users, {
+    fields: [friendships.friendUserId],
+    references: [users.id],
+  }),
+  friendCouple: one(couples, {
+    fields: [friendships.friendCoupleId],
+    references: [couples.id],
+    relationName: 'friendCouple',
+  }),
+}));
+
+export const circlesRelations = relations(circles, ({ one, many }) => ({
+  createdByCouple: one(couples, {
+    fields: [circles.createdByCoupleId],
+    references: [couples.id],
+  }),
+  members: many(circleMembers),
+  posts: many(circlePosts),
+}));
+
+export const circleMembersRelations = relations(circleMembers, ({ one }) => ({
+  circle: one(circles, {
+    fields: [circleMembers.circleId],
+    references: [circles.id],
+  }),
+  couple: one(couples, {
+    fields: [circleMembers.coupleId],
+    references: [couples.id],
+  }),
+}));
+
+export const circlePostsRelations = relations(circlePosts, ({ one, many }) => ({
+  circle: one(circles, {
+    fields: [circlePosts.circleId],
+    references: [circles.id],
+  }),
+  author: one(users, {
+    fields: [circlePosts.authorId],
+    references: [users.id],
+  }),
+  likes: many(postLikes),
+  comments: many(postComments),
+}));
+
+export const postLikesRelations = relations(postLikes, ({ one }) => ({
+  post: one(circlePosts, {
+    fields: [postLikes.postId],
+    references: [circlePosts.id],
+  }),
+  user: one(users, { fields: [postLikes.userId], references: [users.id] }),
+}));
+
+export const postCommentsRelations = relations(postComments, ({ one }) => ({
+  post: one(circlePosts, {
+    fields: [postComments.postId],
+    references: [circlePosts.id],
+  }),
+  user: one(users, { fields: [postComments.userId], references: [users.id] }),
+}));
+
+export const customEmojisRelations = relations(customEmojis, ({ one }) => ({
+  couple: one(couples, {
+    fields: [customEmojis.coupleId],
+    references: [couples.id],
+  }),
+  creator: one(users, {
+    fields: [customEmojis.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const soundboardSoundsRelations = relations(soundboardSounds, ({ one }) => ({
+  couple: one(couples, {
+    fields: [soundboardSounds.coupleId],
+    references: [couples.id],
+  }),
+}));
+
+export const paintingsRelations = relations(paintings, ({ one }) => ({
+  couple: one(couples, { fields: [paintings.coupleId], references: [couples.id] }),
+  creator: one(users, { fields: [paintings.createdBy], references: [users.id] }),
+}));
+
+export const scribblesRelations = relations(scribbles, ({ one }) => ({
+  couple: one(couples, { fields: [scribbles.coupleId], references: [couples.id] }),
+  creator: one(users, { fields: [scribbles.createdBy], references: [users.id] }),
+}));
+
+export const playlistsRelations = relations(playlists, ({ one, many }) => ({
+  couple: one(couples, { fields: [playlists.coupleId], references: [couples.id] }),
+  tracks: many(playlistTracks),
+}));
+
+export const playlistTracksRelations = relations(playlistTracks, ({ one }) => ({
+  playlist: one(playlists, {
+    fields: [playlistTracks.playlistId],
+    references: [playlists.id],
+  }),
+}));
+
+export const watchPartiesRelations = relations(watchParties, ({ one }) => ({
+  couple: one(couples, { fields: [watchParties.coupleId], references: [couples.id] }),
+  host: one(users, { fields: [watchParties.hostId], references: [users.id] }),
+}));
+
+export const callSessionsRelations = relations(callSessions, ({ one }) => ({
+  couple: one(couples, { fields: [callSessions.coupleId], references: [couples.id] }),
+  caller: one(users, {
+    fields: [callSessions.callerId],
+    references: [users.id],
+    relationName: 'caller',
+  }),
+  callee: one(users, {
+    fields: [callSessions.calleeId],
+    references: [users.id],
+    relationName: 'callee',
+  }),
+}));
+
+export const devicesRelations = relations(devices, ({ one }) => ({
+  user: one(users, { fields: [devices.userId], references: [users.id] }),
+}));
+
+export const verificationCodesRelations = relations(verificationCodes, ({ one }) => ({
+  user: one(users, { fields: [verificationCodes.userId], references: [users.id] }),
 }));

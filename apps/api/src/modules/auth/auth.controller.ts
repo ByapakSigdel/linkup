@@ -35,6 +35,20 @@ export class AuthController {
     };
   }
 
+  @Post('verify')
+  @HttpCode(HttpStatus.OK)
+  async verify(@Body() body: { email: string; code: string }) {
+    const result = await this.authService.verifyEmail(body.email, body.code);
+    return { success: true, data: result };
+  }
+
+  @Post('verify/resend')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(@Body() body: { email: string }) {
+    const result = await this.authService.resendVerification(body.email);
+    return { success: true, data: result };
+  }
+
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() body: { refreshToken: string }) {

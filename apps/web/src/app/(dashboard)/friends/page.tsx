@@ -1,74 +1,191 @@
 'use client';
 
-import { UserPlus, Search, Heart } from 'lucide-react';
-import { Card, Button, Input } from '@/components/ui';
+import { useCallback, useEffect, useState } from 'react';
+import { Users, Inbox, Compass, Heart } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import api from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import { Badge } from '@/components/ui';
+import {
+  FriendsTab,
+  RequestsTab,
+  DiscoverTab,
+  type Friend,
+  type ReceivedInvitation,
+  type SentInvitation,
+} from '@/components/friends';
+
+type TabKey = 'friends' | 'requests' | 'discover';
 
 export default function FriendsPage() {
+  const couple = useAuthStore((s) => s.couple);
+
+  const [activeTab, setActiveTab] = useState<TabKey>('friends');
+
+  // Friends
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [count, setCount] = useState(0);
+  const [maxAllowed, setMaxAllowed] = useState(10);
+  const [loadingFriends, setLoadingFriends] = useState(true);
+
+  // Invites
+  const [invitations, setInvitations] = useState<ReceivedInvitation[]>([]);
+  const [sent, setSent] = useState<SentInvitation[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(true);
+
+  const isPaired = !!couple?.isPaired;
+
+  const fetchFriends = useCallback(async () => {
+    setLoadingFriends(true);
+    try {
+      const { data } = await api.get('/friends');
+      setFriends(data.data.friends ?? []);
+      setCount(data.data.count ?? 0);
+      setMaxAllowed(data.data.maxAllowed ?? 10);
+    } catch {
+      setFriends([]);
+      setCount(0);
+    } finally {
+      setLoadingFriends(false);
+    }
+  }, []);
+
+  const fetchInvites = useCallback(async () => {
+    setLoadingInvites(true);
+    try {
+      const { data } = await api.get('/friends/invites');
+      setInvitations(data.data.invitations ?? []);
+      setSent(data.data.sent ?? []);
+    } catch {
+      setInvitations([]);
+      setSent([]);
+    } finally {
+      setLoadingInvites(false);
+    }
+  }, []);
+
+  const refetchAll = useCallback(() => {
+    fetchFriends();
+    fetchInvites();
+  }, [fetchFriends, fetchInvites]);
+
+  useEffect(() => {
+    if (!isPaired) return;
+    refetchAll();
+  }, [isPaired, refetchAll]);
+
+  const pendingCount = invitations.length;
+  const atLimit = count >= maxAllowed;
+
+  const tabs: { key: TabKey; label: string; icon: typeof Users; badge?: number }[] =
+    [
+      { key: 'friends', label: 'Friends', icon: Users },
+      { key: 'requests', label: 'Requests', icon: Inbox, badge: pendingCount },
+      { key: 'discover', label: 'Discover', icon: Compass },
+    ];
+
+  // ---- Not paired empty state ----
+  if (!isPaired) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-text">Friends</h1>
+          <p className="text-text-muted">
+            Find and connect with friends on LinkUp
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light">
+            <Heart className="h-8 w-8 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-text">
+              Link up with your partner first
+            </h2>
+            <p className="mx-auto max-w-sm text-sm text-text-muted">
+              Link up with your partner first to add friends. Once you are
+              paired, you can connect with up to 10 friends.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div>
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">
+          Your people
+        </p>
         <h1 className="font-display text-2xl font-bold text-text">Friends</h1>
         <p className="text-text-muted">
-          Find and connect with friends on LinkUp
+          Connect with friends and choose what you share
         </p>
       </div>
 
-      {/* Search bar (disabled preview) */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-        <Input
-          placeholder="Search for friends..."
-          className="pl-10"
-          disabled
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                '-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                active
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-text-muted hover:text-text',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+              {tab.badge ? (
+                <Badge
+                  variant={active ? 'default' : 'error'}
+                  size="sm"
+                  className="ml-0.5"
+                >
+                  {tab.badge}
+                </Badge>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'friends' && (
+        <FriendsTab
+          friends={friends}
+          count={count}
+          maxAllowed={maxAllowed}
+          loading={loadingFriends}
+          onChanged={refetchAll}
+          onDiscover={() => setActiveTab('discover')}
         />
-      </div>
+      )}
 
-      {/* Empty state */}
-      <Card cardStyle="bordered" padding="lg">
-        <div className="flex flex-col items-center gap-4 py-12 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light">
-            <UserPlus className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-text">
-            Friends — Coming Soon
-          </h3>
-          <p className="max-w-md text-sm text-text-muted">
-            Add friends, see what other couples are up to, and grow your
-            community. This feature is currently in development.
-          </p>
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <Heart className="h-3.5 w-3.5 text-primary" />
-            <span>Stay tuned for updates</span>
-          </div>
-        </div>
-      </Card>
+      {activeTab === 'requests' && (
+        <RequestsTab
+          invitations={invitations}
+          sent={sent}
+          loading={loadingInvites}
+          onChanged={refetchAll}
+        />
+      )}
 
-      {/* Feature preview cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card cardStyle="bordered" padding="md">
-          <div className="space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-hover">
-              <UserPlus className="h-5 w-5 text-text-muted" />
-            </div>
-            <h4 className="font-semibold text-text">Friend Requests</h4>
-            <p className="text-sm text-text-muted">
-              Send and receive friend requests from other LinkUp users.
-            </p>
-          </div>
-        </Card>
-        <Card cardStyle="bordered" padding="md">
-          <div className="space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-hover">
-              <Search className="h-5 w-5 text-text-muted" />
-            </div>
-            <h4 className="font-semibold text-text">Discover Couples</h4>
-            <p className="text-sm text-text-muted">
-              Find couples with shared interests and mutual connections.
-            </p>
-          </div>
-        </Card>
-      </div>
+      {activeTab === 'discover' && (
+        <DiscoverTab
+          atLimit={atLimit}
+          maxAllowed={maxAllowed}
+          onInvited={refetchAll}
+        />
+      )}
     </div>
   );
 }
