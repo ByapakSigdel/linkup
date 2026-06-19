@@ -19,6 +19,7 @@ import {
   Flame,
   Calendar,
   ChevronRight,
+  Users,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -111,10 +112,16 @@ export default function SettingsPage() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
+  const couple = useAuthStore((s) => s.couple);
+  const setCouple = useAuthStore((s) => s.setCouple);
+  const user = useAuthStore((s) => s.user);
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [coupleName, setCoupleName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -131,6 +138,30 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  useEffect(() => {
+    setCoupleName(couple?.coupleName ?? '');
+  }, [couple?.coupleName]);
+
+  const saveCoupleName = useCallback(async () => {
+    if (!couple) return;
+    const trimmed = coupleName.trim();
+    setSavingName(true);
+    setNameSaved(false);
+    try {
+      const { data } = await api.patch(`/couples/${couple.id}`, {
+        coupleName: trimmed,
+      });
+      const updated = data?.data?.couple ?? { ...couple, coupleName: trimmed };
+      setCouple(updated);
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 2200);
+    } catch {
+      // Leave the field as-is; the user can retry.
+    } finally {
+      setSavingName(false);
+    }
+  }, [couple, coupleName, setCouple]);
 
   const updateSetting = useCallback(
     async (key: keyof UserSettings, value: boolean | string) => {
@@ -187,6 +218,50 @@ export default function SettingsPage() {
           Customize your LinkUp experience
         </p>
       </div>
+
+      {/* Couple */}
+      {couple?.isPaired && (
+        <Card cardStyle="bordered" padding="md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Your couple
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <label
+              htmlFor="couple-name"
+              className="text-sm font-medium text-text"
+            >
+              Couple name
+            </label>
+            <p className="mb-2 text-xs text-text-muted">
+              The shared name for the two of you — shown across LinkUp. Either
+              partner can change it.
+            </p>
+            <div className="flex gap-2">
+              <input
+                id="couple-name"
+                value={coupleName}
+                onChange={(e) => setCoupleName(e.target.value)}
+                maxLength={100}
+                placeholder={`${user?.displayName ?? 'You'} & Partner`}
+                className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
+              />
+              <Button
+                onClick={saveCoupleName}
+                loading={savingName}
+                disabled={
+                  savingName ||
+                  coupleName.trim() === (couple?.coupleName ?? '').trim()
+                }
+              >
+                {nameSaved ? 'Saved' : 'Save'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Theme */}
       <Card cardStyle="bordered" padding="md">

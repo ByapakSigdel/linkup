@@ -687,6 +687,12 @@ export class EventsGateway
     await this.relayToPartner(client.userId, 'stream:started', { by: client.userId });
   }
 
+  /** A partner just opened the stream page — ask if anyone is already live. */
+  @SubscribeMessage('stream:hello')
+  async handleStreamHello(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.relayToPartner(client.userId, 'stream:hello', { by: client.userId });
+  }
+
   @SubscribeMessage('stream:stop')
   async handleStreamStop(@ConnectedSocket() client: AuthenticatedSocket) {
     await this.relayToPartner(client.userId, 'stream:stopped', { by: client.userId });

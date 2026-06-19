@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSocket } from '@/lib/socket';
+import { connectSocket, getSocket } from '@/lib/socket';
 import { useToastStore } from '@/stores/toast-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * The four states the page can be in. A single page handles both roles:
@@ -53,6 +54,7 @@ export function useLiveStream(): LiveStreamApi {
   const [muted, setMuted] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [endedNotice, setEndedNotice] = useState(false);
+  const token = useAuthStore((s) => s.tokens?.accessToken);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -256,17 +258,40 @@ export function useLiveStream(): LiveStreamApi {
   // ----- Signaling -----
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    if (!token) return;
+    // Ensure a live socket even if this page mounted before the realtime
+    // provider connected — child effects run before parent effects, so the
+    // socket is null at first mount, which is exactly why streaming never armed
+    // its listeners and "didn't work at all" on a fresh load.
+    const socket = getSocket() ?? connectSocket(token);
+
+    // Re-send our current offer so a viewer who just arrived (or pressed Watch)
+    // receives it and can connect. Reuses the existing local description, so
+    // it's safe to call repeatedly without glare.
+    const resendOffer = () => {
+      const pc = pcRef.current;
+      if (pc?.localDescription) {
+        getSocket()?.emit('stream:offer', { sdp: pc.localDescription });
+      }
+    };
 
     const onStarted = () => {
       setEndedNotice(false);
-      // Ignore if we are the one broadcasting.
-      if (phaseRef.current === 'broadcasting') return;
+      if (phaseRef.current === 'broadcasting') {
+        // A viewer joined / pressed Watch — make sure they get our offer.
+        resendOffer();
+        return;
+      }
       if (phaseRef.current === 'idle') {
         setPhase('partner-live');
         phaseRef.current = 'partner-live';
       }
+    };
+
+    // A partner just opened the stream page; if we're live, send our offer so
+    // they connect even though they missed the original "started" broadcast.
+    const onHello = () => {
+      if (phaseRef.current === 'broadcasting') resendOffer();
     };
 
     const onStopped = () => {
@@ -342,19 +367,24 @@ export function useLiveStream(): LiveStreamApi {
     };
 
     socket.on('stream:started', onStarted);
+    socket.on('stream:hello', onHello);
     socket.on('stream:stopped', onStopped);
     socket.on('stream:offer', onOffer);
     socket.on('stream:answer', onAnswer);
     socket.on('stream:ice', onIce);
 
+    // Announce presence so a partner who is already live re-sends their offer.
+    socket.emit('stream:hello');
+
     return () => {
       socket.off('stream:started', onStarted);
+      socket.off('stream:hello', onHello);
       socket.off('stream:stopped', onStopped);
       socket.off('stream:offer', onOffer);
       socket.off('stream:answer', onAnswer);
       socket.off('stream:ice', onIce);
     };
-  }, [flushPendingIce, teardown]);
+  }, [flushPendingIce, teardown, token]);
 
   // Safety net: stop any active broadcast / teardown on unmount.
   useEffect(() => {
