@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth-store';
+import { useChatStore } from '@/stores/chat-store';
 import { Avatar } from '@/components/ui';
 import { LinkupMark, LinkupWordmark } from '@/components/brand/logo';
 
@@ -70,6 +71,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
+  const unread = useChatStore((s) => s.unread);
 
   return (
     <aside
@@ -148,6 +150,14 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                       strokeWidth={isActive ? 2.4 : 1.9}
                     />
                     {!collapsed && <span className="truncate">{item.label}</span>}
+                    {item.href === '/chat' && unread > 0 &&
+                      (collapsed ? (
+                        <span className="absolute right-2 top-1.5 h-2.5 w-2.5 rounded-full border border-surface bg-primary" />
+                      ) : (
+                        <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1.5 text-[0.65rem] font-bold text-text-on-primary">
+                          {unread > 9 ? '9+' : unread}
+                        </span>
+                      ))}
                   </Link>
                 );
               })}

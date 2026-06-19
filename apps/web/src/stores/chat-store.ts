@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Message, MessageStatus, HighlightCategory } from '@linkup/types';
 import api from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ChatState {
   // Connection
@@ -10,6 +11,10 @@ interface ChatState {
   messages: Message[];
   isLoadingMessages: boolean;
   hasMoreMessages: boolean;
+
+  // Unread (incoming messages received while the chat isn't open)
+  unread: number;
+  chatOpen: boolean;
 
   // Partner state
   isPartnerTyping: boolean;
@@ -23,6 +28,9 @@ interface ChatState {
 
   // Actions — connection
   setConnected: (connected: boolean) => void;
+
+  // Actions — unread / open state
+  setChatOpen: (open: boolean) => void;
 
   // Actions — messages
   addMessage: (message: Message) => void;
@@ -69,6 +77,8 @@ const initialState = {
   messages: [] as Message[],
   isLoadingMessages: false,
   hasMoreMessages: true,
+  unread: 0,
+  chatOpen: false,
   isPartnerTyping: false,
   isPartnerOnline: false,
   partnerLastSeenAt: undefined as string | undefined,
@@ -83,11 +93,21 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // Connection
   setConnected: (connected) => set({ isConnected: connected }),
 
+  // Open state — opening the chat clears the unread badge.
+  setChatOpen: (open) =>
+    set(open ? { chatOpen: true, unread: 0 } : { chatOpen: false }),
+
   // Messages
   addMessage: (message) =>
-    set((state) => ({
-      messages: [...state.messages, message],
-    })),
+    set((state) => {
+      const me = useAuthStore.getState().user?.id;
+      const incoming = !!me && message.senderId !== me;
+      return {
+        messages: [...state.messages, message],
+        unread:
+          incoming && !state.chatOpen ? state.unread + 1 : state.unread,
+      };
+    }),
 
   updateMessage: (messageId, updates) =>
     set((state) => ({

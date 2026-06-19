@@ -54,12 +54,14 @@ export default function ChatPage() {
 
   // Load messages on mount
   useEffect(() => {
+    useChatStore.getState().setChatOpen(true); // clears the unread badge
     if (couple?.id) {
       fetchMessages(couple.id);
       requestPresence();
     }
 
     return () => {
+      useChatStore.getState().setChatOpen(false);
       reset();
     };
   }, [couple?.id, fetchMessages, requestPresence, reset]);
