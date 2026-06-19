@@ -3,110 +3,89 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  Heart,
   Flame,
   MessageCircle,
-  Image as ImageIcon,
-  Trophy,
-  Calendar,
+  Video,
   Pencil,
-  Palette,
   Camera,
+  Clapperboard,
+  Calendar,
   Clock,
-  ChevronRight,
-  Star,
+  Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useStreaksStore } from '@/stores/streaks-store';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Avatar,
-  Button,
-  Spinner,
-} from '@/components/ui';
+import { useChatStore } from '@/stores/chat-store';
+import { useSocket } from '@/hooks/use-socket';
+import { useCall } from '@/hooks/use-call';
+import { Card, Avatar, Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { LinkupMark } from '@/components/brand/logo';
 import { PairingCard } from '@/components/couple/pairing-card';
 import api from '@/lib/api';
 
-interface DashboardData {
-  coupleStats: {
-    messageCount: number;
-    mediaCount: number;
-    currentStreak: number;
-    longestStreak: number;
-    totalPoints: number;
-    achievementCount: number;
-  } | null;
-  partner: {
-    id: string;
-    displayName: string;
-    avatarUrl: string | null;
-    isOnline: boolean | null;
-  } | null;
-  upcomingDates: Array<{
-    id: string;
-    title: string;
-    date: string;
-    type: string;
-  }>;
-  recentAchievements: Array<{
-    id: string;
-    name: string;
-    points: number;
-    unlockedAt: string | null;
-  }>;
+interface Partner {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isOnline: boolean | null;
+}
+
+interface UpcomingDate {
+  id: string;
+  title: string;
+  date: string;
 }
 
 const quickActions = [
-  { href: '/chat', label: 'Message', icon: MessageCircle, color: 'bg-primary/10 text-primary' },
-  { href: '/scribble', label: 'Draw', icon: Pencil, color: 'bg-secondary/10 text-secondary' },
-  { href: '/gallery', label: 'Photos', icon: Camera, color: 'bg-accent/10 text-accent' },
-  { href: '/paint', label: 'Paint', icon: Palette, color: 'bg-info/10 text-info' },
+  { href: '/chat', label: 'Message', icon: MessageCircle },
+  { href: '/scribble', label: 'Draw', icon: Pencil },
+  { href: '/gallery', label: 'Photos', icon: Camera },
+  { href: '/watch', label: 'Watch', icon: Clapperboard },
 ] as const;
+
+function lastSeenText(iso?: string): string {
+  if (!iso) return 'offline';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'last seen just now';
+  if (m < 60) return `last seen ${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `last seen ${h}h ago`;
+  return `last seen ${Math.floor(h / 24)}d ago`;
+}
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
   const { streak, fetchStreak } = useStreaksStore();
 
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    coupleStats: null,
-    partner: null,
-    upcomingDates: [],
-    recentAchievements: [],
-  });
+  // Live partner presence (kept fresh app-wide by the realtime provider).
+  const isPartnerOnline = useChatStore((s) => s.isPartnerOnline);
+  const partnerLastSeenAt = useChatStore((s) => s.partnerLastSeenAt);
+  const { requestPresence } = useSocket();
+  const { startCall } = useCall();
+
+  const [partner, setPartner] = useState<Partner | null>(null);
+  const [nextDate, setNextDate] = useState<UpcomingDate | null>(null);
+  const [seededOnline, setSeededOnline] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDashboard = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch profile data which includes partner + couple stats
       const { data } = await api.get('/users/me/profile');
-      const profileData = data.data;
-
-      // Fetch upcoming dates
-      let upcomingDates: DashboardData['upcomingDates'] = [];
+      const p = data.data?.partner ?? null;
+      setPartner(p);
+      setSeededOnline(p?.isOnline ?? null);
       try {
-        const datesRes = await api.get('/dates', {
-          params: { limit: 5 },
-        });
-        upcomingDates = datesRes.data.data?.dates ?? [];
+        const datesRes = await api.get('/dates', { params: { limit: 1 } });
+        setNextDate(datesRes.data.data?.dates?.[0] ?? null);
       } catch {
-        // dates endpoint may not return data if no couple
+        /* no dates */
       }
-
-      setDashboardData({
-        coupleStats: profileData.coupleStats ?? null,
-        partner: profileData.partner ?? null,
-        upcomingDates,
-        recentAchievements: profileData.coupleStats?.showcasedAchievements ?? [],
-      });
     } catch {
-      // Silently fail
+      /* silent */
     } finally {
       setIsLoading(false);
     }
@@ -117,32 +96,40 @@ export default function DashboardPage() {
     fetchStreak();
   }, [fetchDashboard, fetchStreak]);
 
-  // Days together
+  // Ask for the partner's current status now, then keep it fresh.
+  useEffect(() => {
+    requestPresence();
+    const t = setInterval(requestPresence, 30000);
+    return () => clearInterval(t);
+  }, [requestPresence]);
+
   const daysTogether = couple?.createdAt
-    ? Math.floor(
-        (Date.now() - new Date(couple.createdAt).getTime()) / (1000 * 60 * 60 * 24),
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(couple.createdAt).getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
       )
     : 0;
 
-  // Hours remaining for streak
+  // Streak time-left
   const now = new Date();
   const midnight = new Date(now);
   midnight.setHours(23, 59, 59, 999);
-  const msRemaining = midnight.getTime() - now.getTime();
-  const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
-  const minutesRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
-
+  const msLeft = midnight.getTime() - now.getTime();
+  const hoursLeft = Math.floor(msLeft / 3_600_000);
+  const minutesLeft = Math.floor((msLeft % 3_600_000) / 60_000);
   const today = new Date().toISOString().split('T')[0];
-  const hasContributedToday = streak?.lastPhotoDate === today;
+  const sharedToday = streak?.lastPhotoDate === today;
 
-  // Days until upcoming dates
-  function daysUntilDate(dateStr: string): number {
-    const target = new Date(dateStr);
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-    return Math.ceil((target.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
-  }
+  const daysUntil = (iso: string) => {
+    const t = new Date(iso);
+    t.setHours(0, 0, 0, 0);
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return Math.ceil((t.getTime() - d.getTime()) / 86_400_000);
+  };
 
   if (isLoading) {
     return (
@@ -152,9 +139,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { coupleStats, partner } = dashboardData;
-
-  // Not linked up yet — surface the pairing flow front and centre.
+  // Not linked up — pairing front and centre.
   if (!couple?.isPaired) {
     return (
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 p-4 md:p-6">
@@ -174,284 +159,189 @@ export default function DashboardPage() {
     );
   }
 
+  const hour = now.getHours();
+  const greeting =
+    hour < 5 ? 'Still up' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  // Prefer the live presence value; fall back to the freshly-fetched one.
+  const online = isPartnerOnline || (partnerLastSeenAt === undefined && seededOnline === true);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
-      {/* Couple Header */}
+    <div className="mx-auto max-w-2xl space-y-5 p-4 md:p-6">
+      {/* ── Partner presence — the centrepiece ── */}
       <Card cardStyle="elevated" padding="lg">
-        <div className="flex flex-col items-center text-center">
-          <div className="flex items-center gap-4">
-            <Avatar
-              src={user?.avatarUrl}
-              name={user?.displayName}
-              size="xl"
-              status={user?.isOnline ? 'online' : 'offline'}
-            />
-            <Heart className="h-6 w-6 text-primary" />
-            {partner ? (
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-text-muted">
+          {greeting}, {user?.displayName}
+        </p>
+
+        {partner ? (
+          <div className="mt-4 flex items-center gap-4">
+            <div className="relative">
               <Avatar
                 src={partner.avatarUrl}
                 name={partner.displayName}
                 size="xl"
-                status={partner.isOnline ? 'online' : 'offline'}
               />
-            ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-border">
-                <span className="text-2xl text-text-muted">?</span>
-              </div>
-            )}
-          </div>
-
-          <h2 className="mt-4 text-xl font-bold text-text">
-            {partner
-              ? couple?.coupleName || `${user?.displayName} & ${partner.displayName}`
-              : `Hey, ${user?.displayName}`}
-          </h2>
-          <p className="text-text-muted">
-            {partner ? (
-              <>Together for <span className="font-mono text-text">{daysTogether}</span> days</>
-            ) : (
-              'Invite your partner to get started'
-            )}
-          </p>
-
-          {/* Quick Stats */}
-          {coupleStats && (
-            <div className="mt-4 grid w-full max-w-md grid-cols-4 gap-3">
-              <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
-                <Flame className="h-4 w-4 text-accent" />
-                <span className="mt-1 font-mono text-lg font-bold text-text">
-                  {coupleStats.currentStreak}
-                </span>
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Streak</span>
-              </div>
-              <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
-                <MessageCircle className="h-4 w-4 text-primary" />
-                <span className="mt-1 font-mono text-lg font-bold text-text">
-                  {coupleStats.messageCount > 999
-                    ? `${Math.floor(coupleStats.messageCount / 1000)}k`
-                    : coupleStats.messageCount}
-                </span>
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Messages</span>
-              </div>
-              <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
-                <ImageIcon className="h-4 w-4 text-secondary" />
-                <span className="mt-1 font-mono text-lg font-bold text-text">
-                  {coupleStats.mediaCount}
-                </span>
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Photos</span>
-              </div>
-              <div className="flex flex-col items-center rounded-lg bg-surface-hover p-2">
-                <Trophy className="h-4 w-4 text-accent" />
-                <span className="mt-1 font-mono text-lg font-bold text-text">
-                  {coupleStats.achievementCount}
-                </span>
-                <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Awards</span>
-              </div>
+              <span
+                className={cn(
+                  'absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-surface',
+                  online ? 'bg-success' : 'bg-text-muted',
+                )}
+              >
+                {online && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-success/70" />
+                )}
+              </span>
             </div>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-2xl font-bold text-text">
+                {partner.displayName}
+              </h1>
+              <p
+                className={cn(
+                  'text-sm font-medium',
+                  online ? 'text-success' : 'text-text-muted',
+                )}
+              >
+                {online ? 'Online now' : lastSeenText(partnerLastSeenAt)}
+              </p>
+              <p className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                Together {daysTogether} days
+                {streak && streak.currentStreak > 0 && (
+                  <>
+                    {' · '}
+                    <Flame className="h-3.5 w-3.5 text-accent" />
+                    {streak.currentStreak}-day streak
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-text-muted">Invite your partner to get started.</p>
+        )}
+
+        {partner && (
+          <div className="mt-5 flex gap-3">
+            <Link href="/chat" className="flex-1">
+              <Button variant="primary" size="md" className="w-full">
+                <MessageCircle className="mr-1.5 h-4 w-4" />
+                Message
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              size="md"
+              className="flex-1"
+              onClick={() =>
+                startCall('video', {
+                  id: partner.id,
+                  displayName: partner.displayName,
+                  avatarUrl: partner.avatarUrl ?? undefined,
+                })
+              }
+            >
+              <Video className="mr-1.5 h-4 w-4" />
+              Video call
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Today's streak — the one daily action ── */}
+      <Card cardStyle="bordered" padding="md">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div
+              className={cn(
+                'flex h-14 w-14 shrink-0 items-center justify-center rounded-full',
+                streak && streak.currentStreak > 0
+                  ? 'bg-gradient-to-br from-accent to-primary'
+                  : 'bg-surface-hover',
+              )}
+            >
+              <Flame
+                className={cn(
+                  'h-7 w-7',
+                  streak && streak.currentStreak > 0
+                    ? 'streak-flame text-text-on-primary'
+                    : 'text-text-muted',
+                )}
+              />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-text">
+                <span className="font-mono">{streak?.currentStreak ?? 0}</span>{' '}
+                day{(streak?.currentStreak ?? 0) === 1 ? '' : 's'} streak
+              </p>
+              {sharedToday ? (
+                <p className="flex items-center gap-1 text-sm text-success">
+                  <Camera className="h-3.5 w-3.5" /> Photo shared today
+                </p>
+              ) : (
+                <p className="flex items-center gap-1 text-sm text-text-muted">
+                  <Clock className="h-3.5 w-3.5" /> {hoursLeft}h {minutesLeft}m left today
+                </p>
+              )}
+            </div>
+          </div>
+          {!sharedToday && (
+            <Link href="/streaks">
+              <Button variant="primary" size="sm">
+                <Camera className="mr-1.5 h-4 w-4" /> Share
+              </Button>
+            </Link>
           )}
         </div>
       </Card>
 
-      {/* Photo Streak Widget */}
-      <Card cardStyle="bordered" padding="md">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Daily ritual</p>
-              <CardTitle className="flex items-center gap-2">
-                <Flame className="h-5 w-5 text-accent" />
-                Photo Streak
-              </CardTitle>
-            </div>
-            <Link href="/streaks" className="text-sm font-medium text-primary hover:underline">
-              View
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className={cn(
-                  'flex h-16 w-16 items-center justify-center rounded-full',
-                  streak && streak.currentStreak > 0
-                    ? 'bg-gradient-to-br from-accent to-primary'
-                    : 'bg-surface-hover',
-                )}
-              >
-                <Flame
-                  className={cn(
-                    'h-8 w-8',
-                    streak && streak.currentStreak > 0
-                      ? 'streak-flame text-text-on-primary'
-                      : 'text-text-muted',
-                  )}
-                />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-text">
-                  <span className="font-mono">{streak?.currentStreak ?? 0}</span> {(streak?.currentStreak ?? 0) === 1 ? 'Day' : 'Days'}
-                </p>
-                {hasContributedToday ? (
-                  <p className="flex items-center gap-1 text-sm text-success">
-                    <Camera className="h-3.5 w-3.5" />
-                    Photo shared today
-                  </p>
-                ) : (
-                  <p className="flex items-center gap-1 text-sm text-text-muted">
-                    <Clock className="h-3.5 w-3.5" />
-                    {hoursRemaining}h {minutesRemaining}m remaining
-                  </p>
-                )}
-              </div>
-            </div>
-            {!hasContributedToday && (
-              <Link href="/streaks">
-                <Button variant="primary" size="sm">
-                  <Camera className="mr-1.5 h-4 w-4" />
-                  Share
-                </Button>
-              </Link>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Dates */}
-      <Card cardStyle="bordered" padding="md">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">On the calendar</p>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Upcoming Dates
-              </CardTitle>
-            </div>
-            <Link href="/profile" className="text-sm font-medium text-primary hover:underline">
-              Manage
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {dashboardData.upcomingDates.length === 0 ? (
-            <p className="py-3 text-center text-sm text-text-muted">
-              No upcoming dates. Add important dates in your profile!
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {dashboardData.upcomingDates.slice(0, 3).map((d) => {
-                const daysLeft = daysUntilDate(d.date);
-                return (
-                  <div key={d.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-light">
-                        <Calendar className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-text">{d.title}</p>
-                        <p className="text-xs text-text-muted">
-                          {new Date(d.date).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        daysLeft <= 3
-                          ? 'bg-error/10 text-error'
-                          : daysLeft <= 7
-                            ? 'bg-warning/10 text-warning'
-                            : 'bg-surface-hover text-text-muted',
-                      )}
-                    >
-                      {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `${daysLeft} days`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Achievements */}
-      <Card cardStyle="bordered" padding="md">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Milestones</p>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent" />
-                Recent Achievements
-              </CardTitle>
-            </div>
-            <Link href="/hall-of-fame" className="text-sm font-medium text-primary hover:underline">
-              View
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {dashboardData.recentAchievements.length === 0 ? (
-            <p className="py-3 text-center text-sm text-text-muted">
-              No achievements yet. Keep using LinkUp to unlock them!
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {dashboardData.recentAchievements.slice(0, 3).map((a) => (
-                <div key={a.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10">
-                      <Star className="h-4 w-4 text-accent" />
-                    </div>
-                    <p className="text-sm font-medium text-text">
-                      {a.name || 'Achievement'}
-                    </p>
-                  </div>
-                  <span className="font-mono text-xs font-medium text-accent">
-                    {a.points} pts
-                  </span>
+      {/* ── Next important date — only when there is one ── */}
+      {nextDate && (
+        <Link href="/profile">
+          <Card cardStyle="bordered" padding="md" className="transition-colors hover:bg-surface-hover">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-light">
+                  <Calendar className="h-5 w-5 text-primary" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-sm font-medium text-text">{nextDate.title}</p>
+                  <p className="text-xs text-text-muted">
+                    {new Date(nextDate.date).toLocaleDateString(undefined, {
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-surface-hover px-3 py-1 text-xs font-medium text-text">
+                {(() => {
+                  const d = daysUntil(nextDate.date);
+                  return d <= 0 ? 'Today' : d === 1 ? 'Tomorrow' : `in ${d} days`;
+                })()}
+              </span>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </Card>
+        </Link>
+      )}
 
-      {/* Quick Actions */}
-      <Card cardStyle="bordered" padding="md">
-        <CardHeader>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-text-muted">Jump back in</p>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 gap-3">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link key={action.href} href={action.href}>
-                  <div className="flex flex-col items-center gap-2 rounded-xl p-3 transition-colors hover:bg-surface-hover">
-                    <div
-                      className={cn(
-                        'flex h-12 w-12 items-center justify-center rounded-full',
-                        action.color,
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-medium text-text">
-                      {action.label}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Quick actions ── */}
+      <div className="grid grid-cols-4 gap-3">
+        {quickActions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-4 transition-colors hover:bg-surface-hover"
+            >
+              <Icon className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium text-text">{a.label}</span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
