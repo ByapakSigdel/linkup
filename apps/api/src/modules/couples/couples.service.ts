@@ -165,6 +165,23 @@ export class CouplesService {
       .where(eq(schema.couples.id, coupleId))
       .returning();
 
+    // The couple's Circle profile shares the couple's name (and avatar): keep
+    // the circle in sync so renaming the couple renames their circle account.
+    const circlePatch: Record<string, unknown> = {};
+    if (data.coupleName && data.coupleName.trim()) {
+      circlePatch.name = data.coupleName.trim();
+    }
+    if (data.coupleAvatarUrl !== undefined) {
+      circlePatch.avatarUrl = data.coupleAvatarUrl || null;
+    }
+    if (Object.keys(circlePatch).length > 0) {
+      circlePatch.updatedAt = new Date();
+      await this.db
+        .update(schema.circles)
+        .set(circlePatch)
+        .where(eq(schema.circles.createdByCoupleId, coupleId));
+    }
+
     return updated;
   }
 

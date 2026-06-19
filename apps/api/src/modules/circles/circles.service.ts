@@ -556,6 +556,22 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       updated = await this.getCircleById(circle.id);
     }
 
+    // The circle name/avatar IS the couple account's — keep the couple in sync.
+    const couplePatch: Record<string, unknown> = {};
+    if (input.name !== undefined && input.name.trim()) {
+      couplePatch.coupleName = input.name.trim();
+    }
+    if (input.avatarUrl !== undefined) {
+      couplePatch.coupleAvatarUrl = input.avatarUrl || null;
+    }
+    if (Object.keys(couplePatch).length > 0) {
+      couplePatch.updatedAt = new Date();
+      await this.db
+        .update(schema.couples)
+        .set(couplePatch)
+        .where(eq(schema.couples.id, coupleId));
+    }
+
     await this.afterOwnerMutation(userId, 'profile', { circleId: circle.id });
     return { circle: this.serializeCircle(updated ?? circle) };
   }
