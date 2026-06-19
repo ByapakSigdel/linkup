@@ -13,6 +13,7 @@ import {
   Volume2,
   Clapperboard,
   Music,
+  Gamepad2,
   Trophy,
   Users,
   Compass,
@@ -53,6 +54,7 @@ const navSections = [
   {
     label: 'Side by side',
     items: [
+      { href: '/games', label: 'Games', icon: Gamepad2 },
       { href: '/watch', label: 'Watch Party', icon: Clapperboard },
       { href: '/music', label: 'Music', icon: Music },
     ],

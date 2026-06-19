@@ -8,6 +8,7 @@ import { useNotificationsStore } from '@/stores/notifications-store';
 import { useCallStore, type CallType } from '@/stores/call-store';
 import { useToastStore } from '@/stores/toast-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { useGamesStore } from '@/stores/games-store';
 import { CallManager } from '@/components/call/call-manager';
 import { ToastContainer } from '@/components/realtime/toast-container';
 import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
@@ -50,6 +51,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       reaction: { userId: string; emoji: string; timestamp: string };
     }) => {
       useChatStore.getState().addReaction(data.messageId, data.reaction);
+    };
+
+    // Couple games: track which game the partner is in; answer presence pings.
+    const onGameEvent = (p: { t?: string; game?: string | null }) => {
+      if (!p) return;
+      if (p.t === 'present') {
+        useGamesStore.getState().setPartnerInGame(p.game ?? null);
+      } else if (p.t === 'present-req') {
+        getSocket()?.emit('game:event', {
+          t: 'present',
+          game: useGamesStore.getState().myGame,
+        });
+      }
     };
 
     const onNotification = (notification: any) => {
@@ -139,6 +153,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('achievement:unlocked', onAchievementUnlocked);
     socket.on('watch:invite', onWatchInvite);
     socket.on('theme:changed', onThemeChanged);
+    socket.on('game:event', onGameEvent);
 
     if (socket.connected) onConnect();
 
@@ -158,6 +173,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('achievement:unlocked', onAchievementUnlocked);
       socket.off('watch:invite', onWatchInvite);
       socket.off('theme:changed', onThemeChanged);
+      socket.off('game:event', onGameEvent);
     };
   }, [token]);
 

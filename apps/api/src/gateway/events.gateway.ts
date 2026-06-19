@@ -698,6 +698,24 @@ export class EventsGateway
     await this.relayToPartner(client.userId, 'stream:stopped', { by: client.userId });
   }
 
+  // ─── Couple Games (generic relay) ────────────────────────────────────────────
+
+  /**
+   * One relay for ALL 2-player games. Game logic lives client-side; the server
+   * just forwards each event to the partner. Payload shape is owned by the
+   * client (`{ t: 'present'|'msg', game, data }`).
+   */
+  @SubscribeMessage('game:event')
+  async handleGameEvent(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: unknown,
+  ) {
+    await this.relayToPartner(client.userId, 'game:event', {
+      by: client.userId,
+      ...(payload as object),
+    });
+  }
+
   // ─── Helper Methods ─────────────────────────────────────────────────────────
 
   /**
