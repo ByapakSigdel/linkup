@@ -8,6 +8,14 @@ import { TruthOrDare } from './truth-or-dare';
 import { MemoryMatch } from './memory-match';
 import { Pictionary } from './pictionary';
 import { DiceDuel } from './dice-duel';
+import { Battleship } from './battleship';
+import { DotsAndBoxes } from './dots-and-boxes';
+import { Reversi } from './reversi';
+import { Hangman } from './hangman';
+import { EmojiRiddles } from './emoji-riddles';
+import { MindMeld } from './mind-meld';
+import { TwentyQuestions } from './twenty-questions';
+import { ReactionDuel } from './reaction-duel';
 
 export type GameCategory = 'classic' | 'couple' | 'creative' | 'luck';
 
@@ -37,6 +45,14 @@ export const GAMES: GameDef[] = [
   { key: 'memory-match', name: 'Memory Match', tagline: 'Find the pairs', emoji: '🧠', category: 'luck', Component: MemoryMatch },
   { key: 'pictionary', name: 'Pictionary', tagline: 'One draws, one guesses', emoji: '🎨', category: 'creative', Component: Pictionary },
   { key: 'dice-duel', name: 'Dice Duel', tagline: 'Highest roll wins', emoji: '🎲', category: 'luck', Component: DiceDuel },
+  { key: 'battleship', name: 'Battleship', tagline: 'Sink their fleet', emoji: '🚢', category: 'classic', Component: Battleship },
+  { key: 'dots-and-boxes', name: 'Dots & Boxes', tagline: 'Claim the most boxes', emoji: '🔳', category: 'classic', Component: DotsAndBoxes },
+  { key: 'reversi', name: 'Reversi', tagline: 'Flip and flank', emoji: '⚫', category: 'classic', Component: Reversi },
+  { key: 'hangman', name: 'Hangman', tagline: 'Guess the word', emoji: '🔤', category: 'creative', Component: Hangman },
+  { key: 'emoji-riddles', name: 'Emoji Riddles', tagline: 'Decode the emojis', emoji: '🧩', category: 'creative', Component: EmojiRiddles },
+  { key: 'mind-meld', name: 'Mind Meld', tagline: 'Think alike', emoji: '💭', category: 'couple', Component: MindMeld },
+  { key: 'twenty-questions', name: 'Twenty Questions', tagline: 'Guess what I picked', emoji: '❓', category: 'couple', Component: TwentyQuestions },
+  { key: 'reaction-duel', name: 'Reaction Duel', tagline: 'Fastest finger wins', emoji: '⚡', category: 'luck', Component: ReactionDuel },
 ];
 
 export const getGame = (key: string): GameDef | undefined =>
