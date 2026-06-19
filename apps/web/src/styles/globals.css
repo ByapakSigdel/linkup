@@ -761,6 +761,15 @@ body::after {
   animation: achievementUnlock 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
+@keyframes reactionPop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.lk-reaction-pop {
+  animation: reactionPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @keyframes shimmer {
   0% { background-position: -1000px 0; }
   100% { background-position: 1000px 0; }

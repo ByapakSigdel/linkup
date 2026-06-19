@@ -12,11 +12,14 @@ import {
   Trash2,
   Star,
   MessageSquare,
+  SmilePlus,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Emoji } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useThemeStore } from '@/stores/theme-store';
+import { reactionPack, ALL_REACTIONS } from '@/lib/reaction-packs';
 import {
   useCustomEmojiStore,
   type CustomEmojiEntry,
@@ -99,7 +102,7 @@ function ReactionsDisplay({
       {entries.map(([emoji, arr]) => (
         <span
           key={emoji}
-          className="inline-flex items-center gap-0.5 rounded-full bg-surface-hover px-1.5 py-0.5 text-xs border border-border"
+          className="lk-reaction-pop inline-flex items-center gap-0.5 rounded-full bg-surface-hover px-1.5 py-0.5 text-xs border border-border"
         >
           <Emoji emoji={emoji} size={14} />
           {arr.length > 1 && (
@@ -143,6 +146,8 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
     const [showActions, setShowActions] = useState(false);
     const emojiByName = useCustomEmojiStore((s) => s.byName);
     const loadCustomEmojis = useCustomEmojiStore((s) => s.load);
+    const currentThemeId = useThemeStore((s) => s.currentThemeId);
+    const [showAllReactions, setShowAllReactions] = useState(false);
     useEffect(() => {
       void loadCustomEmojis();
     }, [loadCustomEmojis]);
@@ -169,7 +174,7 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
       ? highlightColorMap[message.highlightCategory as HighlightCategory] ?? undefined
       : undefined;
 
-    const quickReactions = ['\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE0D', '\uD83D\uDD25', '\uD83D\uDC4D'];
+    const quickReactions = reactionPack(currentThemeId);
 
     return (
       <div
@@ -190,18 +195,45 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
               isSent ? 'right-[calc(70%+8px)]' : 'left-[calc(70%+8px)]',
             )}
           >
-            {/* Quick reactions */}
-            <div className="flex items-center gap-0.5 rounded-full bg-surface border border-border shadow-md px-1.5 py-0.5">
+            {/* Quick reactions (themed pack + full picker) */}
+            <div className="relative flex items-center gap-0.5 rounded-full bg-surface border border-border shadow-md px-1.5 py-0.5">
               {quickReactions.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => onReact?.(message.id, emoji)}
-                  className="flex items-center hover:scale-125 transition-transform p-0.5"
+                  className="flex items-center p-0.5 transition-transform hover:scale-150 active:scale-90"
                   aria-label={`React with ${emoji}`}
                 >
                   <Emoji emoji={emoji} size={18} />
                 </button>
               ))}
+              <button
+                onClick={() => setShowAllReactions((v) => !v)}
+                className="flex items-center justify-center p-0.5 text-text-muted transition-colors hover:text-text"
+                aria-label="More reactions"
+              >
+                <SmilePlus className="h-4 w-4" />
+              </button>
+
+              {showAllReactions && (
+                <div className="absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-60 -translate-x-1/2 rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+                  <div className="grid grid-cols-8 gap-0.5">
+                    {ALL_REACTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => {
+                          onReact?.(message.id, emoji);
+                          setShowAllReactions(false);
+                        }}
+                        className="flex items-center justify-center rounded-md p-1 transition-transform hover:scale-125 hover:bg-surface-hover"
+                        aria-label={`React with ${emoji}`}
+                      >
+                        <Emoji emoji={emoji} size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* More actions */}
