@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, MonitorUp } from 'lucide-react';
-import { getSocket } from '@/lib/socket';
+import { getSocket, connectSocket } from '@/lib/socket';
 import { useCallStore } from '@/stores/call-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { Avatar } from '@/components/ui';
@@ -23,6 +23,7 @@ export function CallManager() {
   const isCaller = useCallStore((s) => s.isCaller);
   const muted = useCallStore((s) => s.muted);
   const cameraOff = useCallStore((s) => s.cameraOff);
+  const token = useAuthStore((s) => s.tokens?.accessToken);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -120,9 +121,13 @@ export function CallManager() {
     stream.getTracks().forEach((t) => pcRef.current?.addTrack(t, stream));
   }
 
-  // Signaling listeners (live for the lifetime of the manager)
+  // Signaling listeners (live for the lifetime of the manager).
+  // Bind via connectSocket(token) — idempotent, returns the shared singleton —
+  // so listeners attach even though this child effect runs before the parent
+  // RealtimeProvider establishes the connection.
   useEffect(() => {
-    const socket = getSocket();
+    if (!token) return;
+    const socket = connectSocket(token);
     if (!socket) return;
 
     const onAccepted = async () => {
@@ -134,7 +139,8 @@ export function CallManager() {
         const offer = await pcRef.current.createOffer();
         await pcRef.current.setLocalDescription(offer);
         socket.emit('call:offer', { sdp: offer });
-      } catch {
+      } catch (err) {
+        console.error('[call] caller onAccepted failed', err);
         endCall();
       }
     };
@@ -156,7 +162,8 @@ export function CallManager() {
         const answer = await pcRef.current.createAnswer();
         await pcRef.current.setLocalDescription(answer);
         socket.emit('call:answer', { sdp: answer });
-      } catch {
+      } catch (err) {
+        console.error('[call] callee onOffer failed', err);
         endCall();
       }
     };
@@ -211,7 +218,7 @@ export function CallManager() {
       socket.off('call:ended', onEnded);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   async function acceptIncoming() {
     useCallStore.getState().setConnecting();

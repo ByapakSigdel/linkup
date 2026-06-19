@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Palette, Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useThemeStore } from '@/stores/theme-store';
+import { selectTheme } from '@/lib/sync-theme';
 import { themes, themeIds } from '@/styles/themes/index';
 
 function ThemePreview({
@@ -48,7 +49,6 @@ function ThemePreview({
 
 export function ThemeSelector() {
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
-  const setTheme = useThemeStore((s) => s.setTheme);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +97,7 @@ export function ThemeSelector() {
                 <button
                   key={id}
                   onClick={() => {
-                    setTheme(id);
+                    selectTheme(id);
                     setOpen(false);
                   }}
                   className={cn(

@@ -219,7 +219,7 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
             className={cn(
               'px-3 py-2 text-sm leading-relaxed break-words',
               isSent
-                ? 'text-message-sent-text'
+                ? 'bg-message-sent text-message-sent-text'
                 : 'bg-message-received text-message-received-text',
             )}
             style={{
@@ -227,9 +227,6 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
                 ? 'var(--chat-bubble-sent-radius)'
                 : 'var(--chat-bubble-received-radius)',
               boxShadow: 'var(--chat-bubble-shadow)',
-              background: isSent
-                ? 'var(--gradient-primary)'
-                : undefined,
               ...(highlightColor
                 ? {
                     border: `2px solid ${highlightColor}`,

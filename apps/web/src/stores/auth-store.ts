@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { User, Couple, AuthTokens } from '@linkup/types';
 import api from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
+import { useThemeStore } from '@/stores/theme-store';
 
 interface AuthState {
   user: User | null;
@@ -91,7 +92,12 @@ export const useAuthStore = create<AuthState>()(
             const { data: cBody } = await api.get(
               `/couples/${fullUser.coupleId}`,
             );
-            set({ couple: cBody.data.couple ?? null });
+            const couple = cBody.data.couple ?? null;
+            set({ couple });
+            // The couple's shared theme is authoritative for both partners.
+            if (couple?.sharedThemeId) {
+              useThemeStore.getState().setTheme(couple.sharedThemeId);
+            }
           } else {
             set({ couple: null });
           }

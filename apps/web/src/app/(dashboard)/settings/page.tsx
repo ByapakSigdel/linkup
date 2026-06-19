@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
+import { selectTheme } from '@/lib/sync-theme';
 import { themes, themeIds } from '@/styles/themes/index';
 import {
   Card,
@@ -109,7 +110,7 @@ function Toggle({
 export default function SettingsPage() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
-  const { currentThemeId, setTheme } = useThemeStore();
+  const currentThemeId = useThemeStore((s) => s.currentThemeId);
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,7 +151,8 @@ export default function SettingsPage() {
 
   const handleThemeChange = useCallback(
     async (themeId: string) => {
-      setTheme(themeId);
+      // Applies locally + shares with the partner + persists on the couple.
+      selectTheme(themeId);
       if (settings) {
         setSettings({ ...settings, themeId });
         try {
@@ -160,7 +162,7 @@ export default function SettingsPage() {
         }
       }
     },
-    [settings, setTheme],
+    [settings],
   );
 
   const handleLogout = async () => {

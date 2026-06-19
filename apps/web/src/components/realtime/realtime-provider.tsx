@@ -7,6 +7,7 @@ import { useChatStore } from '@/stores/chat-store';
 import { useNotificationsStore } from '@/stores/notifications-store';
 import { useCallStore, type CallType } from '@/stores/call-store';
 import { useToastStore } from '@/stores/toast-store';
+import { useThemeStore } from '@/stores/theme-store';
 import { CallManager } from '@/components/call/call-manager';
 import { ToastContainer } from '@/components/realtime/toast-container';
 import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
@@ -100,6 +101,20 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
+    const onThemeChanged = (data: { themeId: string }) => {
+      if (data?.themeId) {
+        // Partner changed the shared theme — apply it locally without
+        // re-broadcasting (that would loop).
+        useThemeStore.getState().setTheme(data.themeId);
+        const couple = useAuthStore.getState().couple;
+        if (couple) {
+          useAuthStore
+            .getState()
+            .setCouple({ ...couple, sharedThemeId: data.themeId });
+        }
+      }
+    };
+
     const onWatchInvite = (data: { party?: { title?: string } }) => {
       useToastStore.getState().push({
         title: 'Watch Party',
@@ -123,6 +138,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('soundboard:play', onSoundboardPlay);
     socket.on('achievement:unlocked', onAchievementUnlocked);
     socket.on('watch:invite', onWatchInvite);
+    socket.on('theme:changed', onThemeChanged);
 
     if (socket.connected) onConnect();
 
@@ -141,6 +157,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('soundboard:play', onSoundboardPlay);
       socket.off('achievement:unlocked', onAchievementUnlocked);
       socket.off('watch:invite', onWatchInvite);
+      socket.off('theme:changed', onThemeChanged);
     };
   }, [token]);
 
