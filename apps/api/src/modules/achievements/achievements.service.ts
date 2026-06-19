@@ -106,14 +106,23 @@ export class AchievementsService implements OnModuleInit {
       schema.scribbles,
       eq(schema.scribbles.coupleId, coupleId),
     );
-    const friendsCount = await countOf(
-      schema.friendships,
-      sql`(${schema.friendships.coupleId} = ${coupleId} OR ${schema.friendships.friendCoupleId} = ${coupleId})`,
-    );
-    const circlesCount = await countOf(
-      schema.circleMembers,
-      eq(schema.circleMembers.coupleId, coupleId),
-    );
+    // Friends were retired and folded into circle follows. The couple's circle
+    // (if any) is the social anchor; "friends" now counts accepted follow edges.
+    const [myCircle] = await this.db
+      .select({ id: schema.circles.id })
+      .from(schema.circles)
+      .where(eq(schema.circles.createdByCoupleId, coupleId))
+      .limit(1);
+    const circlesCount = myCircle ? 1 : 0;
+    const friendsCount = myCircle
+      ? await countOf(
+          schema.circleFollows,
+          and(
+            eq(schema.circleFollows.followerCircleId, myCircle.id),
+            eq(schema.circleFollows.status, 'accepted'),
+          ),
+        )
+      : 0;
 
     // Days together: from anniversary date, else couple creation.
     let daysTogether = 0;

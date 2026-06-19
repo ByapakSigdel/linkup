@@ -11,10 +11,12 @@ export type NotificationType =
   | 'anniversary'
   | 'date_reminder'
   | 'achievement'
-  | 'friend_request'
-  | 'friend_accepted'
-  | 'circle_invite'
-  | 'circle_post'
+  // Circles (Instagram-for-couples) — follows/likes/comments
+  | 'circle_follow'
+  | 'circle_follow_request'
+  | 'circle_follow_accepted'
+  | 'circle_post_like'
+  | 'circle_comment'
   | 'highlight'
   | 'media_shared'
   | 'system';

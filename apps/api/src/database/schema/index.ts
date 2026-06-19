@@ -12,6 +12,8 @@ import {
   timestamp,
   json,
   jsonb,
+  index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // ─── Users ──────────────────────────────────────────────────────────────────────
@@ -382,133 +384,187 @@ export const dateCelebrations = pgTable('date_celebrations', {
 // Phase 5+ — Social, Creative, Entertainment & Communication features
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Single Friends ─────────────────────────────────────────────────────────────
+// ─── Couple Circles (Instagram-for-couples: profiles + one-way follows) ───────────
 
-export const friendships = pgTable('friendships', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  coupleId: uuid('couple_id')
-    .notNull()
-    .references(() => couples.id),
-  friendUserId: uuid('friend_user_id').references(() => users.id),
-  friendCoupleId: uuid('friend_couple_id').references((): AnyPgColumn => couples.id),
-  initiatedBy: uuid('initiated_by')
-    .notNull()
-    .references(() => users.id),
-  status: varchar('status', { length: 20 }).default('active'), // active, blocked
-  permissions: jsonb('permissions')
-    .$type<{
-      viewPhotos: boolean;
-      viewVideos: boolean;
-      viewMessages: boolean;
-      viewAchievements: boolean;
-      commentOnPosts: boolean;
-    }>()
-    .default({
-      viewPhotos: true,
-      viewVideos: false,
-      viewMessages: false,
-      viewAchievements: true,
-      commentOnPosts: true,
-    }),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+// A couple's PUBLIC/PRIVATE profile — exactly ONE per couple (opt-in).
+export const circles = pgTable(
+  'circles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 100 }).notNull(), // profile display name
+    handle: varchar('handle', { length: 30 }).unique(), // @handle for discover/deep-links
+    description: varchar('description', { length: 1000 }), // bio (exposed as `bio` in API)
+    avatarUrl: text('avatar_url'), // profile picture
+    coverImageUrl: text('cover_image_url'), // profile banner
+    createdByCoupleId: uuid('created_by_couple_id')
+      .notNull()
+      .references(() => couples.id), // OWNER couple (UNIQUE — one circle per couple)
+    createdByUserId: uuid('created_by_user_id')
+      .notNull()
+      .references(() => users.id), // which partner opted in
+    isPrivate: boolean('is_private').default(false), // public by default
+    followerCount: integer('follower_count').default(0),
+    followingCount: integer('following_count').default(0),
+    postCount: integer('post_count').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    ownerUnique: uniqueIndex('circles_owner_unique').on(table.createdByCoupleId),
+  }),
+);
 
-export const friendInvitations = pgTable('friend_invitations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  fromCoupleId: uuid('from_couple_id')
-    .notNull()
-    .references(() => couples.id),
-  fromUserId: uuid('from_user_id')
-    .notNull()
-    .references(() => users.id),
-  toUserId: uuid('to_user_id').references(() => users.id),
-  toEmail: varchar('to_email', { length: 255 }),
-  inviteCode: varchar('invite_code', { length: 30 }).notNull().unique(),
-  permissions: jsonb('permissions').$type<Record<string, boolean>>(),
-  status: varchar('status', { length: 20 }).default('pending'), // pending, accepted, declined, expired
-  expiresAt: timestamp('expires_at').notNull(),
-  acceptedBy: uuid('accepted_by').references(() => users.id),
-  acceptedAt: timestamp('accepted_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+// One-way follow edge between two CIRCLES (couple-to-couple, Instagram model).
+export const circleFollows = pgTable(
+  'circle_follows',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    followerCircleId: uuid('follower_circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }), // the circle doing the following
+    followingCircleId: uuid('following_circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }), // the circle being followed
+    status: varchar('status', { length: 20 }).notNull().default('accepted'), // accepted | pending
+    requestedByUserId: uuid('requested_by_user_id')
+      .notNull()
+      .references(() => users.id), // which partner tapped follow
+    createdAt: timestamp('created_at').defaultNow(),
+    acceptedAt: timestamp('accepted_at'),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex('circle_follows_pair_unique').on(
+      table.followerCircleId,
+      table.followingCircleId,
+    ),
+    followingStatusIdx: index('circle_follows_following_status_idx').on(
+      table.followingCircleId,
+      table.status,
+    ),
+    followerStatusIdx: index('circle_follows_follower_status_idx').on(
+      table.followerCircleId,
+      table.status,
+    ),
+  }),
+);
 
-// ─── Couple Circles ─────────────────────────────────────────────────────────────
+// A photo/video post on a couple's OWN circle (Instagram grid item).
+export const circlePosts = pgTable(
+  'circle_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    circleId: uuid('circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }),
+    coupleId: uuid('couple_id')
+      .notNull()
+      .references(() => couples.id),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    content: text('content'), // caption (nullable, photo-first); exposed as `caption` in API
+    type: varchar('type', { length: 20 }).default('photo'), // photo | video | carousel
+    mediaUrls: json('media_urls').$type<string[]>().default([]),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    likeCount: integer('like_count').default(0),
+    commentCount: integer('comment_count').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    circleCreatedIdx: index('circle_posts_circle_created_idx').on(
+      table.circleId,
+      table.createdAt,
+    ),
+  }),
+);
 
-export const circles = pgTable('circles', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 100 }).notNull(),
-  description: varchar('description', { length: 1000 }),
-  coverImageUrl: text('cover_image_url'),
-  createdByCoupleId: uuid('created_by_couple_id')
-    .notNull()
-    .references(() => couples.id),
-  createdByUserId: uuid('created_by_user_id')
-    .notNull()
-    .references(() => users.id),
-  isPrivate: boolean('is_private').default(true),
-  maxMembers: integer('max_members').default(10),
-  inviteCode: varchar('invite_code', { length: 30 }).unique(),
-  memberCount: integer('member_count').default(1),
-  postCount: integer('post_count').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+export const postLikes = pgTable(
+  'post_likes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => circlePosts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    postUserUnique: uniqueIndex('post_likes_post_user_unique').on(table.postId, table.userId),
+  }),
+);
 
-export const circleMembers = pgTable('circle_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  circleId: uuid('circle_id')
-    .notNull()
-    .references(() => circles.id, { onDelete: 'cascade' }),
-  coupleId: uuid('couple_id')
-    .notNull()
-    .references(() => couples.id),
-  role: varchar('role', { length: 20 }).default('member'), // admin, member
-  joinedAt: timestamp('joined_at').defaultNow(),
-});
+export const postComments = pgTable(
+  'post_comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => circlePosts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    postCreatedIdx: index('post_comments_post_created_idx').on(table.postId, table.createdAt),
+  }),
+);
 
-export const circlePosts = pgTable('circle_posts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  circleId: uuid('circle_id')
-    .notNull()
-    .references(() => circles.id, { onDelete: 'cascade' }),
-  coupleId: uuid('couple_id')
-    .notNull()
-    .references(() => couples.id),
-  authorId: uuid('author_id')
-    .notNull()
-    .references(() => users.id),
-  content: text('content').notNull(),
-  type: varchar('type', { length: 20 }).default('post'), // post, poll, event, announcement
-  mediaUrls: json('media_urls').$type<string[]>().default([]),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
-  likeCount: integer('like_count').default(0),
-  commentCount: integer('comment_count').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+// Ephemeral 24h photo/video story owned by a couple's circle.
+export const circleStories = pgTable(
+  'circle_stories',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    circleId: uuid('circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }),
+    coupleId: uuid('couple_id')
+      .notNull()
+      .references(() => couples.id),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    mediaUrl: text('media_url').notNull(),
+    mediaType: varchar('media_type', { length: 20 }).notNull().default('image'), // image | video
+    durationMs: integer('duration_ms').default(5000),
+    caption: varchar('caption', { length: 500 }),
+    viewCount: integer('view_count').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    expiresAt: timestamp('expires_at').notNull(), // createdAt + 24h, set server-side
+  },
+  (table) => ({
+    circleExpiresIdx: index('circle_stories_circle_expires_idx').on(
+      table.circleId,
+      table.expiresAt,
+    ),
+    expiresIdx: index('circle_stories_expires_idx').on(table.expiresAt),
+  }),
+);
 
-export const postLikes = pgTable('post_likes', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  postId: uuid('post_id')
-    .notNull()
-    .references(() => circlePosts.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
-export const postComments = pgTable('post_comments', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  postId: uuid('post_id')
-    .notNull()
-    .references(() => circlePosts.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-});
+// Who viewed a story — powers 'seen' ring state and owner viewer list.
+export const circleStoryViews = pgTable(
+  'circle_story_views',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storyId: uuid('story_id')
+      .notNull()
+      .references(() => circleStories.id, { onDelete: 'cascade' }),
+    viewerUserId: uuid('viewer_user_id')
+      .notNull()
+      .references(() => users.id),
+    viewerCircleId: uuid('viewer_circle_id').references(() => circles.id), // nullable: viewer may have no circle
+    viewedAt: timestamp('viewed_at').defaultNow(),
+  },
+  (table) => ({
+    storyViewerUnique: uniqueIndex('circle_story_views_story_viewer_unique').on(
+      table.storyId,
+      table.viewerUserId,
+    ),
+  }),
+);
 
 // ─── Custom Emojis ──────────────────────────────────────────────────────────────
 
@@ -897,40 +953,31 @@ export const dateCelebrationsRelations = relations(dateCelebrations, ({ one }) =
 
 // ─── Phase 5+ Relations ──────────────────────────────────────────────────────────
 
-export const friendshipsRelations = relations(friendships, ({ one }) => ({
-  couple: one(couples, {
-    fields: [friendships.coupleId],
-    references: [couples.id],
-    relationName: 'ownerCouple',
-  }),
-  friendUser: one(users, {
-    fields: [friendships.friendUserId],
-    references: [users.id],
-  }),
-  friendCouple: one(couples, {
-    fields: [friendships.friendCoupleId],
-    references: [couples.id],
-    relationName: 'friendCouple',
-  }),
-}));
-
 export const circlesRelations = relations(circles, ({ one, many }) => ({
   createdByCouple: one(couples, {
     fields: [circles.createdByCoupleId],
     references: [couples.id],
   }),
-  members: many(circleMembers),
+  followers: many(circleFollows, { relationName: 'following' }),
+  following: many(circleFollows, { relationName: 'follower' }),
   posts: many(circlePosts),
+  stories: many(circleStories),
 }));
 
-export const circleMembersRelations = relations(circleMembers, ({ one }) => ({
-  circle: one(circles, {
-    fields: [circleMembers.circleId],
+export const circleFollowsRelations = relations(circleFollows, ({ one }) => ({
+  follower: one(circles, {
+    fields: [circleFollows.followerCircleId],
     references: [circles.id],
+    relationName: 'follower',
   }),
-  couple: one(couples, {
-    fields: [circleMembers.coupleId],
-    references: [couples.id],
+  following: one(circles, {
+    fields: [circleFollows.followingCircleId],
+    references: [circles.id],
+    relationName: 'following',
+  }),
+  requestedByUser: one(users, {
+    fields: [circleFollows.requestedByUserId],
+    references: [users.id],
   }),
 }));
 
@@ -961,6 +1008,37 @@ export const postCommentsRelations = relations(postComments, ({ one }) => ({
     references: [circlePosts.id],
   }),
   user: one(users, { fields: [postComments.userId], references: [users.id] }),
+}));
+
+export const circleStoriesRelations = relations(circleStories, ({ one, many }) => ({
+  circle: one(circles, {
+    fields: [circleStories.circleId],
+    references: [circles.id],
+  }),
+  couple: one(couples, {
+    fields: [circleStories.coupleId],
+    references: [couples.id],
+  }),
+  author: one(users, {
+    fields: [circleStories.authorId],
+    references: [users.id],
+  }),
+  views: many(circleStoryViews),
+}));
+
+export const circleStoryViewsRelations = relations(circleStoryViews, ({ one }) => ({
+  story: one(circleStories, {
+    fields: [circleStoryViews.storyId],
+    references: [circleStories.id],
+  }),
+  viewer: one(users, {
+    fields: [circleStoryViews.viewerUserId],
+    references: [users.id],
+  }),
+  viewerCircle: one(circles, {
+    fields: [circleStoryViews.viewerCircleId],
+    references: [circles.id],
+  }),
 }));
 
 export const customEmojisRelations = relations(customEmojis, ({ one }) => ({
