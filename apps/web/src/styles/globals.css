@@ -717,6 +717,61 @@ body::after {
 }
 .lk-glimmer { animation: lkGlimmer 7s ease-in-out infinite; }
 
+/* Barely-there ambient float — gives the star field a sense of depth. */
+@keyframes lkFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(6px, -8px, 0); }
+}
+.lk-float { animation: lkFloat 22s ease-in-out infinite; }
+
+/* Shooting star — a brief, faint streak that crosses now and then. The streak
+   is only visible for a small slice of the cycle, so meteors feel occasional
+   rather than constant. Direction/length tuned per-element via --r / --d. */
+@keyframes lkShoot {
+  0% { opacity: 0; transform: rotate(var(--r, 22deg)) translateX(-40px); }
+  7% { opacity: 0.9; }
+  20% { opacity: 0; transform: rotate(var(--r, 22deg)) translateX(var(--d, 520px)); }
+  100% { opacity: 0; transform: rotate(var(--r, 22deg)) translateX(var(--d, 520px)); }
+}
+.lk-shoot {
+  position: absolute;
+  height: 1.5px;
+  width: 150px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgba(232, 228, 220, 0.8));
+  filter: drop-shadow(0 0 4px rgba(232, 228, 220, 0.45));
+  opacity: 0;
+  animation: lkShoot 10s ease-in infinite;
+}
+
+/* Breathing glow halo behind the constellation's key stars + link point. */
+@keyframes lkPulseGlow {
+  0%, 100% { opacity: 0.05; transform: scale(1); }
+  50% { opacity: 0.16; transform: scale(1.3); }
+}
+.lk-pulse-glow {
+  animation: lkPulseGlow 4.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The link-point sparkle keeps shimmering gently after it ignites. */
+@keyframes lkSparklePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.lk-sparkle-pulse {
+  animation: lkSparklePulse 3.6s ease-in-out 2.6s infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Dashes drift along the shared orbit — slow, premium orbital motion. */
+@keyframes lkOrbitFlow {
+  to { stroke-dashoffset: -200; }
+}
+.lk-orbit-flow { animation: lkOrbitFlow 38s linear infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

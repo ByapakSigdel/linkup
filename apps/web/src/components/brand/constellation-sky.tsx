@@ -115,8 +115,9 @@ export function ConstellationSky({ className }: { className?: string }) {
         ))}
       </svg>
 
-      {/* Star field — dim, mostly steady, a third gently breathing. */}
-      <div className="absolute inset-0">
+      {/* Star field — dim, mostly steady, a third gently breathing; the whole
+          field drifts almost imperceptibly for depth. */}
+      <div className="lk-float absolute inset-0">
         {STARS.map((s, i) => (
           <span
             key={i}
@@ -139,6 +140,27 @@ export function ConstellationSky({ className }: { className?: string }) {
           />
         ))}
       </div>
+
+      {/* Shooting stars — sporadic, faint streaks. */}
+      {[
+        { top: '12%', left: '8%', r: '24deg', d: '560px', dur: '11s', delay: '3s', w: '160px' },
+        { top: '6%', left: '54%', r: '32deg', d: '440px', dur: '14s', delay: '8s', w: '120px' },
+        { top: '30%', left: '70%', r: '18deg', d: '600px', dur: '17s', delay: '13s', w: '180px' },
+      ].map((m, i) => (
+        <span
+          key={i}
+          className="lk-shoot"
+          style={{
+            top: m.top,
+            left: m.left,
+            width: m.w,
+            animationDuration: m.dur,
+            animationDelay: m.delay,
+            ['--r' as string]: m.r,
+            ['--d' as string]: m.d,
+          }}
+        />
+      ))}
 
       {/* Pre-dawn glow at the horizon — periwinkle warming toward amber. */}
       <div

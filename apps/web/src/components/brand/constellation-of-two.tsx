@@ -18,7 +18,7 @@ export function ConstellationOfTwo({ className }: { className?: string }) {
       aria-label="Two stars joined by a bond line — a constellation of two"
       className={cn('h-full w-full', className)}
     >
-      {/* Faint orbit the pair share — drifts gently. */}
+      {/* Faint orbit the pair share — drifts gently while its dashes flow. */}
       <g className="lk-drift">
         <ellipse
           cx="215"
@@ -29,6 +29,7 @@ export function ConstellationOfTwo({ className }: { className?: string }) {
           strokeWidth="0.75"
           strokeOpacity="0.16"
           strokeDasharray="2 7"
+          className="lk-orbit-flow"
         />
       </g>
 
@@ -60,15 +61,22 @@ export function ConstellationOfTwo({ className }: { className?: string }) {
         style={{ ['--lk-dash' as string]: '240' }}
       />
 
-      {/* Large star — amber. */}
+      {/* Large star — amber, with a breathing glow. */}
+      <circle cx="120" cy="250" r="20" fill="#d4a574" className="lk-pulse-glow" />
       <g className="lk-anim-pop" style={{ animationDelay: '0.5s' }}>
-        <circle cx="120" cy="250" r="20" fill="#d4a574" fillOpacity="0.08" />
         <circle cx="120" cy="250" r="11" fill="#cfa170" />
       </g>
 
-      {/* Small star — starlight. */}
+      {/* Small star — starlight, with a breathing glow. */}
+      <circle
+        cx="310"
+        cy="120"
+        r="14"
+        fill="#e8e4dc"
+        className="lk-pulse-glow"
+        style={{ animationDelay: '1.4s' }}
+      />
       <g className="lk-anim-pop" style={{ animationDelay: '0.95s' }}>
-        <circle cx="310" cy="120" r="14" fill="#e8e4dc" fillOpacity="0.08" />
         <circle cx="310" cy="120" r="6.5" fill="#ddd8cf" />
       </g>
 
@@ -76,11 +84,14 @@ export function ConstellationOfTwo({ className }: { className?: string }) {
           Translate lives on the group (an SVG attribute) so the path's CSS
           scale animation doesn't override its position. */}
       <g transform="translate(215 185)">
-        <path
-          d="M0,-15 C1.6,-4.2 4.2,-1.6 15,0 C4.2,1.6 1.6,4.2 0,15 C-1.6,4.2 -4.2,1.6 -15,0 C-4.2,-1.6 -1.6,-4.2 0,-15 Z"
-          fill="#c4a8e0"
-          className="lk-anim-ignite"
-        />
+        <circle r="13" fill="#c4a8e0" className="lk-pulse-glow" style={{ animationDelay: '2.4s' }} />
+        <g className="lk-sparkle-pulse">
+          <path
+            d="M0,-15 C1.6,-4.2 4.2,-1.6 15,0 C4.2,1.6 1.6,4.2 0,15 C-1.6,4.2 -4.2,1.6 -15,0 C-4.2,-1.6 -1.6,-4.2 0,-15 Z"
+            fill="#c4a8e0"
+            className="lk-anim-ignite"
+          />
+        </g>
       </g>
 
       {/* Star-chart coordinate tags. */}
