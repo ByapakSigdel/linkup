@@ -24,6 +24,7 @@ import { MediaService } from './media.service';
 import { StorageService } from './storage.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('media')
 @UseGuards(JwtAuthGuard)
@@ -282,6 +283,7 @@ export class MediaController {
    * unique storage key which includes the coupleId, making them
    * effectively unguessable. For production, use signed URLs or S3.
    */
+  @Public()
   @Get('files/:coupleId/:type/:filename')
   async serveFile(
     @Param('coupleId') coupleId: string,
