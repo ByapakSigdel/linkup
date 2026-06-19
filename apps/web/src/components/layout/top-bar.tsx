@@ -33,7 +33,6 @@ const pageTitles: Record<string, string> = {
   streaks: 'Streaks',
   'hall-of-fame': 'Hall of Fame',
   circles: 'Circles',
-  friends: 'Friends',
   profile: 'Profile',
   settings: 'Settings',
   emojis: 'Custom Emojis',

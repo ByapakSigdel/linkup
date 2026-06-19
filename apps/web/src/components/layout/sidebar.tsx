@@ -16,7 +16,7 @@ import {
   Radio,
   Trophy,
   Users,
-  UserPlus,
+  Compass,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -63,7 +63,7 @@ const navSections = [
     items: [
       { href: '/hall-of-fame', label: 'Hall of Fame', icon: Trophy },
       { href: '/circles', label: 'Circles', icon: Users },
-      { href: '/friends', label: 'Friends', icon: UserPlus },
+      { href: '/circles/discover', label: 'Discover', icon: Compass },
     ],
   },
 ] as const;
