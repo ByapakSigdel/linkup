@@ -43,6 +43,53 @@ export function extractYouTubeId(input: string): string | null {
   return match ? match[0] : null;
 }
 
+export type WatchSourceKind = 'youtube' | 'url';
+
+export interface ResolvedWatchMedia {
+  source: WatchSourceKind;
+  /** Set for YouTube. */
+  videoId: string | null;
+  /** Set for a direct media link. */
+  videoUrl: string | null;
+}
+
+/**
+ * Decide whether a pasted value is a YouTube video or a direct media link.
+ * - A bare 11-char id or any youtube.com / youtu.be URL → YouTube.
+ * - Any other valid http(s) URL → a direct video link (mp4/webm/… played in a
+ *   native <video>). We trust the user's "direct link" rather than sniffing the
+ *   extension, so CDN URLs with query strings work too.
+ * Returns null when the value is neither.
+ */
+export function resolveWatchSource(input: string): ResolvedWatchMedia | null {
+  if (!input) return null;
+  const value = input.trim();
+
+  // Bare YouTube id.
+  if (/^[A-Za-z0-9_-]{11}$/.test(value)) {
+    return { source: 'youtube', videoId: value, videoUrl: null };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+
+  const host = url.hostname.replace(/^www\./, '');
+  const isYouTube =
+    host === 'youtu.be' || host === 'youtube.com' || host === 'm.youtube.com';
+  if (isYouTube) {
+    const id = extractYouTubeId(value);
+    return id ? { source: 'youtube', videoId: id, videoUrl: null } : null;
+  }
+
+  // Any other http(s) URL → treat as a direct media link.
+  return { source: 'url', videoId: null, videoUrl: url.toString() };
+}
+
 declare global {
   interface Window {
     YT: any;

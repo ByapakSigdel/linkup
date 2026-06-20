@@ -1,7 +1,10 @@
 export interface WatchParty {
   id: string;
-  source: 'youtube';
-  videoId: string;
+  source: 'youtube' | 'url';
+  /** YouTube video id (when source === 'youtube'). */
+  videoId?: string | null;
+  /** Direct media URL (when source === 'url'). */
+  videoUrl?: string | null;
   title?: string | null;
   status?: 'active' | 'ended' | string;
   createdAt?: string;
@@ -24,7 +27,9 @@ export interface FloatingReaction {
 
 /** Payloads over the watch:* socket events. */
 export interface WatchLoadPayload {
-  videoId: string;
+  source?: 'youtube' | 'url';
+  videoId?: string;
+  videoUrl?: string;
   title?: string;
 }
 

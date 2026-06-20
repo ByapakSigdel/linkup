@@ -8,9 +8,13 @@ import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
 import { Button, Input, Spinner, Emoji } from '@/components/ui';
 import { LinkupMark } from '@/components/brand/logo';
-import { WatchPlayer, type WatchPlayerHandle } from '@/components/watch/watch-player';
+import {
+  WatchPlayer,
+  type WatchPlayerHandle,
+  type WatchMedia,
+} from '@/components/watch/watch-player';
 import { ChatPanel } from '@/components/watch/chat-panel';
-import { extractYouTubeId } from '@/components/watch/youtube';
+import { resolveWatchSource } from '@/components/watch/youtube';
 import type {
   WatchParty,
   ChatMessage,
@@ -26,17 +30,28 @@ function errMessage(err: unknown, fallback: string): string {
   return e?.response?.data?.error?.message || fallback;
 }
 
+/** Turn a stored party / socket payload into the media the player should load. */
+function toMedia(
+  m:
+    | { source?: string | null; videoId?: string | null; videoUrl?: string | null }
+    | null
+    | undefined,
+): WatchMedia | null {
+  if (!m) return null;
+  if (m.source === 'url' && m.videoUrl) return { source: 'url', src: m.videoUrl };
+  if (m.videoId) return { source: 'youtube', src: m.videoId };
+  if (m.videoUrl) return { source: 'url', src: m.videoUrl };
+  return null;
+}
+
 export default function WatchPage() {
   const couple = useAuthStore((s) => s.couple);
   const user = useAuthStore((s) => s.user);
   const pushToast = useToastStore((s) => s.push);
 
   const playerRef = useRef<WatchPlayerHandle | null>(null);
-  const playerReadyRef = useRef(false);
   // Guards against feedback loops while applying a remote action.
   const applyingRemoteRef = useRef(false);
-  // Buffer a video to load once the player is ready.
-  const pendingVideoRef = useRef<string | null>(null);
 
   const [party, setParty] = useState<WatchParty | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,10 +70,8 @@ export default function WatchPage() {
       const { data } = await api.get('/entertainment/watch/active');
       const active: WatchParty | null = data.data.party ?? null;
       setParty(active);
-      if (active?.videoId) {
-        if (playerReadyRef.current) playerRef.current?.loadVideo(active.videoId);
-        else pendingVideoRef.current = active.videoId;
-      }
+      const media = toMedia(active);
+      if (media) playerRef.current?.load(media);
     } catch {
       setParty(null);
     } finally {
@@ -84,16 +97,6 @@ export default function WatchPage() {
     }
   }, [couple?.isPaired, loadActive, loadHistory]);
 
-  // ---- Player ready: flush any pending video -----------------------------
-
-  const handlePlayerReady = useCallback(() => {
-    playerReadyRef.current = true;
-    if (pendingVideoRef.current) {
-      playerRef.current?.loadVideo(pendingVideoRef.current);
-      pendingVideoRef.current = null;
-    }
-  }, []);
-
   // ---- Sync emit (local actions) -----------------------------------------
 
   const emitState = useCallback(
@@ -111,20 +114,18 @@ export default function WatchPage() {
     if (!socket) return;
 
     const onLoad = (payload: WatchLoadPayload) => {
-      if (!payload?.videoId) return;
-      setParty((prev) =>
-        prev
-          ? { ...prev, videoId: payload.videoId, title: payload.title ?? prev.title }
-          : {
-              id: 'remote',
-              source: 'youtube',
-              videoId: payload.videoId,
-              title: payload.title,
-              status: 'active',
-            },
-      );
-      if (playerReadyRef.current) playerRef.current?.loadVideo(payload.videoId);
-      else pendingVideoRef.current = payload.videoId;
+      const media = toMedia(payload);
+      if (!media) return;
+      const source = payload.source ?? (payload.videoUrl ? 'url' : 'youtube');
+      setParty((prev) => ({
+        id: prev?.id ?? 'remote',
+        source,
+        videoId: payload.videoId ?? null,
+        videoUrl: payload.videoUrl ?? null,
+        title: payload.title ?? prev?.title ?? null,
+        status: 'active',
+      }));
+      playerRef.current?.load(media);
     };
 
     const onState = (payload: WatchStatePayload) => {
@@ -192,11 +193,11 @@ export default function WatchPage() {
 
   const startParty = useCallback(
     async (rawUrl: string, title?: string) => {
-      const videoId = extractYouTubeId(rawUrl);
-      if (!videoId) {
+      const resolved = resolveWatchSource(rawUrl);
+      if (!resolved) {
         pushToast({
           title: 'Invalid link',
-          body: 'Paste a valid YouTube URL or video id.',
+          body: 'Paste a YouTube link, a video id, or a direct video URL (.mp4, .webm…).',
           variant: 'info',
         });
         return;
@@ -204,16 +205,22 @@ export default function WatchPage() {
       setStarting(true);
       try {
         const { data } = await api.post('/entertainment/watch', {
-          source: 'youtube',
-          videoId,
+          source: resolved.source,
+          videoId: resolved.videoId ?? undefined,
+          videoUrl: resolved.videoUrl ?? undefined,
           title: title || undefined,
         });
         const created: WatchParty = data.data.party;
         setParty(created);
         setUrlInput('');
-        if (playerReadyRef.current) playerRef.current?.loadVideo(videoId);
-        else pendingVideoRef.current = videoId;
-        getSocket()?.emit('watch:load', { videoId, title: created.title });
+        const media = toMedia(created);
+        if (media) playerRef.current?.load(media);
+        getSocket()?.emit('watch:load', {
+          source: created.source,
+          videoId: created.videoId ?? undefined,
+          videoUrl: created.videoUrl ?? undefined,
+          title: created.title ?? undefined,
+        });
         loadHistory();
       } catch (err) {
         pushToast({
@@ -272,7 +279,7 @@ export default function WatchPage() {
         <LinkupMark size={56} className="mb-4" />
         <h2 className="text-lg font-semibold text-text">Watch together</h2>
         <p className="mt-1 max-w-sm text-sm text-text-muted">
-          Link up with your partner to start a synchronized YouTube watch party.
+          Link up with your partner to start a synchronized watch party.
         </p>
       </div>
     );
@@ -287,7 +294,7 @@ export default function WatchPage() {
         <div>
           <h1 className="text-2xl font-bold text-text">Watch Party</h1>
           <p className="text-sm text-text-muted">
-            Watch YouTube in sync with your partner
+            Watch YouTube or a direct video link in sync with your partner
           </p>
         </div>
       </div>
@@ -303,7 +310,7 @@ export default function WatchPage() {
         <Input
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
-          placeholder="Paste a YouTube link to start or change the video"
+          placeholder="Paste a YouTube link or a direct video URL (.mp4, .webm…)"
           className="flex-1"
         />
         <Button type="submit" loading={starting} disabled={!urlInput.trim()}>
@@ -331,10 +338,12 @@ export default function WatchPage() {
                 is chosen. An overlay covers it when no party is active. */}
             <WatchPlayer
               ref={playerRef}
-              onReady={handlePlayerReady}
               onLocalPlay={(t) => emitState('play', t)}
               onLocalPause={(t) => emitState('pause', t)}
               onLocalSeek={(t) => emitState('seek', t)}
+              onError={(message) =>
+                pushToast({ title: 'Playback error', body: message, variant: 'info' })
+              }
             />
 
             {!hasParty && !loading && (
@@ -344,7 +353,8 @@ export default function WatchPage() {
                   No active watch party
                 </p>
                 <p className="mt-1 max-w-xs text-sm text-text-muted">
-                  Paste a YouTube link above to start watching together.
+                  Paste a YouTube link or direct video URL above to start
+                  watching together.
                 </p>
               </div>
             )}
@@ -379,26 +389,31 @@ export default function WatchPage() {
               </p>
             ) : (
               <ul className="space-y-1">
-                {history.map((h) => (
-                  <li key={h.id}>
-                    <button
-                      onClick={() => startParty(h.videoId, h.title ?? undefined)}
-                      className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-surface-hover"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-light">
-                        <Play className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-text">
-                          {h.title || 'YouTube video'}
-                        </p>
-                        <p className="truncate font-mono text-xs text-text-muted">
-                          {h.videoId}
-                        </p>
-                      </div>
-                    </button>
-                  </li>
-                ))}
+                {history.map((h) => {
+                  const isUrl = h.source === 'url';
+                  const ref = isUrl ? h.videoUrl ?? '' : h.videoId ?? '';
+                  return (
+                    <li key={h.id}>
+                      <button
+                        onClick={() => startParty(ref, h.title ?? undefined)}
+                        disabled={!ref}
+                        className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-light">
+                          <Play className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-text">
+                            {h.title || (isUrl ? 'Direct video' : 'YouTube video')}
+                          </p>
+                          <p className="truncate font-mono text-xs text-text-muted">
+                            {ref}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
