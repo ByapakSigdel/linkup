@@ -199,7 +199,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-[calc(100vh-1.5rem)] -m-4 lg:-m-6 relative">
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 lg:-m-6 relative">
       {/* Header */}
       <ChatHeader
         partnerName={partnerName}
