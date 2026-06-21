@@ -12,6 +12,7 @@ import { useThemeStore } from '@/stores/theme-store';
 import { useGamesStore } from '@/stores/games-store';
 import { useTheme } from '@/theme';
 import { AppText, Card } from '@/components/ui';
+import { CallManager } from '@/components/call-manager';
 import type { Message, PresenceUpdate, TypingIndicator } from '@/types';
 
 /**
@@ -185,6 +186,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     <>
       {children}
       <ToastHost />
+      <CallManager />
     </>
   );
 }

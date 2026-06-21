@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { router } from 'expo-router';
 import { getSocket } from '@/lib/socket';
 import { useCallStore, type CallType } from '@/stores/call-store';
 import api from '@/lib/api';
@@ -14,7 +13,8 @@ interface CallPeer {
  * Mirrors apps/web/src/hooks/use-call.ts: marks the call store as "calling",
  * emits the `call:initiate` socket event, and records a best-effort call-history
  * row. The actual WebRTC media is owned by the calls feature; here we only wire
- * the initiation + navigate to the call screen.
+ * the initiation; the global <CallManager/> overlay renders the call UI off the
+ * call store, so no navigation is needed here.
  */
 export function useCall() {
   const startCall = useCallback(async (type: CallType, peer: CallPeer) => {
@@ -22,7 +22,6 @@ export function useCall() {
     if (!socket?.connected) return;
     useCallStore.getState().setCalling(type, peer);
     socket.emit('call:initiate', { callType: type });
-    router.push('/call');
     try {
       const { data } = await api.post('/entertainment/calls', {
         type,
