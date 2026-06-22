@@ -55,7 +55,7 @@
       "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
-      "typedRoutes": true,
+      "typedRoutes": false,
       "reactCompiler": true
     }
   }
