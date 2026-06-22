@@ -1,93 +1,112 @@
-# Deploying the LinkUp backend to a Google Cloud VM
+# Deploying LinkUp (web + API) to the Google Cloud VM
 
-The backend (NestJS API + Postgres + Redis) runs as a Docker Compose stack on a
-single Compute Engine VM. The mobile app then points at the VM instead of your
-laptop's LAN IP.
+The full stack runs as a Docker Compose project on a single Compute Engine VM and
+is published at **https://linkup.mahansigdel.com.np** through a **Cloudflare
+Tunnel** (no inbound firewall ports; Cloudflare terminates HTTPS).
 
-## 0. Prerequisites on the VM
-- A Compute Engine VM (Debian/Ubuntu recommended), SSH access.
-- Docker + Compose v2:
-  ```bash
-  curl -fsSL https://get.docker.com | sh
-  sudo usermod -aG docker $USER && newgrp docker   # run docker without sudo
-  docker compose version
-  ```
+## Architecture
 
-## 1. Open the firewall (GCP)
-Allow inbound to the API (and 80/443 if you'll use a domain). From Cloud Shell or
-any machine with gcloud:
+```
+            Cloudflare edge (HTTPS for linkup.mahansigdel.com.np)
+                          │  (outbound tunnel)
+                  ┌───────▼────────┐
+                  │  cloudflared    │   linkup-vm tunnel
+                  └───────┬────────┘
+                          │  http://router:80
+                  ┌───────▼────────┐
+                  │  router (Caddy) │   /api/* , /socket.io/*  → api:4000
+                  └───┬─────────┬──┘   everything else         → web:3000
+                      │         │
+              ┌───────▼──┐  ┌───▼────────┐
+              │ api      │  │ web         │
+              │ :4000    │  │ (Next.js)   │
+              └──┬───┬───┘  └─────────────┘
+                 │   │
+        ┌────────▼┐ ┌▼────────┐
+        │ postgres│ │ redis    │
+        └─────────┘ └──────────┘
+```
+
+- **VM**: `sigdelmb123@35.255.211.15` (Debian 13, 2 vCPU, ~2 GB RAM + 4 GB swap).
+  Project `project-d54f9992-81c3-4261-b21`, zone `us-central1-f`,
+  instance `instance-20260622-085630`.
+- **Compose file**: `docker-compose.prod.yml`; env in `.env.production` (NOT
+  committed — holds `POSTGRES_PASSWORD`, `JWT_SECRET`, `TUNNEL_TOKEN`).
+- **SSH (deploy key)**: `ssh -i ~/.ssh/linkup_deploy sigdelmb123@35.255.211.15`
+  (the public key lives in the VM's *instance metadata* SSH keys, not just
+  `authorized_keys`, so the GCP guest agent doesn't wipe it).
+
+## Cloudflare Tunnel
+
+- Tunnel **`linkup-vm`** (Networks → Tunnels). The connector runs as the
+  `cloudflared` compose service using `TUNNEL_TOKEN` from `.env.production`.
+- One **Route** (public hostname): `linkup.mahansigdel.com.np` → **HTTP** →
+  `router:80`. Cloudflare manages the DNS (CNAME → tunnel) automatically.
+- To rotate the token: dashboard → tunnel → *Rotate token*, then update
+  `TUNNEL_TOKEN` in `.env.production` and `... up -d cloudflared`.
+
+## Everyday operations (run on the VM, in `~/linkup`)
+
 ```bash
-# HTTP-on-IP (quickest, good for testing):
-gcloud compute firewall-rules create linkup-api --allow=tcp:4000 --direction=INGRESS --network=default
-# OR domain + HTTPS (Caddy):
-gcloud compute firewall-rules create linkup-web --allow=tcp:80,tcp:443 --direction=INGRESS --network=default
-```
-Also confirm the VM has an **external IP** (ephemeral is fine for testing; reserve a
-static IP for production).
+EF="--env-file .env.production -f docker-compose.prod.yml"
 
-## 2. Get the code onto the VM
+docker compose $EF ps                 # status
+docker compose $EF logs -f api        # tail a service (api|web|router|cloudflared)
+docker compose $EF restart api        # restart one service
+```
+
+### Deploy an update (after pushing to GitHub)
+
 ```bash
-git clone https://github.com/ByapakSigdel/linkup.git
-cd linkup
+cd ~/linkup && git pull --ff-only
+EF="--env-file .env.production -f docker-compose.prod.yml"
+docker compose $EF up -d --build api web          # rebuild changed apps
+docker compose $EF exec -T api pnpm db:migrate    # if the schema changed
 ```
 
-## 3. Configure secrets
+> The web image bakes `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` at **build**
+> time (defaults to the production origin), so always `--build web` after web
+> changes. `next build` is RAM-heavy — the 4 GB swap covers it.
+
+### Start the whole stack from cold
+
 ```bash
-cp .env.production.example .env.production
-nano .env.production
+cd ~/linkup
+docker compose --env-file .env.production -f docker-compose.prod.yml --profile tunnel up -d --build
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T api pnpm db:migrate
 ```
-Set at minimum:
-- `POSTGRES_PASSWORD` → `openssl rand -base64 24`
-- `JWT_SECRET` → `openssl rand -hex 48`
-- `API_URL` → `http://YOUR_VM_IP:4000` (or `https://api.yourdomain.com`)
-- `CORS_ORIGIN` → your web origin, or `*` if mobile-only
-- (domain only) `DOMAIN` → `api.yourdomain.com`
 
-## 4. Start it
+All services use `restart: unless-stopped` and Docker is enabled on boot, so the
+stack comes back automatically after a VM reboot.
+
+## Verify
+
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f api      # watch it boot
+# on the VM (through the router):
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8088/
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8088/api/v1/auth/login -X POST -H 'Content-Type: application/json' -d '{}'
+# from anywhere (through Cloudflare):
+curl -i https://linkup.mahansigdel.com.np/
+curl -i https://linkup.mahansigdel.com.np/api/v1/auth/login -X POST -H 'Content-Type: application/json' -d '{}'
 ```
 
-## 5. Run database migrations (first deploy + after schema changes)
-```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml exec api pnpm db:migrate
-# optional demo data:
-docker compose --env-file .env.production -f docker-compose.prod.yml exec api pnpm db:seed
+## Mobile app
+
+`mobile/src/lib/env.ts` defaults to `https://linkup.mahansigdel.com.np`. To point
+a build at a LAN dev server instead, create `mobile/.env.local`:
+
+```
+EXPO_PUBLIC_API_URL=http://192.168.x.x:4000
 ```
 
-## 6. Verify
-```bash
-curl -i http://localhost:4000/api/v1/auth/login -X POST -H 'Content-Type: application/json' -d '{}'
-# from your laptop:
-curl -i http://YOUR_VM_IP:4000/api/v1/auth/login -X POST -H 'Content-Type: application/json' -d '{}'
-```
-A JSON error (not a connection failure) means it's up.
+then `npx expo start --clear` (env vars are inlined at bundle time).
 
-## 7. (Recommended) HTTPS with a domain
-Point a DNS **A record** `api.yourdomain.com → VM_IP`, set `DOMAIN` in
-`.env.production`, then:
-```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml --profile tls up -d
-```
-Caddy gets a Let's Encrypt cert automatically and proxies `https://api.yourdomain.com → api:4000`.
-(Alternatively, if you use Cloudflare Tunnel — you already have `cloudflared` — run a tunnel to `http://localhost:4000` and let Cloudflare terminate TLS.)
+## Notes / gotchas
 
-## 8. Point the mobile app at the server
-Create `mobile/.env`:
-```
-# domain + HTTPS (recommended for real devices / release builds):
-EXPO_PUBLIC_API_URL=https://api.yourdomain.com
-# …or plain HTTP on the VM IP (Android dev builds allow cleartext):
-# EXPO_PUBLIC_API_HOST=YOUR_VM_IP
-```
-Then rebuild/reload the app (`npx expo start --clear`, or a new dev/EAS build).
-> Release (Play Store) builds block cleartext HTTP — use the HTTPS/domain option
-> for anything beyond local testing.
-
-## Updating later
-```bash
-git pull
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.prod.yml exec api pnpm db:migrate
+- `.npmrc` sets `shamefully-hoist=true` so directly-imported transitive deps
+  (e.g. `express`) resolve in the filtered production install.
+- The optional `caddy` (profile `tls`) + `deploy/Caddyfile` are an alternative
+  HTTPS path (grey-cloud DNS + Let's Encrypt) — unused while the tunnel is active.
+- Reserve the VM's external IP as **static** if you ever expose it directly; the
+  tunnel doesn't depend on it, but other tooling might.
 ```
