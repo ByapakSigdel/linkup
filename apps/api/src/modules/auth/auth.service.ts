@@ -14,6 +14,7 @@ import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -23,15 +24,15 @@ export class AuthService {
     @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<typeof schema>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly email: EmailService,
   ) {}
 
   /**
-   * Generate, store and "deliver" a 6-digit verification code.
-   * No SMTP provider is configured in dev, so the code is logged to the server
-   * console and returned to the caller (dev convenience). In production this
-   * would dispatch via an email provider instead.
+   * Generate, store and deliver a 6-digit verification code. Emails it via
+   * Resend when configured (EmailService); always logs it too (dev convenience)
+   * and returns it so the caller can surface a dev code when email is disabled.
    */
-  async issueVerificationCode(userId: string): Promise<string> {
+  async issueVerificationCode(userId: string, email?: string): Promise<string> {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
     await this.db.insert(schema.verificationCodes).values({
@@ -41,6 +42,10 @@ export class AuthService {
       expiresAt,
     });
     this.logger.log(`[DEV] Email verification code for ${userId}: ${code}`);
+    if (email) {
+      // Best-effort — never block account creation on email delivery.
+      void this.email.sendVerificationCode(email, code);
+    }
     return code;
   }
 
@@ -101,8 +106,8 @@ export class AuthService {
     if (user.isVerified) {
       return { sent: false, alreadyVerified: true };
     }
-    const code = await this.issueVerificationCode(user.id);
-    return { sent: true, devCode: code };
+    const code = await this.issueVerificationCode(user.id, user.email);
+    return { sent: true, emailed: this.email.enabled, devCode: this.email.enabled ? undefined : code };
   }
 
   async register(email: string, username: string, displayName: string, password: string) {
@@ -152,8 +157,9 @@ export class AuthService {
       throw new Error('Failed to create user');
     }
 
-    // Issue an email verification code (logged + returned in dev).
-    const verificationCode = await this.issueVerificationCode(user.id);
+    // Issue + email an email verification code (also logged; dev code returned
+    // only when email delivery is disabled, so we don't leak codes in prod).
+    const verificationCode = await this.issueVerificationCode(user.id, user.email);
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email);
@@ -161,7 +167,9 @@ export class AuthService {
     return {
       user,
       ...tokens,
-      verificationCode,
+      emailVerificationRequired: true,
+      emailed: this.email.enabled,
+      verificationCode: this.email.enabled ? undefined : verificationCode,
     };
   }
 

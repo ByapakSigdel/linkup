@@ -16,6 +16,7 @@ import { MusicModule } from './modules/music/music.module';
 import { SearchModule } from './modules/search/search.module';
 import { EntertainmentModule } from './modules/entertainment/entertainment.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AchievementsModule } from './modules/achievements/achievements.module';
       isGlobal: true,
       envFilePath: '../../.env',
     }),
+    EmailModule,
     DatabaseModule,
     GatewayModule,
     NotificationsModule,
