@@ -160,7 +160,7 @@ export default function ScribbleScreen() {
 
         if (sendAsMessage) {
           pushToast({ title: 'Sent to chat!', variant: 'success' });
-          router.push('/(tabs)/chat');
+          router.push('/chat');
         } else {
           pushToast({ title: 'Scribble saved', variant: 'success' });
         }

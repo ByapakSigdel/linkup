@@ -5,8 +5,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 
-import { ThemeProvider, useTheme } from '@/theme';
+import { ThemeProvider, useTheme, fontsToLoad } from '@/theme';
 import { RealtimeProvider } from '@/components/realtime-provider';
 import { Loading } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
@@ -22,18 +23,20 @@ void SplashScreen.preventAutoHideAsync();
 function RootShell() {
   const theme = useTheme();
   const hydrated = useAuthStore((s) => s.hydrated);
+  const [fontsLoaded] = useFonts(fontsToLoad);
+  const ready = hydrated && fontsLoaded;
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!ready) return;
     void SplashScreen.hideAsync();
     const { isAuthenticated, tokens } = useAuthStore.getState();
     if (isAuthenticated && tokens?.accessToken) {
       connectSocket(tokens.accessToken);
       void useAuthStore.getState().hydrate();
     }
-  }, [hydrated]);
+  }, [ready]);
 
-  if (!hydrated) {
+  if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <Loading />

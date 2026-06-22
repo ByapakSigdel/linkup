@@ -121,7 +121,7 @@ export default function RegisterScreen() {
         password,
         ...(dateOfBirth ? { dateOfBirth } : {}),
       });
-      router.replace('/(tabs)/dashboard');
+      router.replace('/dashboard');
     } catch (err) {
       setApiError(apiErrorMessage(err, 'Registration failed. Please try again.'));
     }

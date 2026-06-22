@@ -424,7 +424,7 @@ function SearchResultsView({ results }: { results: SearchResults }) {
                 key={m.id}
                 icon={<MessageCircle color={colors.primary} size={16} />}
                 iconBg={colors.primaryLight}
-                onPress={() => router.push('/(tabs)/chat')}
+                onPress={() => router.push('/chat')}
               >
                 <AppText variant="body" numberOfLines={1}>
                   {m.content}
@@ -495,7 +495,7 @@ function SearchResultsView({ results }: { results: SearchResults }) {
                 key={d.id}
                 icon={<Calendar color={colors.secondary} size={16} />}
                 iconBg={colors.primaryLight}
-                onPress={() => router.push('/(tabs)/dashboard')}
+                onPress={() => router.push('/dashboard')}
               >
                 <AppText variant="label" numberOfLines={1}>
                   {d.title}

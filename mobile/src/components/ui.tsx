@@ -24,7 +24,8 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
-import { useTheme } from '@/theme';
+import { useTheme, type Theme } from '@/theme';
+import { ThemedBackground } from '@/components/themed-background';
 
 /* ─── Screen ──────────────────────────────────────────────────────────────── */
 export function Screen({
@@ -46,6 +47,7 @@ export function Screen({
   const pad: ViewStyle = padded ? { padding: 16 } : {};
   return (
     <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.background }, style]}>
+      <ThemedBackground />
       {scroll ? (
         <ScrollView
           contentContainerStyle={[pad, { flexGrow: 1 }, contentStyle]}
@@ -63,14 +65,24 @@ export function Screen({
 
 /* ─── Text ────────────────────────────────────────────────────────────────── */
 type TextVariant = 'display' | 'title' | 'subtitle' | 'body' | 'caption' | 'label';
-const TEXT_SIZES: Record<TextVariant, TextStyle> = {
-  display: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  title: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
-  subtitle: { fontSize: 17, fontWeight: '600' },
-  body: { fontSize: 15, fontWeight: '400' },
-  caption: { fontSize: 12, fontWeight: '400' },
-  label: { fontSize: 13, fontWeight: '600' },
+const SIZES: Record<TextVariant, number> = {
+  display: 30,
+  title: 22,
+  subtitle: 17,
+  body: 15,
+  caption: 12,
+  label: 13,
 };
+
+/** Resolve the themed font family for a body weight. */
+function bodyFamily(theme: Theme, weight?: TextStyle['fontWeight']): string {
+  if (!weight) return theme.fonts.body;
+  const w = String(weight);
+  if (w === 'bold' || w === '700' || w === '800' || w === '900') return theme.fonts.bodyBold;
+  if (w === '600') return theme.fonts.bodySemibold;
+  if (w === '500' || w === 'medium') return theme.fonts.bodyMedium;
+  return theme.fonts.body;
+}
 
 export function AppText({
   variant = 'body',
@@ -88,13 +100,23 @@ export function AppText({
   weight?: TextStyle['fontWeight'];
   center?: boolean;
 }) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
+  const isHeading = variant === 'display' || variant === 'title' || variant === 'subtitle';
+
+  let family: string;
+  if (isHeading) family = theme.fonts.display;
+  else if (variant === 'label') family = weight ? bodyFamily(theme, weight) : theme.fonts.bodyMedium;
+  else family = bodyFamily(theme, weight);
+
+  const scale = isHeading ? theme.displayScale : theme.bodyScale;
+  const fontSize = SIZES[variant] * scale;
+  const letterSpacing = isHeading ? theme.headingTracking : theme.bodyTracking;
+
   return (
     <Text
       style={[
-        TEXT_SIZES[variant],
-        { color: color ?? (muted ? colors.textMuted : colors.text) },
-        weight ? { fontWeight: weight } : null,
+        { fontFamily: family, fontSize, letterSpacing, color: color ?? (muted ? colors.textMuted : colors.text) },
         center ? { textAlign: 'center' } : null,
         style,
       ]}
@@ -139,7 +161,8 @@ export function Button({
   fullWidth?: boolean;
   style?: ViewStyle;
 }) {
-  const { colors, radius } = useTheme();
+  const theme = useTheme();
+  const { colors, radius, shape } = theme;
   const heights: Record<ButtonSize, number> = { sm: 38, md: 46, lg: 54 };
   const fonts: Record<ButtonSize, number> = { sm: 13, md: 15, lg: 16 };
 
@@ -151,12 +174,24 @@ export function Button({
   const fg =
     variant === 'primary' ? colors.textOnPrimary
     : variant === 'destructive' ? '#fff'
-    : variant === 'secondary' ? colors.text
     : colors.text;
-  const border =
-    variant === 'outline' ? colors.border : 'transparent';
 
   const isDisabled = disabled || loading;
+  const bordered = variant === 'outline' || (shape.uppercaseButtons && variant !== 'ghost');
+  const borderColor = variant === 'outline' ? colors.border : colors.borderStrong;
+
+  // Hard offset shadow on brutalist/arcade; subtle elsewhere for primary.
+  const shadow: ViewStyle = shape.hardShadow && variant !== 'ghost'
+    ? {
+        shadowColor: shape.shadowColor,
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        shadowOffset: { width: 3, height: 3 },
+        elevation: 0,
+      }
+    : {};
+
+  const label2 = label && shape.uppercaseButtons ? label.toUpperCase() : label;
 
   return (
     <Pressable
@@ -167,8 +202,8 @@ export function Button({
           height: heights[size],
           borderRadius: radius.button,
           backgroundColor: bg,
-          borderWidth: variant === 'outline' ? 1 : 0,
-          borderColor: border,
+          borderWidth: bordered ? (shape.uppercaseButtons ? shape.borderWidth : 1) : 0,
+          borderColor,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
@@ -177,6 +212,7 @@ export function Button({
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
           alignSelf: fullWidth ? 'stretch' : undefined,
         },
+        shadow,
         style,
       ]}
     >
@@ -185,8 +221,17 @@ export function Button({
       ) : (
         <>
           {leftIcon}
-          {label ? (
-            <Text style={{ color: fg, fontSize: fonts[size], fontWeight: '700' }}>{label}</Text>
+          {label2 ? (
+            <Text
+              style={{
+                color: fg,
+                fontSize: fonts[size] * theme.bodyScale,
+                fontFamily: theme.fonts.bodyBold,
+                letterSpacing: shape.uppercaseButtons ? 1 : 0.2,
+              }}
+            >
+              {label2}
+            </Text>
           ) : (
             children
           )}
@@ -207,28 +252,34 @@ export function Card({
   variant?: 'bordered' | 'elevated' | 'flat';
   padded?: boolean;
 }) {
-  const { colors, radius, isLight } = useTheme();
-  const elevated: ViewStyle =
-    variant === 'elevated'
-      ? {
-          shadowColor: '#000',
-          shadowOpacity: isLight ? 0.08 : 0.4,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 4,
-        }
-      : {};
+  const { colors, radius, shape } = useTheme();
+
+  const showShadow = variant === 'elevated' && (shape.shadowOpacity > 0 || shape.hardShadow);
+  const shadowStyle: ViewStyle = showShadow
+    ? {
+        shadowColor: shape.shadowColor,
+        shadowOpacity: shape.shadowOpacity,
+        shadowRadius: shape.shadowRadius,
+        shadowOffset: shape.shadowOffset,
+        elevation: shape.elevation,
+      }
+    : {};
+
+  // brutalist/arcade use the strong border; loveletter keeps its tilt + normal border.
+  const strongBorder = shape.hardShadow && shape.cardRotate === 0;
+
   return (
     <View
       style={[
         {
           backgroundColor: colors.surface,
           borderRadius: radius.card,
-          borderWidth: variant === 'flat' ? 0 : 1,
-          borderColor: colors.border,
+          borderWidth: variant === 'flat' ? 0 : shape.borderWidth,
+          borderColor: strongBorder ? colors.borderStrong : colors.border,
           padding: padded ? 16 : 0,
         },
-        elevated,
+        shape.cardRotate ? { transform: [{ rotate: `${shape.cardRotate}deg` }] } : null,
+        shadowStyle,
         style,
       ]}
       {...rest}
@@ -246,7 +297,8 @@ export function Input({
   containerStyle,
   ...rest
 }: TextInputProps & { label?: string; error?: string; containerStyle?: ViewStyle }) {
-  const { colors, radius } = useTheme();
+  const theme = useTheme();
+  const { colors, radius } = theme;
   return (
     <View style={containerStyle}>
       {label ? (
@@ -264,7 +316,8 @@ export function Input({
             borderRadius: radius.input,
             paddingHorizontal: 14,
             paddingVertical: 12,
-            fontSize: 15,
+            fontSize: 15 * theme.bodyScale,
+            fontFamily: theme.fonts.body,
             color: colors.text,
           },
           style,
@@ -292,7 +345,8 @@ export function Avatar({
   size?: number;
   online?: boolean;
 }) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   const initials = (name ?? '?')
     .split(' ')
     .map((p) => p[0])
@@ -317,7 +371,7 @@ export function Avatar({
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: size * 0.38 }}>
+          <Text style={{ color: colors.primary, fontFamily: theme.fonts.bodyBold, fontSize: size * 0.36 }}>
             {initials}
           </Text>
         </View>
@@ -349,7 +403,8 @@ export function Badge({
   label: string | number;
   variant?: 'primary' | 'success' | 'error' | 'muted';
 }) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   const bg =
     variant === 'success' ? colors.success
     : variant === 'error' ? colors.error
@@ -358,7 +413,7 @@ export function Badge({
   const fg = variant === 'muted' ? colors.text : colors.textOnPrimary;
   return (
     <View style={{ minWidth: 20, paddingHorizontal: 6, height: 20, borderRadius: 10, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: fg, fontSize: 11, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: fg, fontSize: 11, fontFamily: theme.fonts.bodyBold }}>{label}</Text>
     </View>
   );
 }
@@ -370,14 +425,10 @@ export function Spinner({ size = 'large', color }: { size?: 'small' | 'large'; c
 }
 
 export function Loading({ label }: { label?: string }) {
-  const { colors } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <Spinner />
       {label ? <AppText muted>{label}</AppText> : null}
-      <View style={{ position: 'absolute' }} pointerEvents="none">
-        <View style={{ width: 0, height: 0, backgroundColor: colors.background }} />
-      </View>
     </View>
   );
 }
@@ -434,7 +485,7 @@ export function Skeleton({ width, height = 16, radius = 8, style }: { width?: nu
   );
 }
 
-/* ─── Pressable helper with scale feedback ────────────────────────────────── */
+/* ─── Pressable helper with opacity feedback ──────────────────────────────── */
 export function Touchable({ children, style, onPress, ...rest }: PressableProps & { style?: ViewStyle }) {
   return (
     <Pressable

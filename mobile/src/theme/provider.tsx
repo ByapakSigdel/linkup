@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useThemeStore } from '@/stores/theme-store';
 import { palettes, type Palette, type ThemeId } from './palettes';
 import { themes, type ThemeMeta } from './themes';
+import { extras, type ThemeExtras, type ThemeFonts, type ThemeShape, type BgPattern } from './theme-spec';
 
 export interface Theme {
   id: ThemeId;
@@ -12,6 +13,14 @@ export interface Theme {
   /** Light background themes → dark status bar, and vice-versa. */
   isLight: boolean;
   meta: ThemeMeta;
+  /** Per-theme font families (loaded via fonts.ts). */
+  fonts: ThemeFonts;
+  headingTracking: number;
+  bodyTracking: number;
+  displayScale: number;
+  bodyScale: number;
+  shape: ThemeShape;
+  pattern: BgPattern;
 }
 
 const ThemeContext = createContext<Theme | null>(null);
@@ -24,12 +33,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ? (currentThemeId as ThemeId)
       : 'default';
     const p = palettes[id];
+    const x: ThemeExtras = extras[id];
     return {
       id,
       colors: p,
       radius: { card: p.cardRadius, button: p.btnRadius, input: p.inputRadius },
       isLight: p.isLight,
       meta: themes[id] ?? themes.default,
+      fonts: x.fonts,
+      headingTracking: x.headingTracking,
+      bodyTracking: x.bodyTracking,
+      displayScale: x.displayScale,
+      bodyScale: x.bodyScale,
+      shape: x.shape,
+      pattern: x.pattern,
     };
   }, [currentThemeId]);
 

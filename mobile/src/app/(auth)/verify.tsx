@@ -55,7 +55,7 @@ export default function VerifyScreen() {
     setIsVerifying(true);
     try {
       await api.post('/auth/verify', { code: trimmed });
-      router.replace('/(tabs)/dashboard');
+      router.replace('/dashboard');
     } catch (err) {
       setError(apiErrorMessage(err, 'Invalid or expired code. Please try again.'));
     } finally {

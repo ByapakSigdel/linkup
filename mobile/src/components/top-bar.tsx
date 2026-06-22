@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Menu } from 'lucide-react-native';
 import { useTheme } from '@/theme';
+import { useUIStore } from '@/stores/ui-store';
 import { AppText, Touchable } from '@/components/ui';
 
 interface ScreenHeaderProps {
@@ -67,11 +68,24 @@ interface AppBarProps {
 }
 
 /**
- * Large title bar for top-level tab screens (no back chevron).
+ * Large title bar for top-level drawer screens. Shows a hamburger that opens the
+ * web-style sidebar drawer (no back chevron).
  */
 export function AppBar({ title, right }: AppBarProps) {
+  const { colors } = useTheme();
+  const openDrawer = useUIStore((s) => s.openDrawer);
+
   return (
     <View style={styles.appBar}>
+      <Touchable
+        onPress={openDrawer}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Open menu"
+        style={styles.menuBtn}
+      >
+        <Menu color={colors.text} size={26} />
+      </Touchable>
       <AppText variant="display" weight="bold" numberOfLines={1} style={styles.appBarTitle}>
         {title}
       </AppText>
@@ -110,8 +124,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     paddingVertical: 8,
     minHeight: 56,
+  },
+  menuBtn: {
+    width: 40,
+    height: 40,
+    marginLeft: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   appBarTitle: {
     flex: 1,

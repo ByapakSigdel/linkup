@@ -40,7 +40,7 @@ export default function LoginScreen() {
 
     try {
       await login(email, password);
-      router.replace('/(tabs)/dashboard');
+      router.replace('/dashboard');
     } catch (err) {
       setApiError(
         apiErrorMessage(err, 'Invalid email or password. Please try again.'),
