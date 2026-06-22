@@ -9,11 +9,22 @@
  * http://HOST:PORT, defaulting to the dev machine's LAN IP.
  */
 const EXPLICIT_URL = process.env.EXPO_PUBLIC_API_URL;
-const HOST = process.env.EXPO_PUBLIC_API_HOST || '192.168.100.93';
+const HOST = process.env.EXPO_PUBLIC_API_HOST;
 const PORT = process.env.EXPO_PUBLIC_API_PORT || '4000';
 
-/** Base origin, e.g. https://api.yourdomain.com or http://192.168.100.93:4000 */
-export const API_ORIGIN = (EXPLICIT_URL || `http://${HOST}:${PORT}`).replace(/\/+$/, '');
+/** Deployed backend (Cloudflare HTTPS) — the default unless an env override is set. */
+const DEFAULT_ORIGIN = 'https://linkup.mahansigdel.com.np';
+
+/**
+ * Base origin. Priority:
+ *   1. EXPO_PUBLIC_API_URL  — explicit full origin
+ *   2. EXPO_PUBLIC_API_HOST — LAN dev over HTTP (http://HOST:PORT)
+ *   3. the deployed server  — production default
+ * e.g. https://linkup.mahansigdel.com.np or http://192.168.1.50:4000
+ */
+export const API_ORIGIN = (
+  EXPLICIT_URL || (HOST ? `http://${HOST}:${PORT}` : DEFAULT_ORIGIN)
+).replace(/\/+$/, '');
 
 /** REST base, e.g. http://192.168.100.93:4000/api/v1 */
 export const API_URL = `${API_ORIGIN}/api/v1`;
