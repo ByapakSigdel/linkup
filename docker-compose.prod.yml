@@ -1,0 +1,80 @@
+# LinkUp — production stack for a single VM (e.g. a Google Cloud Compute Engine
+# instance). Run with:
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+# Postgres + Redis run as containers with persistent volumes; the API connects to
+# them over the compose network. To front the API with HTTPS on a domain, also
+# start the `caddy` service:  ... up -d --profile tls
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-linkup}
+      POSTGRES_USER: ${POSTGRES_USER:-linkup}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-linkup}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      # Internal service URLs (override anything in env_file). The API reaches the
+      # DB/Redis by their compose service names on the private network.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-linkup}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-linkup}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      # Expose the API directly. With the `tls` profile + a domain you can instead
+      # remove this and let Caddy (443) be the only public port.
+      - '4000:4000'
+    volumes:
+      - uploads:/app/uploads
+
+  # Optional: HTTPS reverse proxy with automatic Let's Encrypt certs.
+  # Enable with `--profile tls` and set DOMAIN in .env.production + DNS A record.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ['tls']
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to use the tls profile}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+  caddy_data:
+  caddy_config:

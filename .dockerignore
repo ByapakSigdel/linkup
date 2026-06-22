@@ -1,0 +1,14 @@
+# Build context is the repo root (for the monorepo). Keep it lean.
+**/node_modules
+.git
+.gitignore
+mobile
+**/dist
+**/.next
+**/.turbo
+**/.expo
+uploads
+*.log
+**/*.log
+.DS_Store
+docs

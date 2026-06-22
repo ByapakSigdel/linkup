@@ -1,0 +1,9 @@
+# Caddy auto-HTTPS reverse proxy for the LinkUp API.
+# Used by the `caddy` service (profile: tls) in docker-compose.prod.yml.
+# {$DOMAIN} comes from the environment (set DOMAIN in .env.production) and must
+# resolve (DNS A record) to this VM's external IP. Caddy fetches/renews a
+# Let's Encrypt certificate automatically.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:4000
+}
