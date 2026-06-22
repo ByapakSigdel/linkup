@@ -1,0 +1,20 @@
+# Single-domain HTTP router for linkup.mahansigdel.com.np.
+# TLS is terminated upstream (Cloudflare Tunnel / Cloudflare edge), so this
+# listens on plain :80 inside the compose network. The `router` service is
+# what the Cloudflare Tunnel points at (http://router:80).
+#
+#   /api/*       -> NestJS API   (REST + media at /api/v1/media/...)
+#   /socket.io/* -> NestJS API   (Socket.IO realtime, ws upgrade preserved)
+#   everything else -> Next.js web app
+:80 {
+	encode gzip
+
+	@backend path /api/* /socket.io/*
+	handle @backend {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -54,6 +54,52 @@ services:
     volumes:
       - uploads:/app/uploads
 
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Public origin the browser uses (same domain, fronted by the router).
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-https://linkup.mahansigdel.com.np/api/v1}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_ORIGIN:-https://linkup.mahansigdel.com.np}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api
+    expose:
+      - '3000'
+
+  # Single-domain router (HTTP only; TLS terminated by Cloudflare Tunnel/edge).
+  # Routes /api + /socket.io -> api, everything else -> web. This is what the
+  # Cloudflare Tunnel points at: http://router:80
+  router:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./deploy/router.Caddyfile:/etc/caddy/Caddyfile:ro
+      - router_data:/data
+      - router_config:/config
+    depends_on:
+      - api
+      - web
+    ports:
+      # Local-only on the VM, for verification (curl http://localhost:8088/...).
+      - '127.0.0.1:8088:80'
+
+  # Cloudflare Tunnel — outbound connection, so NO inbound firewall/ports needed
+  # and Cloudflare terminates HTTPS. Set TUNNEL_TOKEN in .env.production and add a
+  # Public Hostname in the Cloudflare dashboard:
+  #   linkup.mahansigdel.com.np  ->  http://router:80
+  # Start with: ... --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ['tunnel']
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env.production}
+    depends_on:
+      - router
+
   # Optional: HTTPS reverse proxy with automatic Let's Encrypt certs.
   # Enable with `--profile tls` and set DOMAIN in .env.production + DNS A record.
   caddy:
@@ -78,3 +124,5 @@ volumes:
   uploads:
   caddy_data:
   caddy_config:
+  router_data:
+  router_config:
