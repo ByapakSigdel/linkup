@@ -96,7 +96,9 @@ services:
     image: cloudflare/cloudflared:latest
     profiles: ['tunnel']
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env.production}
+    # TUNNEL_TOKEN is set in .env.production before starting the `tunnel` profile.
+    # Defaulted to empty so non-tunnel commands (build/up of other services) parse.
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:-}
     depends_on:
       - router
 
