@@ -6,14 +6,35 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useUIStore } from '@/stores/ui-store';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useTheme } from '@/theme';
 import { Sidebar } from '@/components/sidebar';
 
 /**
- * Custom slide-out sidebar host. Expo SDK 56 dropped expo-router's
- * react-navigation compatibility, so we render our own drawer: the screen
- * content (children) plus an animated panel + backdrop driven by useUIStore.
+ * Adaptive navigation host.
+ * - Wide screens (landscape tablets): the sidebar is PINNED open beside the
+ *   content, so the app fills the screen — no black gutters, web-style.
+ * - Narrow screens (phones, portrait tablets): a slide-out overlay drawer.
+ * Expo SDK 56 dropped expo-router's react-navigation drawer, so this is custom.
  */
 export function DrawerShell({ children }: { children: React.ReactNode }) {
+  const { isWide } = useResponsive();
+  return isWide ? <PinnedShell>{children}</PinnedShell> : <OverlayShell>{children}</OverlayShell>;
+}
+
+function PinnedShell({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.background }}>
+      <View style={{ width: 288, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border }}>
+        <Sidebar />
+      </View>
+      <View style={{ flex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
+function OverlayShell({ children }: { children: React.ReactNode }) {
   const open = useUIStore((s) => s.drawerOpen);
   const close = useUIStore((s) => s.closeDrawer);
   const { width } = useWindowDimensions();
@@ -34,7 +55,6 @@ export function DrawerShell({ children }: { children: React.ReactNode }) {
     <View style={{ flex: 1 }}>
       {children}
 
-      {/* Backdrop */}
       <Animated.View
         pointerEvents={open ? 'auto' : 'none'}
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }, backdropStyle]}
@@ -42,7 +62,6 @@ export function DrawerShell({ children }: { children: React.ReactNode }) {
         <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Close menu" />
       </Animated.View>
 
-      {/* Sliding panel */}
       <Animated.View
         pointerEvents={open ? 'auto' : 'none'}
         style={[

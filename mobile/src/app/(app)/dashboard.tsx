@@ -32,6 +32,7 @@ import { useChatStore } from '@/stores/chat-store';
 import { useStreaksStore } from '@/stores/streaks-store';
 import { useSocket } from '@/hooks/use-socket';
 import { useCall } from '@/hooks/use-call';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface Partner {
   id: string;
@@ -66,6 +67,7 @@ function lastSeenText(iso?: string): string {
 
 export default function DashboardScreen() {
   const { colors, radius } = useTheme();
+  const { contentMaxWidth } = useResponsive();
 
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
@@ -148,7 +150,7 @@ export default function DashboardScreen() {
   const hasStreak = !!streak && streak.currentStreak > 0;
 
   return (
-    <Screen scroll padded={false}>
+    <Screen scroll padded={false} maxWidth={contentMaxWidth}>
       <View style={styles.container}>
         <AppBar title="Home" />
 

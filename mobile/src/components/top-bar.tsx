@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { ChevronLeft, Menu } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useUIStore } from '@/stores/ui-store';
+import { useResponsive } from '@/hooks/use-responsive';
 import { AppText, Touchable } from '@/components/ui';
 
 interface ScreenHeaderProps {
@@ -74,18 +75,22 @@ interface AppBarProps {
 export function AppBar({ title, right }: AppBarProps) {
   const { colors } = useTheme();
   const openDrawer = useUIStore((s) => s.openDrawer);
+  const { isWide } = useResponsive();
 
   return (
     <View style={styles.appBar}>
-      <Touchable
-        onPress={openDrawer}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel="Open menu"
-        style={styles.menuBtn}
-      >
-        <Menu color={colors.text} size={26} />
-      </Touchable>
+      {/* On wide screens the sidebar is pinned open, so no hamburger is needed. */}
+      {!isWide ? (
+        <Touchable
+          onPress={openDrawer}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+          style={styles.menuBtn}
+        >
+          <Menu color={colors.text} size={26} />
+        </Touchable>
+      ) : null}
       <AppText variant="display" weight="bold" numberOfLines={1} style={styles.appBarTitle}>
         {title}
       </AppText>

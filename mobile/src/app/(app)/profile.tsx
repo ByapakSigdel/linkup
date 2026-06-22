@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, type DimensionValue } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
@@ -32,6 +32,7 @@ import {
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/env';
 
@@ -76,6 +77,11 @@ interface ProfileData {
 
 export default function ProfileScreen() {
   const { colors, radius } = useTheme();
+  const { isTablet } = useResponsive();
+  // Profile reads best as a capped single column on big screens.
+  const maxWidth = isTablet ? 760 : undefined;
+  // Stats: 2-up on phones, 3-up on tablets to use the wider column.
+  const statWidth: DimensionValue = isTablet ? '33.33%' : '50%';
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,7 +132,7 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <Screen>
+      <Screen maxWidth={maxWidth}>
         <ScreenHeader title="Profile" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Spinner />
@@ -137,7 +143,7 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <Screen>
+      <Screen maxWidth={maxWidth}>
         <ScreenHeader title="Profile" />
         <EmptyState
           icon={<Heart color={colors.textMuted} size={40} />}
@@ -155,7 +161,7 @@ export default function ProfileScreen() {
     (partner ? `${user.displayName} & ${partner.displayName}` : user.displayName);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} maxWidth={maxWidth}>
       <View style={{ paddingHorizontal: 16 }}>
         <ScreenHeader
           title="Profile"
@@ -366,36 +372,42 @@ export default function ProfileScreen() {
                 }}
               >
                 <StatItem
+                  width={statWidth}
                   icon={<MessageCircle color={colors.primary} size={20} />}
                   bg={colors.primaryLight}
                   value={coupleStats.messageCount.toLocaleString()}
                   label="Messages Sent"
                 />
                 <StatItem
+                  width={statWidth}
                   icon={<ImageIcon color={colors.secondary} size={20} />}
                   bg={colors.surfaceHover}
                   value={coupleStats.mediaCount.toLocaleString()}
                   label="Photos Shared"
                 />
                 <StatItem
+                  width={statWidth}
                   icon={<Flame color={colors.accent} size={20} />}
                   bg={colors.surfaceHover}
                   value={`${coupleStats.currentStreak} days`}
                   label="Current Streak"
                 />
                 <StatItem
+                  width={statWidth}
                   icon={<Trophy color={colors.accent} size={20} />}
                   bg={colors.surfaceHover}
                   value={`${coupleStats.achievementCount}`}
                   label="Achievements"
                 />
                 <StatItem
+                  width={statWidth}
                   icon={<Star color={colors.secondary} size={20} />}
                   bg={colors.surfaceHover}
                   value={coupleStats.totalPoints.toLocaleString()}
                   label="Total Points"
                 />
                 <StatItem
+                  width={statWidth}
                   icon={<Calendar color={colors.success} size={20} />}
                   bg={colors.surfaceHover}
                   value={`${daysTogether}`}
@@ -484,17 +496,19 @@ function StatItem({
   bg,
   value,
   label,
+  width = '50%',
 }: {
   icon: React.ReactNode;
   bg: string;
   value: string;
   label: string;
+  width?: DimensionValue;
 }) {
   const { radius } = useTheme();
   return (
     <View
       style={{
-        width: '50%',
+        width,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,

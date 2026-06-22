@@ -35,6 +35,7 @@ import {
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { themes, themeIds, type ThemeMeta } from '@/theme/themes';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
@@ -85,6 +86,9 @@ function selectThemeShared(themeId: string) {
 
 export default function SettingsScreen() {
   const { colors, radius } = useTheme();
+  const { contentMaxWidth, isWide, isTablet } = useResponsive();
+  // Theme swatches: full-width rows on phones; 3-up on wide, 2-up on tablets.
+  const themeColumns = isWide ? 3 : isTablet ? 2 : 1;
   const logout = useAuthStore((s) => s.logout);
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const couple = useAuthStore((s) => s.couple);
@@ -173,7 +177,7 @@ export default function SettingsScreen() {
 
   if (isLoading) {
     return (
-      <Screen>
+      <Screen maxWidth={contentMaxWidth}>
         <ScreenHeader title="Settings" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Spinner />
@@ -186,7 +190,7 @@ export default function SettingsScreen() {
     coupleName.trim() === (couple?.coupleName ?? '').trim();
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} maxWidth={contentMaxWidth}>
       <View style={{ paddingHorizontal: 16 }}>
         <ScreenHeader title="Settings" subtitle="Customize your LinkUp experience" />
       </View>
@@ -235,14 +239,28 @@ export default function SettingsScreen() {
               <Palette color={colors.text} size={18} />
               <AppText variant="subtitle">Theme</AppText>
             </Row>
-            <View style={{ gap: 10 }}>
+            <View
+              style={
+                themeColumns > 1
+                  ? { flexDirection: 'row', flexWrap: 'wrap', margin: -5 }
+                  : { gap: 10 }
+              }
+            >
               {THEME_LIST.map((t) => (
-                <ThemeSwatch
+                <View
                   key={t.id}
-                  theme={t}
-                  active={currentThemeId === t.id}
-                  onPress={() => handleThemeChange(t.id)}
-                />
+                  style={
+                    themeColumns > 1
+                      ? { width: `${100 / themeColumns}%`, padding: 5 }
+                      : undefined
+                  }
+                >
+                  <ThemeSwatch
+                    theme={t}
+                    active={currentThemeId === t.id}
+                    onPress={() => handleThemeChange(t.id)}
+                  />
+                </View>
               ))}
             </View>
           </View>

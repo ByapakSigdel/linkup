@@ -10,6 +10,7 @@ import { Check, Heart, Lock, UserCheck, X } from 'lucide-react-native';
 import { Screen, Avatar, AppText, Button, Card, EmptyState, Spinner, Row, Skeleton, Badge } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { resolveMediaUrl } from '@/lib/env';
 import * as circlesApi from '@/lib/circles-api';
 import type { CircleSummary, FollowRequest } from '@/components/circles';
@@ -25,6 +26,8 @@ interface FollowRequestEvent {
 
 export default function CircleRequestsScreen() {
   const { colors } = useTheme();
+  const { isTablet } = useResponsive();
+  const LIST_WIDTH = 680;
   const couple = useAuthStore((s) => s.couple);
 
   const [requests, setRequests] = useState<FollowRequest[]>([]);
@@ -184,13 +187,19 @@ export default function CircleRequestsScreen() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={{ paddingHorizontal: 16, width: '100%', maxWidth: isTablet ? LIST_WIDTH : undefined, alignSelf: 'center' }}>
         <ScreenHeader title="Follow requests" />
       </View>
       <FlatList
         data={requests}
         keyExtractor={(r) => r.followId}
-        contentContainerStyle={{ padding: 16, gap: 8 }}
+        contentContainerStyle={{
+          padding: 16,
+          gap: 8,
+          width: '100%',
+          maxWidth: isTablet ? LIST_WIDTH : undefined,
+          alignSelf: 'center',
+        }}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         showsVerticalScrollIndicator={false}

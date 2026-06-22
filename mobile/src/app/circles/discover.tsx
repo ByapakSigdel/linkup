@@ -11,6 +11,7 @@ import { Compass, Search, Heart, Sparkles, UserPlus } from 'lucide-react-native'
 import { Screen, AppText, Button, Card, EmptyState, Spinner, Row, Skeleton } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
@@ -18,6 +19,8 @@ import { CircleCard, type CircleProfile, type FollowState } from '@/components/c
 
 export default function DiscoverScreen() {
   const { colors, radius } = useTheme();
+  const { isTablet } = useResponsive();
+  const LIST_WIDTH = 680;
   const couple = useAuthStore((s) => s.couple);
 
   const [query, setQuery] = useState('');
@@ -243,13 +246,19 @@ export default function DiscoverScreen() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={{ paddingHorizontal: 16, width: '100%', maxWidth: isTablet ? LIST_WIDTH : undefined, alignSelf: 'center' }}>
         <ScreenHeader title="Discover" />
       </View>
       <FlatList
         data={circles}
         keyExtractor={(c) => c.id}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
+        contentContainerStyle={{
+          padding: 16,
+          gap: 10,
+          width: '100%',
+          maxWidth: isTablet ? LIST_WIDTH : undefined,
+          alignSelf: 'center',
+        }}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         renderItem={({ item }) => <CircleCard circle={item} onFollowChange={handleFollowChange} />}

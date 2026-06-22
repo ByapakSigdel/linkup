@@ -35,6 +35,7 @@ export function Screen({
   edges = ['top'],
   contentStyle,
   style,
+  maxWidth,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
@@ -42,9 +43,19 @@ export function Screen({
   edges?: Edge[];
   contentStyle?: ViewStyle;
   style?: ViewStyle;
+  /** Center single-column content at this width on big (tablet) screens. */
+  maxWidth?: number;
 }) {
   const { colors } = useTheme();
   const pad: ViewStyle = padded ? { padding: 16 } : {};
+  // Center the content column on wide screens so it doesn't sprawl edge-to-edge.
+  const inner = maxWidth ? (
+    <View style={{ width: '100%', maxWidth, alignSelf: 'center', flex: scroll ? undefined : 1 }}>
+      {children}
+    </View>
+  ) : (
+    children
+  );
   return (
     <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.background }, style]}>
       <ThemedBackground />
@@ -54,10 +65,10 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {children}
+          {inner}
         </ScrollView>
       ) : (
-        <View style={[{ flex: 1 }, pad, contentStyle]}>{children}</View>
+        <View style={[{ flex: 1 }, pad, contentStyle]}>{inner}</View>
       )}
     </SafeAreaView>
   );

@@ -45,6 +45,7 @@ import {
   Touchable,
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
@@ -390,6 +391,9 @@ function TrackRow({
 
 export default function MusicScreen() {
   const { colors, radius } = useTheme();
+  const { contentMaxWidth } = useResponsive();
+  // Center the list + sticky player on tablets so they don't stretch edge-to-edge.
+  const maxW = contentMaxWidth ?? undefined;
   const couple = useAuthStore((s) => s.couple);
   const pushToast = useToastStore((s) => s.push);
 
@@ -713,14 +717,22 @@ export default function MusicScreen() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View
+        style={[
+          { paddingHorizontal: 16 },
+          maxW ? { maxWidth: maxW, width: '100%', alignSelf: 'center' } : null,
+        ]}
+      >
         <ScreenHeader title="Music" subtitle="Shared playlists" right={headerRight} />
       </View>
 
       <FlatList
         data={tracks}
         keyExtractor={(t) => t.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+        contentContainerStyle={[
+          { padding: 16, paddingBottom: 24 },
+          maxW ? { maxWidth: maxW, width: '100%', alignSelf: 'center' } : null,
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 8 }}>
@@ -850,7 +862,13 @@ export default function MusicScreen() {
 
       {/* Sticky player bar */}
       {currentTrack ? (
-        <View style={styles.playerWrap}>
+        <View
+          style={[
+            styles.playerWrap,
+            maxW ? { left: 16, right: 16, alignItems: 'center' } : null,
+          ]}
+        >
+         <View style={maxW ? { width: '100%', maxWidth: maxW } : undefined}>
           <PlayerBar
             track={currentTrack}
             isPlaying={isPlaying}
@@ -877,6 +895,7 @@ export default function MusicScreen() {
           <Muted variant="caption" center style={{ marginTop: 6 }}>
             Best-effort sync: track selection and play/pause are shared.
           </Muted>
+         </View>
         </View>
       ) : null}
 

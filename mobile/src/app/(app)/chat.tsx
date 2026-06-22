@@ -19,11 +19,17 @@ import { MessageInput } from '@/components/chat/message-input';
 import { TypingIndicator } from '@/components/chat/typing-indicator';
 import { HighlightPicker } from '@/components/chat/highlight-picker';
 import { resolveMediaUrl } from '@/lib/env';
+import { useResponsive } from '@/hooks/use-responsive';
 import api from '@/lib/api';
 import type { Message, HighlightCategory } from '@/types';
 
+// Comfortable reading column for the conversation on tablets so bubbles don't
+// stretch edge-to-edge. Phones (isWide === false) keep full width.
+const CHAT_MAX_WIDTH = 760;
+
 export default function ChatScreen() {
   const { colors } = useTheme();
+  const { isWide } = useResponsive();
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
 
@@ -168,7 +174,7 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.flex}>
+        <View style={[styles.flex, isWide && styles.column]}>
           <MessageList
             onReply={handleReply}
             onEdit={handleEdit}
@@ -195,13 +201,15 @@ export default function ChatScreen() {
           </Pressable>
         ) : null}
 
-        <MessageInput
-          onSend={handleSend}
-          onEditSend={handleEditSend}
-          onTypingStart={startTyping}
-          onTypingStop={stopTyping}
-          partnerName={partnerName}
-        />
+        <View style={isWide ? styles.column : undefined}>
+          <MessageInput
+            onSend={handleSend}
+            onEditSend={handleEditSend}
+            onTypingStart={startTyping}
+            onTypingStop={stopTyping}
+            partnerName={partnerName}
+          />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -209,6 +217,8 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  // Centered reading column on tablets/wide screens (phones unaffected).
+  column: { width: '100%', maxWidth: CHAT_MAX_WIDTH, alignSelf: 'center' },
   overlay: {
     position: 'absolute',
     top: 0,

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { LinkupMark } from '@/components/brand-mark';
+import { useResponsive } from '@/hooks/use-responsive';
 import {
   ScribbleCanvas,
   type ScribbleCanvasHandle,
@@ -35,6 +36,7 @@ interface ScribbleItem {
 
 export default function ScribbleScreen() {
   const { colors } = useTheme();
+  const { isTablet } = useResponsive();
   const couple = useAuthStore((s) => s.couple);
   const token = useAuthStore((s) => s.tokens?.accessToken);
   const pushToast = useToastStore((s) => s.push);
@@ -201,7 +203,7 @@ export default function ScribbleScreen() {
   }
 
   return (
-    <Screen edges={['top']} scroll>
+    <Screen edges={['top']} scroll maxWidth={isTablet ? 860 : undefined}>
       <ScreenHeader
         title="Scribble"
         subtitle="Draw together live"
@@ -242,7 +244,7 @@ export default function ScribbleScreen() {
 
         <ScribbleCanvas
           ref={canvasRef}
-          height={380}
+          height={isTablet ? 480 : 380}
           onLocalStroke={handleLocalStroke}
           onClear={handleClear}
           onCursorMove={handleCursorMove}
@@ -258,7 +260,12 @@ export default function ScribbleScreen() {
         {loadingGallery ? (
           <View style={styles.grid}>
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} height={96} radius={12} style={styles.cell} />
+              <Skeleton
+                key={i}
+                height={96}
+                radius={12}
+                style={isTablet ? { ...styles.cell, ...styles.cellWide } : styles.cell}
+              />
             ))}
           </View>
         ) : gallery.length === 0 ? (
@@ -271,7 +278,11 @@ export default function ScribbleScreen() {
               <Animated.View
                 key={item.id}
                 entering={FadeInDown.delay(i * 40)}
-                style={[styles.cell, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                style={[
+                  styles.cell,
+                  isTablet && styles.cellWide,
+                  { borderColor: colors.border, backgroundColor: colors.surface },
+                ]}
               >
                 <Image
                   source={{ uri: resolveMediaUrl(item.imageUrl) }}
@@ -304,6 +315,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  cellWide: {
+    width: '31%',
   },
   thumb: {
     width: '100%',

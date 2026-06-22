@@ -1,4 +1,10 @@
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  type DimensionValue,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Gamepad2, ChevronRight } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -6,6 +12,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen, AppText } from '@/components/ui';
 import { LinkupMark } from '@/components/brand-mark';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGamesStore } from '@/stores/games-store';
 import {
@@ -19,6 +26,11 @@ const ORDER: GameCategory[] = ['classic', 'couple', 'creative', 'luck'];
 
 export default function GamesScreen() {
   const { colors, radius } = useTheme();
+  const { isTablet, gridColumns, contentMaxWidth } = useResponsive();
+  // Phones keep the original 2-up layout; tablets fan out to more columns.
+  const columns = isTablet ? gridColumns : 2;
+  // basis% leaves room for the 12px gaps between columns.
+  const tileBasis = `${100 / columns - (columns > 2 ? 2 : 1.5)}%` as DimensionValue;
   const couple = useAuthStore((s) => s.couple);
   const partnerInGame = useGamesStore((s) => s.partnerInGame);
   const joinable = partnerInGame ? getGame(partnerInGame) : null;
@@ -43,7 +55,12 @@ export default function GamesScreen() {
   return (
     <Screen padded={false}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          contentMaxWidth
+            ? { maxWidth: contentMaxWidth, width: '100%', alignSelf: 'center' }
+            : null,
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -114,6 +131,7 @@ export default function GamesScreen() {
                     onPress={() => router.push(`/games/${g.key}`)}
                     style={({ pressed }) => [
                       styles.tile,
+                      { flexBasis: tileBasis },
                       {
                         borderColor: colors.border,
                         backgroundColor: colors.surface,
@@ -216,7 +234,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tile: {
-    width: '47%',
+    flexBasis: '47%',
     flexGrow: 1,
     borderWidth: 1,
     padding: 16,

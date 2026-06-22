@@ -42,6 +42,7 @@ import {
   Skeleton,
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
+import { useResponsive } from '@/hooks/use-responsive';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface CustomEmoji {
@@ -565,6 +566,9 @@ function EmojiCard({
 /* ─── Screen ──────────────────────────────────────────────────────────────── */
 export default function EmojisScreen() {
   const { colors } = useTheme();
+  const { gridColumns, contentMaxWidth } = useResponsive();
+  // gridColumns is 3 on phones, then 4/5 on wider tablets — drives the emoji grid.
+  const columns = gridColumns;
   const couple = useAuthStore((s) => s.couple);
   const [emojis, setEmojis] = useState<CustomEmoji[]>([]);
   const [loading, setLoading] = useState(true);
@@ -685,10 +689,16 @@ export default function EmojisScreen() {
       </View>
       <FlatList
         data={loading ? [] : emojis}
+        key={columns}
         keyExtractor={(item) => item.id}
-        numColumns={3}
+        numColumns={columns}
         columnWrapperStyle={{ gap: 10 }}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
+        contentContainerStyle={[
+          { padding: 16, gap: 10 },
+          contentMaxWidth
+            ? { maxWidth: contentMaxWidth, width: '100%', alignSelf: 'center' }
+            : null,
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={{ gap: 16, marginBottom: 16 }}>
@@ -730,7 +740,7 @@ export default function EmojisScreen() {
         renderItem={({ item, index }) => (
           <Animated.View
             entering={FadeInDown.delay(Math.min(index, 8) * 40).springify()}
-            style={{ flex: 1 / 3 }}
+            style={{ flex: 1 / columns }}
           >
             <EmojiCard
               emoji={item}

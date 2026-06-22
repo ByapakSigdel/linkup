@@ -6,12 +6,13 @@
 // the grid and follow-state fresh.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TextInput } from 'react-native';
+import { View, ScrollView, TextInput, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Heart, ImagePlus, Lock, Plus, X } from 'lucide-react-native';
 import { Screen, AppText, Button, Card, EmptyState, Input, Row, Skeleton } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
 import { getSocket } from '@/lib/socket';
@@ -32,6 +33,14 @@ import { isHandleValid, sanitizeHandle, errMessage } from '@/components/circles/
 
 export default function CircleProfileScreen() {
   const { colors } = useTheme();
+  const { isTablet, gridColumns } = useResponsive();
+  // On tablets, cap the profile column so the header + grid don't sprawl, but
+  // keep it wide enough for a denser grid than the phone's 3-up.
+  const PROFILE_WIDTH = 900;
+  const gridColumnCount = isTablet ? gridColumns : 3;
+  const { width: winWidth } = useWindowDimensions();
+  // The grid lives inside the centered, capped profile column.
+  const gridWidth = isTablet ? Math.min(winWidth, PROFILE_WIDTH) : winWidth;
   const params = useLocalSearchParams<{ id: string }>();
   const idOrHandle = params?.id;
 
@@ -297,10 +306,19 @@ export default function CircleProfileScreen() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={{ paddingHorizontal: 16, width: '100%', maxWidth: isTablet ? PROFILE_WIDTH : undefined, alignSelf: 'center' }}>
         <ScreenHeader title={profile.circle.handle ? `@${profile.circle.handle}` : profile.circle.name} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 16,
+          gap: 20,
+          width: '100%',
+          maxWidth: isTablet ? PROFILE_WIDTH : undefined,
+          alignSelf: 'center',
+        }}
+        showsVerticalScrollIndicator={false}
+      >
         <ProfileHeader
           profile={profile}
           hasStories={hasUnseenStories}
@@ -346,6 +364,8 @@ export default function CircleProfileScreen() {
               <PostGrid
                 posts={posts}
                 loading={postsLoading}
+                columns={gridColumnCount}
+                containerWidth={gridWidth}
                 emptyLabel={isOwner ? 'Share your first photo with your followers.' : 'No posts yet.'}
               />
               {nextCursor ? (

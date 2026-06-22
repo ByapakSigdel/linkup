@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { LinkupMark } from '@/components/brand-mark';
+import { useResponsive } from '@/hooks/use-responsive';
 import {
   PaintCanvas,
   type PaintCanvasHandle,
@@ -50,6 +51,7 @@ function errMessage(err: unknown): string {
 
 export default function PaintScreen() {
   const { colors } = useTheme();
+  const { isTablet } = useResponsive();
   const couple = useAuthStore((s) => s.couple);
   const pushToast = useToastStore((s) => s.push);
 
@@ -270,7 +272,7 @@ export default function PaintScreen() {
   }
 
   return (
-    <Screen edges={['top']} scroll>
+    <Screen edges={['top']} scroll maxWidth={isTablet ? 900 : undefined}>
       <ScreenHeader
         title="Paint"
         subtitle="A shared studio"
@@ -314,7 +316,7 @@ export default function PaintScreen() {
 
         <PaintCanvas
           ref={canvasRef}
-          height={380}
+          height={isTablet ? 500 : 380}
           onLocalStroke={handleLocalStroke}
           onClear={handleClear}
           onCursorMove={handleCursorMove}
@@ -326,7 +328,12 @@ export default function PaintScreen() {
         {loadingGallery ? (
           <View style={styles.grid}>
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} height={96} radius={12} style={styles.cell} />
+              <Skeleton
+                key={i}
+                height={96}
+                radius={12}
+                style={isTablet ? { ...styles.cell, ...styles.cellWide } : styles.cell}
+              />
             ))}
           </View>
         ) : gallery.length === 0 ? (
@@ -344,6 +351,7 @@ export default function PaintScreen() {
                   entering={FadeInDown.delay(i * 40)}
                   style={[
                     styles.cell,
+                    isTablet && styles.cellWide,
                     {
                       borderColor: selected ? colors.primary : colors.border,
                       borderWidth: selected ? 2 : 1,
@@ -403,6 +411,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  cellWide: {
+    width: '31%',
   },
   thumb: {
     width: '100%',

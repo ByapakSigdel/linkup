@@ -28,15 +28,27 @@ export interface PostGridProps {
   posts: CirclePost[];
   loading?: boolean;
   emptyLabel?: string;
+  /** Column count (defaults to 3 — phone Instagram grid). Tablets pass more. */
+  columns?: number;
+  /** Width available for the grid (defaults to window width). Used to size cells. */
+  containerWidth?: number;
 }
 
-const COLS = 3;
 const GAP = 2;
 
-export function PostGrid({ posts, loading = false, emptyLabel = 'No posts yet' }: PostGridProps) {
+export function PostGrid({
+  posts,
+  loading = false,
+  emptyLabel = 'No posts yet',
+  columns = 3,
+  containerWidth,
+}: PostGridProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const cell = Math.floor((width - 32 - GAP * (COLS - 1)) / COLS);
+  const cols = Math.max(1, columns);
+  // 32 = the 16px horizontal padding on each side of the profile content column.
+  const avail = (containerWidth ?? width) - 32;
+  const cell = Math.floor((avail - GAP * (cols - 1)) / cols);
   const [openId, setOpenId] = useState<string | null>(null);
   const openPost = posts.find((p) => p.id === openId) ?? null;
 

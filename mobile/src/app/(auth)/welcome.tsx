@@ -15,6 +15,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Eye, EyeOff, Check, ArrowRight } from 'lucide-react-native';
 import { useAuthStore } from '@/stores/auth-store';
+import { useResponsive } from '@/hooks/use-responsive';
 import { apiErrorMessage } from '@/lib/api';
 import { CELESTIAL as C, CELESTIAL_FONTS as F } from '@/theme/celestial';
 import { LinkupMark } from '@/components/brand-mark';
@@ -94,9 +95,76 @@ export default function FrontDoor() {
 
 /* ─── Landing (page 0) ────────────────────────────────────────────────────── */
 function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => void }) {
+  const { isTablet, isWide, isLandscape } = useResponsive();
+  // Two-column hero on wide screens (mirrors the web's lg:grid-cols layout),
+  // especially in landscape. Phones keep the single-column stack.
+  const twoCol = isWide || (isTablet && isLandscape);
+  const h1Style = isTablet ? [styles.h1, styles.h1Tablet] : styles.h1;
+
+  const eyebrow = (
+    <Animated.Text
+      entering={FadeInDown.duration(700).delay(100)}
+      style={{ fontFamily: F.mono, fontSize: 11, letterSpacing: 3.4, textTransform: 'uppercase', color: C.accent, opacity: 0.85, marginBottom: 14 }}
+    >
+      made for the hours between midnight & dawn
+    </Animated.Text>
+  );
+
+  const headline = (
+    <>
+      <Animated.Text entering={FadeInDown.duration(700).delay(200)} style={h1Style}>
+        A constellation
+      </Animated.Text>
+      <Animated.Text entering={FadeInDown.duration(700).delay(350)} style={h1Style}>
+        of <Animated.Text style={[h1Style, { color: C.primary, fontStyle: 'italic' }]}>two</Animated.Text>.
+      </Animated.Text>
+    </>
+  );
+
+  const paragraph = (
+    <Animated.Text
+      entering={FadeInDown.duration(700).delay(500)}
+      style={{ fontFamily: F.body, fontSize: isTablet ? 17 : 16, lineHeight: isTablet ? 26 : 24, color: C.textMuted, marginTop: 18, maxWidth: 460 }}
+    >
+      A private sky for you and the one you orbit. Chat, create, and keep every moment between the two of you — and no one else.
+    </Animated.Text>
+  );
+
+  const cta = (
+    <Animated.View entering={FadeInDown.duration(700).delay(650)} style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 28, flexWrap: 'wrap' }}>
+      <Pressable
+        onPress={onSignup}
+        style={({ pressed }) => ({
+          height: 50,
+          borderRadius: 999,
+          backgroundColor: C.primary,
+          paddingHorizontal: 28,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          opacity: pressed ? 0.9 : 1,
+        })}
+      >
+        <Animated.Text style={{ fontFamily: F.bodyMedium, fontSize: 15, color: C.textOnPrimary, letterSpacing: 0.3 }}>
+          Begin your sky
+        </Animated.Text>
+        <ArrowRight size={17} color={C.textOnPrimary} />
+      </Pressable>
+    </Animated.View>
+  );
+
+  const constellation = (
+    <Animated.View entering={FadeIn.duration(1400).delay(300)} style={{ alignItems: 'center' }}>
+      <ConstellationOfTwo />
+    </Animated.View>
+  );
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: twoCol ? 48 : 24, alignSelf: 'center', width: '100%', maxWidth: twoCol ? 1040 : undefined }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -113,53 +181,27 @@ function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => v
         </View>
 
         {/* Hero */}
-        <View style={{ flex: 1, justifyContent: 'center', gap: 4, paddingVertical: 12 }}>
-          <Animated.View entering={FadeIn.duration(1400).delay(300)} style={{ alignItems: 'center', marginBottom: 8 }}>
-            <ConstellationOfTwo />
-          </Animated.View>
-
-          <Animated.Text
-            entering={FadeInDown.duration(700).delay(100)}
-            style={{ fontFamily: F.mono, fontSize: 11, letterSpacing: 3.4, textTransform: 'uppercase', color: C.accent, opacity: 0.85, marginBottom: 14 }}
-          >
-            made for the hours between midnight & dawn
-          </Animated.Text>
-
-          <Animated.Text entering={FadeInDown.duration(700).delay(200)} style={styles.h1}>
-            A constellation
-          </Animated.Text>
-          <Animated.Text entering={FadeInDown.duration(700).delay(350)} style={styles.h1}>
-            of <Animated.Text style={[styles.h1, { color: C.primary, fontStyle: 'italic' }]}>two</Animated.Text>.
-          </Animated.Text>
-
-          <Animated.Text
-            entering={FadeInDown.duration(700).delay(500)}
-            style={{ fontFamily: F.body, fontSize: 16, lineHeight: 24, color: C.textMuted, marginTop: 18, maxWidth: 420 }}
-          >
-            A private sky for you and the one you orbit. Chat, create, and keep every moment between the two of you — and no one else.
-          </Animated.Text>
-
-          <Animated.View entering={FadeInDown.duration(700).delay(650)} style={{ flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 28, flexWrap: 'wrap' }}>
-            <Pressable
-              onPress={onSignup}
-              style={({ pressed }) => ({
-                height: 50,
-                borderRadius: 999,
-                backgroundColor: C.primary,
-                paddingHorizontal: 28,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <Animated.Text style={{ fontFamily: F.bodyMedium, fontSize: 15, color: C.textOnPrimary, letterSpacing: 0.3 }}>
-                Begin your sky
-              </Animated.Text>
-              <ArrowRight size={17} color={C.textOnPrimary} />
-            </Pressable>
-          </Animated.View>
-        </View>
+        {twoCol ? (
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 48, paddingVertical: 24 }}>
+            {/* Words (left) */}
+            <View style={{ flex: 1.05 }}>
+              {eyebrow}
+              {headline}
+              {paragraph}
+              {cta}
+            </View>
+            {/* Constellation (right) */}
+            <View style={{ flex: 0.95 }}>{constellation}</View>
+          </View>
+        ) : (
+          <View style={{ flex: 1, justifyContent: 'center', gap: 4, paddingVertical: 12 }}>
+            <View style={{ marginBottom: 8 }}>{constellation}</View>
+            {eyebrow}
+            {headline}
+            {paragraph}
+            {cta}
+          </View>
+        )}
 
         {/* Ephemeris footer */}
         <Animated.View
@@ -254,6 +296,9 @@ function AuthPanel({
               backgroundColor: 'rgba(27,32,43,0.82)',
               padding: 26,
               overflow: 'hidden',
+              width: '100%',
+              maxWidth: 460,
+              alignSelf: 'center',
             }}
           >
             {/* top hairline accent */}
@@ -409,4 +454,5 @@ function Field({
 
 const styles = {
   h1: { fontFamily: F.serif, fontSize: 48, lineHeight: 50, color: C.text, letterSpacing: -0.5 } as const,
+  h1Tablet: { fontSize: 64, lineHeight: 66 } as const,
 };

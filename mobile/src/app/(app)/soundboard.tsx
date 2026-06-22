@@ -40,6 +40,7 @@ import {
   EmptyState,
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
+import { useResponsive } from '@/hooks/use-responsive';
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface BoardSound {
@@ -479,19 +480,21 @@ function SoundPad({
   onDelete,
   playing,
   deleting,
+  columns,
 }: {
   sound: BoardSound;
   onPlay: (sound: BoardSound) => void;
   onDelete: (sound: BoardSound) => void;
   playing?: boolean;
   deleting?: boolean;
+  columns: number;
 }) {
   const { colors, radius } = useTheme();
   const [confirming, setConfirming] = useState(false);
   const color = sound.color || DEFAULT_COLOR;
 
   return (
-    <View style={{ flex: 1 / 3 }}>
+    <View style={{ flex: 1 / columns }}>
       <Pressable
         onPress={() => onPlay(sound)}
         style={({ pressed }) => [
@@ -566,6 +569,9 @@ function SoundPad({
 /* ─── Screen ──────────────────────────────────────────────────────────────── */
 export default function SoundboardScreen() {
   const { colors } = useTheme();
+  const { gridColumns } = useResponsive();
+  // Sound pads: 3 on phones → more columns on wide screens.
+  const columns = gridColumns;
   const couple = useAuthStore((s) => s.couple);
   const [sounds, setSounds] = useState<BoardSound[]>([]);
   const [loading, setLoading] = useState(true);
@@ -703,13 +709,14 @@ export default function SoundboardScreen() {
       </View>
       <FlatList
         data={loading ? [] : sounds}
+        key={`pads-${columns}`}
         keyExtractor={(item) => item.id}
-        numColumns={3}
+        numColumns={columns}
         columnWrapperStyle={{ gap: 10 }}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <View style={{ gap: 16, marginBottom: 16 }}>
+          <View style={{ gap: 16, marginBottom: 16, maxWidth: 760, width: '100%' }}>
             <Muted variant="caption">
               Record or upload sounds, then tap a pad to play it on both your devices.
             </Muted>
@@ -740,7 +747,7 @@ export default function SoundboardScreen() {
         renderItem={({ item, index }) => (
           <Animated.View
             entering={FadeInDown.delay(Math.min(index, 8) * 40).springify()}
-            style={{ flex: 1 / 3 }}
+            style={{ flex: 1 / columns }}
           >
             <SoundPad
               sound={item}
@@ -748,6 +755,7 @@ export default function SoundboardScreen() {
               onDelete={handleDelete}
               playing={playingId === item.id}
               deleting={deletingId === item.id}
+              columns={columns}
             />
           </Animated.View>
         )}

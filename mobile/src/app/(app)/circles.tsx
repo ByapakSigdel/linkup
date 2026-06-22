@@ -15,6 +15,7 @@ import { Compass, Heart, Inbox, Sparkles, UserCircle } from 'lucide-react-native
 import { Screen, AppText, Button, Card, Spinner, EmptyState, Touchable, Row, Badge, Skeleton } from '@/components/ui';
 import { AppBar } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
@@ -29,6 +30,8 @@ import { errMessage } from '@/components/circles/helpers';
 
 export default function CirclesScreen() {
   const { colors } = useTheme();
+  const { isTablet } = useResponsive();
+  const FEED_WIDTH = 680;
   const couple = useAuthStore((s) => s.couple);
 
   const [myCircle, setMyCircle] = useState<CircleProfileResponse['circle'] | null>(null);
@@ -185,7 +188,7 @@ export default function CirclesScreen() {
   // ─── Opt-in CTA (no circle yet) ─────────────────────────────────────────────
   if (!myCircle) {
     return (
-      <Screen scroll>
+      <Screen scroll maxWidth={isTablet ? 560 : undefined}>
         <View style={{ gap: 24, paddingVertical: 8 }}>
           <View style={{ alignItems: 'center', gap: 10 }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
@@ -255,13 +258,20 @@ export default function CirclesScreen() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={{ paddingHorizontal: 16, width: '100%', maxWidth: isTablet ? FEED_WIDTH : undefined, alignSelf: 'center' }}>
         <AppBar title="Home" right={headerActions} />
       </View>
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 20 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+          gap: 20,
+          width: '100%',
+          maxWidth: isTablet ? FEED_WIDTH : undefined,
+          alignSelf: 'center',
+        }}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={emptyFeed}
         renderItem={({ item }) => <FeedPostCard post={item} onUpdate={handlePostUpdate} />}

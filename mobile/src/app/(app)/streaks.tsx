@@ -23,6 +23,7 @@ import {
 import { Screen, Card, AppText, Button, Spinner, Divider } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useStreaksStore } from '@/stores/streaks-store';
 
 const MILESTONE_LABELS: Record<number, string> = {
@@ -135,15 +136,20 @@ function StatCell({
   value,
   label,
   iconColor,
+  wide,
 }: {
   icon: (c: string) => React.ReactNode;
   value: number;
   label: string;
   iconColor: string;
+  wide?: boolean;
 }) {
   const { colors } = useTheme();
   return (
-    <Card variant="bordered" style={styles.statCard}>
+    <Card
+      variant="bordered"
+      style={[styles.statCard, wide ? styles.statCardWide : null]}
+    >
       <View style={styles.statInner}>
         {icon(iconColor)}
         <AppText
@@ -161,6 +167,7 @@ function StatCell({
 
 export default function StreaksScreen() {
   const { colors, radius } = useTheme();
+  const { contentMaxWidth, isWide } = useResponsive();
   const {
     streak,
     history,
@@ -207,7 +214,7 @@ export default function StreaksScreen() {
 
   if (isLoading && !streak) {
     return (
-      <Screen>
+      <Screen maxWidth={contentMaxWidth}>
         <ScreenHeader title="Photo Streak" />
         <View style={styles.center}>
           <Spinner size="large" />
@@ -219,7 +226,7 @@ export default function StreaksScreen() {
   const flameActive = !!streak && streak.currentStreak > 0;
 
   return (
-    <Screen scroll padded={false}>
+    <Screen scroll padded={false} maxWidth={contentMaxWidth}>
       <View style={styles.headerWrap}>
         <ScreenHeader title="Photo Streak" />
       </View>
@@ -369,27 +376,31 @@ export default function StreaksScreen() {
           )}
         </Card>
 
-        {/* Stats grid */}
+        {/* Stats grid — 2-up on phones/tablets, 4-up on wide screens. */}
         <View style={styles.statsGrid}>
           <StatCell
+            wide={isWide}
             icon={(c) => <TrendingUp color={c} size={20} />}
             iconColor={colors.primary}
             value={streak?.longestStreak ?? 0}
             label="Longest Streak"
           />
           <StatCell
+            wide={isWide}
             icon={(c) => <Camera color={c} size={20} />}
             iconColor={colors.secondary}
             value={streak?.totalPhotos ?? 0}
             label="Total Photos"
           />
           <StatCell
+            wide={isWide}
             icon={(c) => <Star color={c} size={20} />}
             iconColor={colors.accent}
             value={streak?.totalPoints ?? 0}
             label="Total Points"
           />
           <StatCell
+            wide={isWide}
             icon={(c) => <Snowflake color={c} size={20} />}
             iconColor={colors.info}
             value={streak?.freezesAvailable ?? 0}
@@ -590,6 +601,7 @@ const styles = StyleSheet.create({
   actionBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statCard: { flexGrow: 1, flexBasis: '46%' },
+  statCardWide: { flexBasis: '22%' },
   statInner: { alignItems: 'center', gap: 4, paddingVertical: 6 },
   statValue: { fontSize: 24, fontWeight: '800' },
   statLabel: { letterSpacing: 1, textTransform: 'uppercase', fontSize: 11 },

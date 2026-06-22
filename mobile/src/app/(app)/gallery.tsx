@@ -33,12 +33,15 @@ import {
 } from '@/components/media';
 import { useAuthStore } from '@/stores/auth-store';
 import { useMediaStore } from '@/stores/media-store';
-
-const GRID_COLUMNS = 3;
-const ALBUM_COLUMNS = 2;
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function GalleryScreen() {
   const { colors, radius } = useTheme();
+  const { gridColumns, isTablet } = useResponsive();
+  // Photo grid: 3 on phones → up to 5 on wide screens.
+  const GRID_COLUMNS = gridColumns;
+  // Albums: 2 on phones → up to 4 on wide tablets.
+  const ALBUM_COLUMNS = isTablet ? Math.max(2, gridColumns - 1) : 2;
   const couple = useAuthStore((s) => s.couple);
   const coupleId = couple?.id;
 
@@ -261,7 +264,7 @@ export default function GalleryScreen() {
           <View style={styles.body}>
             {Header}
             <View style={styles.skeletonGrid}>
-              {Array.from({ length: 9 }).map((_, i) => (
+              {Array.from({ length: GRID_COLUMNS * 3 }).map((_, i) => (
                 <Skeleton key={i} width={cellSize} height={cellSize} radius={radius.card} />
               ))}
             </View>

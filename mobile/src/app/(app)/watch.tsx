@@ -18,6 +18,7 @@ import {
   Row,
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
+import { useResponsive } from '@/hooks/use-responsive';
 import {
   WatchPlayer,
   type WatchPlayerHandle,
@@ -61,6 +62,12 @@ function toMedia(
 
 export default function WatchScreen() {
   const { colors, radius } = useTheme();
+  const { isWide, isLandscape, contentMaxWidth } = useResponsive();
+  // On a wide landscape tablet the player + live chat sit side-by-side.
+  const sideBySide = isWide && isLandscape;
+  const centered = contentMaxWidth
+    ? { maxWidth: sideBySide ? 1100 : contentMaxWidth, width: '100%' as const, alignSelf: 'center' as const }
+    : null;
   const couple = useAuthStore((s) => s.couple);
   const user = useAuthStore((s) => s.user);
   const pushToast = useToastStore((s) => s.push);
@@ -306,14 +313,14 @@ export default function WatchScreen() {
 
   return (
     <Screen scroll edges={['top']} padded={false}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={[{ paddingHorizontal: 16 }, centered]}>
         <ScreenHeader
           title="Watch Party"
           subtitle="Watch YouTube or a direct video link in sync"
         />
       </View>
 
-      <View style={{ padding: 16, gap: 16 }}>
+      <View style={[{ padding: 16, gap: 16 }, centered]}>
         {/* Start / control bar */}
         <View style={{ gap: 8 }}>
           <Input
@@ -344,6 +351,15 @@ export default function WatchScreen() {
           </Row>
         </View>
 
+        {/* Player + chat — side-by-side on wide landscape, stacked otherwise */}
+        <View
+          style={
+            sideBySide
+              ? { flexDirection: 'row', gap: 16, alignItems: 'flex-start' }
+              : { gap: 16 }
+          }
+        >
+          <View style={sideBySide ? { flex: 1.6, gap: 16 } : { gap: 16 }}>
         {/* Player */}
         <View style={{ position: 'relative' }}>
           <WatchPlayer
@@ -408,15 +424,23 @@ export default function WatchScreen() {
         {party?.title ? (
           <AppText variant="subtitle">{party.title}</AppText>
         ) : null}
+          </View>
 
-        {/* Chat side panel */}
-        <View style={{ height: 460 }}>
-          <ChatPanel
-            messages={messages}
-            onSend={sendChat}
-            onReact={sendReaction}
-            disabled={!hasParty}
-          />
+          {/* Chat side panel */}
+          <View
+            style={
+              sideBySide
+                ? { flex: 1, height: 520, minWidth: 280 }
+                : { height: 460 }
+            }
+          >
+            <ChatPanel
+              messages={messages}
+              onSend={sendChat}
+              onReact={sendReaction}
+              disabled={!hasParty}
+            />
+          </View>
         </View>
 
         {/* History */}

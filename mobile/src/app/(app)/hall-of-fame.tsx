@@ -29,6 +29,7 @@ import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
+import { useResponsive } from '@/hooks/use-responsive';
 import api from '@/lib/api';
 
 type Tab = 'achievements' | 'highlights';
@@ -40,6 +41,7 @@ const TABS: { value: Tab; label: string; icon: LucideIcon }[] = [
 
 export default function HallOfFameScreen() {
   const { colors } = useTheme();
+  const { isTablet } = useResponsive();
   const couple = useAuthStore((s) => s.couple);
   const [activeTab, setActiveTab] = useState<Tab>('achievements');
 
@@ -70,7 +72,11 @@ export default function HallOfFameScreen() {
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-        <AppText variant="display" weight="bold">
+        <AppText
+          variant="display"
+          weight="bold"
+          style={isTablet ? { fontSize: 34 } : undefined}
+        >
           Hall of Fame
         </AppText>
         <AppText muted style={{ marginTop: 2 }}>
@@ -153,9 +159,21 @@ const ACH_CATEGORIES = [
 
 /* ─── Achievements tab ────────────────────────────────────────────────────── */
 
+const ACH_GRID_GAP = 12;
+const CONTENT_PADDING = 16;
+
 function AchievementsTab() {
   const { colors, radius } = useTheme();
   const push = useToastStore((s) => s.push);
+  const { width, isTablet, isWide, contentMaxWidth } = useResponsive();
+
+  // Achievement cards: 1 col phone → 2 on small tablets → 3-4 on wide.
+  const columns = isWide ? (width >= 1100 ? 4 : 3) : isTablet ? 2 : 1;
+  const innerWidth = Math.min(width, contentMaxWidth ?? width) - CONTENT_PADDING * 2;
+  const cardWidth =
+    columns > 1
+      ? Math.floor((innerWidth - ACH_GRID_GAP * (columns - 1)) / columns)
+      : undefined;
 
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [stats, setStats] = useState<AchievementStats>({
@@ -257,7 +275,14 @@ function AchievementsTab() {
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+      contentContainerStyle={{
+        padding: 16,
+        paddingBottom: 40,
+        gap: 16,
+        width: '100%',
+        maxWidth: contentMaxWidth ? contentMaxWidth + CONTENT_PADDING * 2 : undefined,
+        alignSelf: 'center',
+      }}
       showsVerticalScrollIndicator={false}
     >
       {/* Stats header */}
@@ -332,16 +357,26 @@ function AchievementsTab() {
           </AppText>
         </View>
       ) : (
-        <View style={{ gap: 12 }}>
+        <View
+          style={{
+            flexDirection: columns > 1 ? 'row' : 'column',
+            flexWrap: columns > 1 ? 'wrap' : 'nowrap',
+            gap: ACH_GRID_GAP,
+          }}
+        >
           {filtered.map((achievement, i) => (
-            <AchievementCard
+            <View
               key={achievement.id}
-              index={i}
-              achievement={achievement}
-              onToggleShowcase={handleToggleShowcase}
-              colors={colors}
-              radius={radius}
-            />
+              style={cardWidth ? { width: cardWidth } : undefined}
+            >
+              <AchievementCard
+                index={i}
+                achievement={achievement}
+                onToggleShowcase={handleToggleShowcase}
+                colors={colors}
+                radius={radius}
+              />
+            </View>
           ))}
         </View>
       )}
@@ -618,6 +653,7 @@ function highlightColor(
 
 function HighlightsTab() {
   const { colors } = useTheme();
+  const { contentMaxWidth } = useResponsive();
   const couple = useAuthStore((s) => s.couple);
   const user = useAuthStore((s) => s.user);
   const coupleId = couple?.id;
@@ -663,7 +699,14 @@ function HighlightsTab() {
 
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+      contentContainerStyle={{
+        padding: 16,
+        paddingBottom: 40,
+        gap: 16,
+        width: '100%',
+        maxWidth: contentMaxWidth ? contentMaxWidth + 32 : undefined,
+        alignSelf: 'center',
+      }}
       showsVerticalScrollIndicator={false}
     >
       {/* Category filter */}

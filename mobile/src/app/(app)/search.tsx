@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable, Image } from 'react-native';
+import {
+  View,
+  ScrollView,
+  TextInput,
+  Pressable,
+  Image,
+  type DimensionValue,
+} from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import {
@@ -24,6 +31,7 @@ import {
 import { ScreenHeader } from '@/components/top-bar';
 import { LinkupMark } from '@/components/brand-mark';
 import { useTheme } from '@/theme';
+import { useResponsive } from '@/hooks/use-responsive';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/env';
 
@@ -107,6 +115,7 @@ function formatDate(value: string) {
 
 export default function SearchScreen() {
   const { colors, radius } = useTheme();
+  const { contentMaxWidth, gridColumns } = useResponsive();
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -186,7 +195,7 @@ export default function SearchScreen() {
   const showEmptyPrompt = !debouncedQuery && !isLoading;
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} maxWidth={contentMaxWidth}>
       <View style={{ paddingHorizontal: 16 }}>
         <ScreenHeader title="Search" subtitle="Find anything across your shared world" />
       </View>
@@ -290,7 +299,9 @@ export default function SearchScreen() {
         )}
 
         {/* Results */}
-        {showResults && <SearchResultsView results={results} />}
+        {showResults && (
+          <SearchResultsView results={results} mediaColumns={gridColumns} />
+        )}
 
         {/* No results */}
         {showNoResults && (
@@ -405,8 +416,17 @@ function ResultRow({
   );
 }
 
-function SearchResultsView({ results }: { results: SearchResults }) {
+function SearchResultsView({
+  results,
+  mediaColumns,
+}: {
+  results: SearchResults;
+  mediaColumns: number;
+}) {
   const { colors, radius } = useTheme();
+  // Media tiles follow the shared grid; emojis pack a couple more per row.
+  const mediaWidth = `${100 / mediaColumns - 2}%` as DimensionValue;
+  const emojiWidth = `${100 / (mediaColumns + 1) - 2}%` as DimensionValue;
 
   return (
     <View style={{ gap: 28 }}>
@@ -449,7 +469,7 @@ function SearchResultsView({ results }: { results: SearchResults }) {
               <Touchable
                 key={item.id}
                 onPress={() => router.push('/gallery')}
-                style={{ width: '31%' }}
+                style={{ width: mediaWidth }}
               >
                 <View
                   style={{
@@ -520,7 +540,7 @@ function SearchResultsView({ results }: { results: SearchResults }) {
               <Touchable
                 key={e.id}
                 onPress={() => router.push('/emojis')}
-                style={{ width: '22%' }}
+                style={{ width: emojiWidth }}
               >
                 <Card padded={false} style={{ padding: 8, alignItems: 'center', gap: 6 }}>
                   <Image
