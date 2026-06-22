@@ -1,6 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -79,22 +78,6 @@ const STARS = buildStars(58, 0x5eed1e);
 const V_LINES = [16, 33, 50, 67, 84];
 const H_LINES = [22, 44, 66, 88];
 
-interface Shooter {
-  top: number;
-  left: number;
-  rot: number;
-  dur: number;
-  delay: number;
-  w: number;
-}
-
-/** Shooting-star configs ported from the web (top/left as viewport fractions). */
-const SHOOTERS: Shooter[] = [
-  { top: 0.12, left: 0.08, rot: 24, dur: 11000, delay: 3000, w: 160 },
-  { top: 0.06, left: 0.54, rot: 32, dur: 14000, delay: 8000, w: 120 },
-  { top: 0.3, left: 0.7, rot: 18, dur: 17000, delay: 13000, w: 180 },
-];
-
 const AnimatedView = Animated.View;
 
 function TwinkleStar({ star, w, h }: { star: Star; w: number; h: number }) {
@@ -134,59 +117,6 @@ function TwinkleStar({ star, w, h }: { star: Star; w: number; h: number }) {
   );
 }
 
-function ShootingStar({ config }: { config: Shooter }) {
-  const t = useSharedValue(0);
-
-  useEffect(() => {
-    t.value = withDelay(
-      config.delay,
-      withRepeat(
-        withTiming(1, { duration: config.dur, easing: Easing.linear }),
-        -1,
-        false,
-      ),
-    );
-  }, [t, config.delay, config.dur]);
-
-  const animStyle = useAnimatedStyle(() => {
-    const x = -40 + t.value * 560;
-    // Fade in over the first 20%, hold, then fade out past 80% — peak 0.9.
-    const opacity =
-      t.value < 0.2
-        ? (t.value / 0.2) * 0.9
-        : t.value > 0.8
-          ? ((1 - t.value) / 0.2) * 0.9
-          : 0.9;
-    return {
-      opacity,
-      transform: [{ translateX: x }, { rotate: `${config.rot}deg` }],
-    };
-  });
-
-  return (
-    <AnimatedView
-      pointerEvents="none"
-      style={[
-        {
-          position: 'absolute',
-          top: config.top,
-          left: config.left,
-          width: config.w,
-          height: 1,
-        },
-        animStyle,
-      ]}
-    >
-      <LinearGradient
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        colors={['transparent', 'rgba(232,228,220,0.8)']}
-        style={{ flex: 1, height: 1 }}
-      />
-    </AnimatedView>
-  );
-}
-
 export function ConstellationSky() {
   const { width: w, height: h } = useWindowDimensions();
 
@@ -207,16 +137,6 @@ export function ConstellationSky() {
       { translateY: drift.value * -8 },
     ],
   }));
-
-  const shooters = useMemo(
-    () =>
-      SHOOTERS.map((s) => ({
-        ...s,
-        top: s.top * h,
-        left: s.left * w,
-      })),
-    [w, h],
-  );
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.root]} pointerEvents="none">
@@ -337,11 +257,6 @@ export function ConstellationSky() {
           ),
         )}
       </AnimatedView>
-
-      {/* Shooting stars — sporadic, faint streaks that occasionally cross. */}
-      {shooters.map((s, i) => (
-        <ShootingStar key={i} config={s} />
-      ))}
     </View>
   );
 }

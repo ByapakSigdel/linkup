@@ -158,9 +158,6 @@ function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => v
               </Animated.Text>
               <ArrowRight size={17} color={C.textOnPrimary} />
             </Pressable>
-            <Pressable onPress={onLogin} hitSlop={8} style={{ borderBottomWidth: 1, borderBottomColor: C.borderStrong, paddingBottom: 2 }}>
-              <Animated.Text style={{ fontFamily: F.body, fontSize: 15, color: C.text }}>I already have one</Animated.Text>
-            </Pressable>
           </Animated.View>
         </View>
 
