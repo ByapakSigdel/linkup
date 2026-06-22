@@ -91,15 +91,16 @@ interface Shooter {
   delay: number;
 }
 
-/** A handful of occasional meteors, staggered so the sky is rarely busy. */
+/** Staggered meteors (like the web): one streaks across every few seconds. */
 const SHOOTERS: Shooter[] = [
-  { topPct: 0.1, leftPct: 0.06, rot: 24, travel: 300, len: 120, period: 9000, delay: 1200 },
-  { topPct: 0.05, leftPct: 0.52, rot: 30, travel: 250, len: 96, period: 13000, delay: 6000 },
-  { topPct: 0.24, leftPct: 0.6, rot: 17, travel: 340, len: 140, period: 17000, delay: 11000 },
+  { topPct: 0.08, leftPct: 0.04, rot: 24, travel: 360, len: 150, period: 6500, delay: 700 },
+  { topPct: 0.04, leftPct: 0.5, rot: 31, travel: 300, len: 120, period: 8500, delay: 3200 },
+  { topPct: 0.22, leftPct: 0.58, rot: 16, travel: 400, len: 160, period: 11000, delay: 6000 },
+  { topPct: 0.14, leftPct: 0.26, rot: 27, travel: 330, len: 130, period: 9500, delay: 9000 },
 ];
 
 /** Fraction of each cycle the meteor is visible (the rest is a quiet pause). */
-const VIS = 0.1;
+const VIS = 0.22;
 
 /**
  * A delicate meteor: a tapered streak with a bright head that shoots ALONG its
@@ -119,10 +120,11 @@ function ShootingStar({ s, w, h }: { s: Shooter; w: number; h: number }) {
   const animStyle = useAnimatedStyle(() => {
     const inWindow = p.value <= VIS;
     const q = inWindow ? p.value / VIS : 0; // 0..1 across the visible streak
-    const tx = q * s.travel;
+    const tx = -40 + q * s.travel; // start just off its origin, like the web
     let opacity = 0;
     if (inWindow) {
-      opacity = (q < 0.25 ? q / 0.25 : q > 0.7 ? (1 - q) / 0.3 : 1) * 0.9;
+      // Fade in fast (first 35%), then trail off — matches the web's lkShoot.
+      opacity = (q < 0.35 ? q / 0.35 : (1 - q) / 0.65) * 0.95;
     }
     return {
       opacity,
@@ -138,22 +140,41 @@ function ShootingStar({ s, w, h }: { s: Shooter; w: number; h: number }) {
         animStyle,
       ]}
     >
+      {/* soft glow underlay (approximates the web's drop-shadow) */}
       <LinearGradient
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        colors={['rgba(232,228,220,0)', 'rgba(232,228,220,0.85)']}
+        colors={['rgba(232,228,220,0)', 'rgba(232,228,220,0.22)']}
+        style={{ position: 'absolute', left: 0, right: 0, top: -2, height: 6, borderRadius: 3 }}
+      />
+      {/* the streak: transparent tail -> bright head */}
+      <LinearGradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        colors={['rgba(232,228,220,0)', 'rgba(232,228,220,0.95)']}
         style={{ flex: 1, borderRadius: 1 }}
       />
-      {/* bright leading head */}
+      {/* glowing head */}
       <View
         style={{
           position: 'absolute',
-          right: -1.5,
+          right: -5,
+          top: -4,
+          width: 10,
+          height: 10,
+          borderRadius: 5,
+          backgroundColor: 'rgba(232,228,220,0.28)',
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          right: -2,
           top: -1,
           width: 4,
           height: 4,
           borderRadius: 2,
-          backgroundColor: '#f3efe6',
+          backgroundColor: '#f6f2ea',
         }}
       />
     </AnimatedView>
