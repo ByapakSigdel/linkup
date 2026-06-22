@@ -6,12 +6,14 @@ import { ArrowLeft, Mail } from 'lucide-react-native';
 import { AuthBanner, AuthShell } from '@/components/auth-shell';
 import { AppText, Button, Input } from '@/components/ui';
 import api, { apiErrorMessage } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { useTheme } from '@/theme';
 
 const RESEND_COOLDOWN = 60; // seconds
 
 export default function VerifyScreen() {
   const { colors } = useTheme();
+  const email = useAuthStore((s) => s.user?.email);
 
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -32,7 +34,7 @@ export default function VerifyScreen() {
     setError('');
     setSuccess('');
     try {
-      await api.post('/auth/verify/resend');
+      await api.post('/auth/verify/resend', { email });
       setSuccess('A new verification code has been sent to your email.');
       setCooldown(RESEND_COOLDOWN);
     } catch (err) {
@@ -52,9 +54,14 @@ export default function VerifyScreen() {
       return;
     }
 
+    if (!email) {
+      setError('Your session expired. Please log in or sign up again.');
+      return;
+    }
+
     setIsVerifying(true);
     try {
-      await api.post('/auth/verify', { code: trimmed });
+      await api.post('/auth/verify', { email, code: trimmed });
       router.replace('/dashboard');
     } catch (err) {
       setError(apiErrorMessage(err, 'Invalid or expired code. Please try again.'));

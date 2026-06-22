@@ -264,13 +264,15 @@ function AuthPanel({
       if (mode === 'login') {
         if (!email || !password) return setError('Enter your email and password.');
         await login(email.trim(), password);
+        router.replace('/dashboard');
       } else {
         if (!email || !username || !displayName || !password) return setError('Please fill in every field.');
         if (password !== confirm) return setError('Passwords do not match.');
         if (!agree) return setError('Please agree to the Terms to continue.');
         await register({ email: email.trim(), username: username.trim(), displayName: displayName.trim(), password });
+        // Finish sign-up by entering the OTP we just emailed.
+        router.replace('/verify');
       }
-      router.replace('/dashboard');
     } catch (e) {
       setError(apiErrorMessage(e, mode === 'login' ? 'Invalid email or password.' : 'Could not create your account.'));
     }

@@ -8,12 +8,14 @@ import { Button, Input } from '@/components/ui';
 import { AuthFormWrapper } from '@/components/layout/auth-form-wrapper';
 import { cn } from '@/lib/cn';
 import api from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 import type { AxiosError } from 'axios';
 
 const RESEND_COOLDOWN = 60; // seconds
 
 export default function VerifyPage() {
   const router = useRouter();
+  const email = useAuthStore((s) => s.user?.email);
 
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -40,7 +42,7 @@ export default function VerifyPage() {
     setSuccess('');
 
     try {
-      await api.post('/auth/verify/resend');
+      await api.post('/auth/verify/resend', { email });
       setSuccess('A new verification code has been sent to your email.');
       setCooldown(RESEND_COOLDOWN);
     } catch (err) {
@@ -65,10 +67,15 @@ export default function VerifyPage() {
       return;
     }
 
+    if (!email) {
+      setError('Your session expired. Please log in or sign up again.');
+      return;
+    }
+
     setIsVerifying(true);
 
     try {
-      await api.post('/auth/verify', { code: trimmed });
+      await api.post('/auth/verify', { email, code: trimmed });
       router.push('/chat');
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>;

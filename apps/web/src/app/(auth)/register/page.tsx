@@ -119,7 +119,8 @@ export default function RegisterPage() {
         displayName: result.data!.displayName,
         password: result.data!.password,
       });
-      router.push('/chat');
+      // Finish account creation by entering the OTP we just emailed.
+      router.push('/verify');
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>;
       const message =
