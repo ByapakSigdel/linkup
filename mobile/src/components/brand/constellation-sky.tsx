@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -79,6 +80,85 @@ const V_LINES = [16, 33, 50, 67, 84];
 const H_LINES = [22, 44, 66, 88];
 
 const AnimatedView = Animated.View;
+
+interface Shooter {
+  topPct: number;
+  leftPct: number;
+  rot: number; // degrees; the streak travels along this diagonal
+  travel: number; // px traveled along its own axis
+  len: number; // streak length
+  period: number; // full cycle ms (mostly idle — streaks are occasional)
+  delay: number;
+}
+
+/** A handful of occasional meteors, staggered so the sky is rarely busy. */
+const SHOOTERS: Shooter[] = [
+  { topPct: 0.1, leftPct: 0.06, rot: 24, travel: 300, len: 120, period: 9000, delay: 1200 },
+  { topPct: 0.05, leftPct: 0.52, rot: 30, travel: 250, len: 96, period: 13000, delay: 6000 },
+  { topPct: 0.24, leftPct: 0.6, rot: 17, travel: 340, len: 140, period: 17000, delay: 11000 },
+];
+
+/** Fraction of each cycle the meteor is visible (the rest is a quiet pause). */
+const VIS = 0.1;
+
+/**
+ * A delicate meteor: a tapered streak with a bright head that shoots ALONG its
+ * own diagonal (rotate is applied before translateX so it moves the way it
+ * points), fades in and out quickly, then waits out a long idle pause.
+ */
+function ShootingStar({ s, w, h }: { s: Shooter; w: number; h: number }) {
+  const p = useSharedValue(0);
+
+  useEffect(() => {
+    p.value = withDelay(
+      s.delay,
+      withRepeat(withTiming(1, { duration: s.period, easing: Easing.linear }), -1, false),
+    );
+  }, [p, s.delay, s.period]);
+
+  const animStyle = useAnimatedStyle(() => {
+    const inWindow = p.value <= VIS;
+    const q = inWindow ? p.value / VIS : 0; // 0..1 across the visible streak
+    const tx = q * s.travel;
+    let opacity = 0;
+    if (inWindow) {
+      opacity = (q < 0.25 ? q / 0.25 : q > 0.7 ? (1 - q) / 0.3 : 1) * 0.9;
+    }
+    return {
+      opacity,
+      transform: [{ rotate: `${s.rot}deg` }, { translateX: tx }],
+    };
+  });
+
+  return (
+    <AnimatedView
+      pointerEvents="none"
+      style={[
+        { position: 'absolute', top: s.topPct * h, left: s.leftPct * w, width: s.len, height: 2 },
+        animStyle,
+      ]}
+    >
+      <LinearGradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        colors={['rgba(232,228,220,0)', 'rgba(232,228,220,0.85)']}
+        style={{ flex: 1, borderRadius: 1 }}
+      />
+      {/* bright leading head */}
+      <View
+        style={{
+          position: 'absolute',
+          right: -1.5,
+          top: -1,
+          width: 4,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: '#f3efe6',
+        }}
+      />
+    </AnimatedView>
+  );
+}
 
 function TwinkleStar({ star, w, h }: { star: Star; w: number; h: number }) {
   const op = useSharedValue(star.o);
@@ -257,6 +337,11 @@ export function ConstellationSky() {
           ),
         )}
       </AnimatedView>
+
+      {/* Shooting stars — occasional meteors that shoot along their diagonal. */}
+      {SHOOTERS.map((s, i) => (
+        <ShootingStar key={i} s={s} w={w} h={h} />
+      ))}
     </View>
   );
 }
