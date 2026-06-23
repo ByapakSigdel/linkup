@@ -30,6 +30,8 @@ import { LinkupMark, LinkupWordmark } from '@/components/brand/logo';
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /** Called when a nav link is tapped — used to close the mobile drawer. */
+  onNavigate?: () => void;
 }
 
 const navSections = [
@@ -69,7 +71,7 @@ const navSections = [
   },
 ] as const;
 
-export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
@@ -129,6 +131,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={onNavigate}
                     title={collapsed ? item.label : undefined}
                     className={cn(
                       'group relative flex items-center gap-3 rounded-[var(--lk-btn-radius)] px-3 py-2.5 text-sm transition-all',
@@ -190,6 +193,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       <div className="border-t border-border p-3">
         <Link
           href="/profile"
+          onClick={onNavigate}
           className={cn(
             'flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-surface-hover',
             collapsed && 'justify-center px-0',

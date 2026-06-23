@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TopBar } from '@/components/layout/top-bar';
-import { MobileNav } from '@/components/layout/mobile-nav';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
 import { Spinner } from '@/components/ui';
 
@@ -18,12 +17,19 @@ export default function DashboardLayout({
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const hydrate = useAuthStore((s) => s.hydrate);
+  const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   // Refresh user + couple on each dashboard mount so pairing/profile changes
   // made elsewhere (or by the partner) are reflected.
@@ -67,17 +73,32 @@ export default function DashboardLayout({
           />
         </div>
 
+        {/* Mobile drawer — the SAME sidebar, opened by the hamburger */}
+        {mobileNavOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm lk-anim-fade"
+              onClick={() => setMobileNavOpen(false)}
+              aria-hidden
+            />
+            <div className="absolute inset-y-0 left-0 shadow-2xl">
+              <Sidebar
+                collapsed={false}
+                onToggleCollapse={() => {}}
+                onNavigate={() => setMobileNavOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Main content area */}
         <div className="flex flex-1 flex-col min-w-0">
-          <TopBar onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)} />
+          <TopBar onToggleSidebar={() => setMobileNavOpen(true)} />
 
-          <main className="flex-1 overflow-y-auto p-4 pb-20 lg:p-6 lg:pb-6">
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6">
             {children}
           </main>
         </div>
-
-        {/* Mobile bottom nav */}
-        <MobileNav />
       </div>
     </RealtimeProvider>
   );
