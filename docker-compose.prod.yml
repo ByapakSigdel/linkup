@@ -80,6 +80,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./deploy/router.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./releases:/srv/downloads:ro
       - router_data:/data
       - router_config:/config
     depends_on:

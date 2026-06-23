@@ -45,6 +45,15 @@ export const GOOGLE_WEB_CLIENT_ID =
   '522265029111-9n0a26dkeovi6fh3e9l4q2745pe14a4b.apps.googleusercontent.com';
 
 /**
+ * In-app updates. APP_BUILD is this binary's build number — bump it on every
+ * release. The app fetches UPDATE_MANIFEST_URL (a JSON with { build, version,
+ * url, notes }) and, if the server's build is higher, offers to download the new
+ * APK. Lets sideloaded users update from within the app instead of re-installing.
+ */
+export const APP_BUILD = 1;
+export const UPDATE_MANIFEST_URL = `${API_ORIGIN}/downloads/latest.json`;
+
+/**
  * Resolve a possibly-relative media path returned by the API into an absolute
  * URL the device can load. The API returns paths like `/media/files/abc.png`.
  */

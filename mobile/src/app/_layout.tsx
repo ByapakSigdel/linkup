@@ -12,6 +12,7 @@ import { RealtimeProvider } from '@/components/realtime-provider';
 import { Loading } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { connectSocket } from '@/lib/socket';
+import { checkForUpdate } from '@/lib/updates';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +35,8 @@ function RootShell() {
       connectSocket(tokens.accessToken);
       void useAuthStore.getState().hydrate();
     }
+    // Offer an in-app update if the server has a newer APK (silent on launch).
+    void checkForUpdate({ silent: true });
   }, [ready]);
 
   if (!ready) {

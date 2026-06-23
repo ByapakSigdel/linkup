@@ -14,6 +14,13 @@
 		reverse_proxy api:4000
 	}
 
+	# In-app updates: serves the APK + latest.json from the releases volume.
+	#   /downloads/latest.json , /downloads/LinkUp.apk
+	handle_path /downloads/* {
+		root * /srv/downloads
+		file_server
+	}
+
 	handle {
 		reverse_proxy web:3000
 	}
