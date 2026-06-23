@@ -117,17 +117,24 @@ export class AuthService {
       .where(eq(schema.users.email, email))
       .limit(1);
 
-    if (existingUser.length > 0) {
+    // An email that's already registered AND verified is a real duplicate.
+    // But an *unverified* row is just an abandoned signup (OTP was sent but never
+    // entered) — re-registering should resume it (refresh the details + send a
+    // fresh code) rather than dead-end the user with "Email already registered".
+    const existing = existingUser[0];
+    if (existing && existing.isVerified) {
       throw new ConflictException('Email already registered');
     }
 
+    // The chosen username must be free — unless it's already held by this same
+    // unverified row we're about to resume.
     const existingUsername = await this.db
-      .select()
+      .select({ id: schema.users.id })
       .from(schema.users)
       .where(eq(schema.users.username, username))
       .limit(1);
 
-    if (existingUsername.length > 0) {
+    if (existingUsername.length > 0 && existingUsername[0]!.id !== existing?.id) {
       throw new ConflictException('Username already taken');
     }
 
@@ -135,23 +142,43 @@ export class AuthService {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Create user
-    const result = await this.db
-      .insert(schema.users)
-      .values({
-        email,
-        username,
-        displayName,
-        passwordHash,
-      })
-      .returning({
-        id: schema.users.id,
-        email: schema.users.email,
-        username: schema.users.username,
-        displayName: schema.users.displayName,
-      });
+    let user:
+      | { id: string; email: string; username: string; displayName: string }
+      | undefined;
 
-    const user = result[0];
+    if (existing) {
+      // Resume the abandoned signup: overwrite with the latest details so the user
+      // isn't stuck on a stale password/username from the half-finished attempt.
+      const updated = await this.db
+        .update(schema.users)
+        .set({ username, displayName, passwordHash, updatedAt: new Date() })
+        .where(eq(schema.users.id, existing.id))
+        .returning({
+          id: schema.users.id,
+          email: schema.users.email,
+          username: schema.users.username,
+          displayName: schema.users.displayName,
+        });
+      user = updated[0];
+    } else {
+      // Create user
+      const result = await this.db
+        .insert(schema.users)
+        .values({
+          email,
+          username,
+          displayName,
+          passwordHash,
+        })
+        .returning({
+          id: schema.users.id,
+          email: schema.users.email,
+          username: schema.users.username,
+          displayName: schema.users.displayName,
+        });
+      user = result[0];
+    }
+
     if (!user) {
       throw new Error('Failed to create user');
     }
