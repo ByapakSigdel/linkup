@@ -131,14 +131,21 @@ export default function ProfilePage() {
     try {
       const form = new FormData();
       form.append('file', file);
-      // Must override the client's default application/json so axios sets the
-      // multipart boundary — otherwise the backend can't parse the file.
-      await api.post('/users/me/avatar', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // Let axios set the multipart boundary itself for FormData (it strips the
+      // client's default application/json), so the backend can parse the file.
+      await api.post('/users/me/avatar', form);
       await fetchProfile();
-    } catch {
-      alert('Could not update your photo. Please try again.');
+    } catch (err) {
+      // Surface the real cause so failures are diagnosable instead of generic.
+      const e = err as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
+      const status = e?.response?.status;
+      const detail =
+        e?.response?.data?.message || e?.message || 'Unknown error';
+      console.error('Avatar upload failed:', status, e?.response?.data || err);
+      alert(`Could not update your photo (${status ?? 'network/CORS'}): ${detail}`);
     } finally {
       setUploadingAvatar(false);
     }
