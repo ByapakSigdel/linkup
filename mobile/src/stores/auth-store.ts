@@ -24,6 +24,9 @@ interface AuthState {
     dateOfBirth?: string;
   }) => Promise<{ verificationCode?: string }>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  createCouple: () => Promise<Couple>;
+  joinCouple: (pairingCode: string) => Promise<void>;
+  refreshCouple: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -98,6 +101,35 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           set({ isLoading: false });
           throw error;
+        }
+      },
+
+      createCouple: async () => {
+        const { data: body } = await api.post('/couples');
+        const couple = body.data.couple as Couple;
+        const u = get().user;
+        set({ couple, user: u ? { ...u, coupleId: couple.id } : u });
+        return couple;
+      },
+
+      joinCouple: async (pairingCode) => {
+        const { data: body } = await api.post('/couples/join', { pairingCode });
+        set({ couple: body.data.couple });
+        await get().hydrate();
+      },
+
+      /** Re-fetch the couple (e.g. polling for the partner to accept the code). */
+      refreshCouple: async () => {
+        const c = get().couple;
+        if (!c?.id) {
+          await get().hydrate();
+          return;
+        }
+        try {
+          const { data: body } = await api.get(`/couples/${c.id}`);
+          if (body?.data?.couple) set({ couple: body.data.couple });
+        } catch {
+          // keep current couple
         }
       },
 

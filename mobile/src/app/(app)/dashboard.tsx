@@ -473,7 +473,7 @@ function NotPaired({ displayName }: { displayName?: string }) {
       </AppText>
       <Button
         variant="primary"
-        onPress={() => router.push('/settings')}
+        onPress={() => router.push('/pair')}
         label="Link up with your partner"
         style={{ marginTop: 8 }}
       />
