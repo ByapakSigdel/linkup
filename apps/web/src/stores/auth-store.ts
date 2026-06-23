@@ -21,6 +21,7 @@ interface AuthState {
     password: string;
     dateOfBirth?: string;
   }) => Promise<{ verificationCode?: string }>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -76,6 +77,24 @@ export const useAuthStore = create<AuthState>()(
           });
           await get().hydrate();
           return { verificationCode: d.verificationCode };
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      loginWithGoogle: async (credential) => {
+        set({ isLoading: true });
+        try {
+          const { data: body } = await api.post('/auth/google', { credential });
+          const d = body.data;
+          set({
+            user: d.user,
+            tokens: { accessToken: d.accessToken, refreshToken: d.refreshToken, expiresIn: d.expiresIn ?? 900 },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          await get().hydrate();
         } catch (error) {
           set({ isLoading: false });
           throw error;

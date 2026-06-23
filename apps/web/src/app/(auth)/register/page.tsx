@@ -8,6 +8,7 @@ import { registerSchema } from '@linkup/validation';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button, Input } from '@/components/ui';
 import { AuthFormWrapper } from '@/components/layout/auth-form-wrapper';
+import { GoogleSignInButton } from '@/components/auth/google-sign-in-button';
 import { cn } from '@/lib/cn';
 import type { AxiosError } from 'axios';
 
@@ -136,6 +137,10 @@ export default function RegisterPage() {
       title="Find your other star"
       description="Create your account, then link up with the one you orbit."
     >
+      <div className="mb-5">
+        <GoogleSignInButton redirectTo="/chat" />
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         {apiError && (
           <div

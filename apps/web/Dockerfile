@@ -15,8 +15,10 @@ RUN pnpm install --frozen-lockfile --filter "@linkup/web..."
 # Public origin the browser uses to reach the API + socket (same domain).
 ARG NEXT_PUBLIC_API_URL=https://linkup.mahansigdel.com.np/api/v1
 ARG NEXT_PUBLIC_WS_URL=https://linkup.mahansigdel.com.np
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL \
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID \
     NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_OPTIONS=--max-old-space-size=1536
