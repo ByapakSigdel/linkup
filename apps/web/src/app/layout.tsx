@@ -95,9 +95,8 @@ export const metadata: Metadata = {
   title: 'linkup — your constellation of two',
   description:
     'A private space for couples to connect, share, and grow together. Made for the hours between midnight and dawn.',
-  icons: {
-    icon: '/favicon.ico',
-  },
+  // Favicon + Apple icon come from app/icon.png and app/apple-icon.png
+  // (Next.js file convention) — the LinkUp constellation mark.
 };
 
 export default function RootLayout({
