@@ -31,7 +31,8 @@
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
       ],
-      "package": "com.linkup.app"
+      "package": "com.linkup.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -57,7 +58,14 @@
       "expo-video",
       "expo-audio",
       "@config-plugins/react-native-webrtc",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#070a11"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

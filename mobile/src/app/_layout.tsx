@@ -13,6 +13,7 @@ import { Loading } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { connectSocket } from '@/lib/socket';
 import { checkForUpdate } from '@/lib/updates';
+import { registerForPushNotifications } from '@/lib/push';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +35,9 @@ function RootShell() {
     if (isAuthenticated && tokens?.accessToken) {
       connectSocket(tokens.accessToken);
       void useAuthStore.getState().hydrate();
+      // Register this device for push so the partner's messages notify even
+      // when the app is closed.
+      void registerForPushNotifications();
     }
     // Offer an in-app update if the server has a newer APK (silent on launch).
     void checkForUpdate({ silent: true });
