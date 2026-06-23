@@ -37,6 +37,7 @@ export const users = pgTable('users', {
   lastSeenAt: timestamp('last_seen_at'),
   isVerified: boolean('is_verified').default(false),
   isActive: boolean('is_active').default(true),
+  fcmToken: varchar('fcm_token', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

@@ -63,6 +63,15 @@ export class UsersController {
     return { success: true, data: { settings } };
   }
 
+  @Post('me/push-token')
+  async registerPushToken(
+    @CurrentUser('id') userId: string,
+    @Body() body: { token?: string },
+  ) {
+    await this.usersService.updatePushToken(userId, body.token ?? null);
+    return { success: true, data: { ok: true } };
+  }
+
   @Get('search')
   async searchUsers(@Query('q') query: string, @Query('limit') limit?: string) {
     const users = await this.usersService.searchUsers(

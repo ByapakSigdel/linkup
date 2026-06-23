@@ -252,6 +252,15 @@ export class UsersService {
     return updated;
   }
 
+  /** Store (or clear) the device's FCM push token for this user. */
+  async updatePushToken(userId: string, token: string | null) {
+    await this.db
+      .update(schema.users)
+      .set({ fcmToken: token, updatedAt: new Date() })
+      .where(eq(schema.users.id, userId));
+    return { ok: true };
+  }
+
   async searchUsers(query: string, limit = 10) {
     if (!query || query.length < 2) return [];
 

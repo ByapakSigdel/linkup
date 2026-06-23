@@ -17,6 +17,7 @@ import { SearchModule } from './modules/search/search.module';
 import { EntertainmentModule } from './modules/entertainment/entertainment.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { EmailModule } from './modules/email/email.module';
+import { PushModule } from './modules/push/push.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { EmailModule } from './modules/email/email.module';
       envFilePath: '../../.env',
     }),
     EmailModule,
+    PushModule,
     DatabaseModule,
     GatewayModule,
     NotificationsModule,

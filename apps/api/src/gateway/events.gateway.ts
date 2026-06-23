@@ -16,6 +16,7 @@ import * as jwt from 'jsonwebtoken';
 import { TypingIndicator, PresenceUpdate } from '@linkup/types';
 import { DRIZZLE } from '../database/database.module';
 import * as schema from '../database/schema';
+import { FcmService } from '../modules/push/fcm.service';
 
 interface AuthenticatedSocket extends Socket {
   userId: string;
@@ -57,6 +58,7 @@ export class EventsGateway
     @Inject(DRIZZLE)
     private readonly db: PostgresJsDatabase<typeof schema>,
     private readonly configService: ConfigService,
+    private readonly fcm: FcmService,
   ) {}
 
   // ─── Connection Lifecycle ───────────────────────────────────────────────────
@@ -162,8 +164,47 @@ export class EventsGateway
     // Emit the new message to the receiver
     this.emitToUser(receiverId, 'message:new', message);
 
+    // If the receiver is offline, send a push notification (best-effort).
+    if (!this.connectedUsers.has(receiverId)) {
+      void this.sendMessagePush(userId, receiverId, content, messageType);
+    }
+
     // Confirm delivery back to sender
     return { event: 'message:sent', data: message };
+  }
+
+  /** Push a "new message" notification to an offline recipient via FCM. */
+  private async sendMessagePush(
+    senderId: string,
+    receiverId: string,
+    content: string,
+    messageType?: string,
+  ): Promise<void> {
+    if (!this.fcm.enabled) return;
+    try {
+      const [receiver] = await this.db
+        .select({ fcmToken: schema.users.fcmToken })
+        .from(schema.users)
+        .where(eq(schema.users.id, receiverId))
+        .limit(1);
+      if (!receiver?.fcmToken) return;
+
+      const [sender] = await this.db
+        .select({ displayName: schema.users.displayName })
+        .from(schema.users)
+        .where(eq(schema.users.id, senderId))
+        .limit(1);
+
+      const title = sender?.displayName || 'New message';
+      const body =
+        messageType && messageType !== 'text'
+          ? `Sent you a ${messageType}`
+          : (content || '').slice(0, 120) || 'Sent you a message';
+
+      await this.fcm.sendToToken(receiver.fcmToken, title, body, { type: 'message' });
+    } catch (e) {
+      this.logger.warn(`Message push failed: ${(e as Error).message}`);
+    }
   }
 
   @SubscribeMessage('message:read')
