@@ -27,11 +27,30 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     if (!token) return;
     const socket = connectSocket(token);
 
-    const onConnect = () => useChatStore.getState().setConnected(true);
+    const onConnect = () => {
+      useChatStore.getState().setConnected(true);
+      // Ask the server for the partner's current presence (online + last seen).
+      // The server only pushes presence on the partner's own connect/disconnect,
+      // so without this the partner always looks offline until they toggle.
+      socket.emit('presence:update');
+    };
     const onDisconnect = () => useChatStore.getState().setConnected(false);
 
     const onMessageNew = (message: Message) => {
+      const me = useAuthStore.getState().user?.id;
+      const incoming = !!me && message.senderId !== me;
+      const { chatOpen } = useChatStore.getState();
       useChatStore.getState().addMessage(message);
+      // Notify on partner messages when the chat screen isn't open.
+      if (incoming && !chatOpen) {
+        const preview = (message.content || '').trim();
+        useToastStore.getState().push({
+          title: 'New message',
+          body: preview ? preview.slice(0, 90) : 'Sent you a message 💬',
+          icon: '💬',
+          variant: 'info',
+        });
+      }
     };
     const onMessageRead = (data: { messageId: string; readAt: string }) => {
       useChatStore.getState().updateMessageStatus(data.messageId, 'read', data.readAt);
@@ -151,6 +170,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('message:deleted', onMessageDeleted);
     socket.on('typing:update', onTyping);
     socket.on('presence:update', onPresence);
+    socket.on('presence:status', onPresence);
     socket.on('reaction:added', onReaction);
     socket.on('notification:new', onNotification);
     socket.on('call:incoming', onCallIncoming);
@@ -171,6 +191,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('message:deleted', onMessageDeleted);
       socket.off('typing:update', onTyping);
       socket.off('presence:update', onPresence);
+      socket.off('presence:status', onPresence);
       socket.off('reaction:added', onReaction);
       socket.off('notification:new', onNotification);
       socket.off('call:incoming', onCallIncoming);
