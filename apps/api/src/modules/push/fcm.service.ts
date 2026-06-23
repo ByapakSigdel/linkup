@@ -124,7 +124,19 @@ export class FcmService {
               token,
               notification: { title, body },
               data: data ?? {},
-              android: { priority: 'high', notification: { sound: 'default' } },
+              android: {
+                priority: 'high',
+                notification: {
+                  sound: 'default',
+                  channel_id: 'default',
+                  // Brand accent (lilac) — tints the small icon, title + app name.
+                  color: '#c4a8e0',
+                  notification_priority: 'PRIORITY_HIGH',
+                  default_sound: true,
+                  default_vibrate_timings: true,
+                  visibility: 'PRIVATE',
+                },
+              },
             },
           }),
         },
