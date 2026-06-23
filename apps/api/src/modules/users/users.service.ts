@@ -3,11 +3,13 @@ import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, count, ilike, or } from 'drizzle-orm';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
+import { StorageService } from '../media/storage.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<typeof schema>,
+    private readonly storage: StorageService,
   ) {}
 
   async findById(id: string) {
@@ -103,6 +105,34 @@ export class UsersService {
         themeId: schema.users.themeId,
         locale: schema.users.locale,
         timezone: schema.users.timezone,
+      });
+
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+
+    return updated;
+  }
+
+  /**
+   * Store an uploaded image as this user's avatar and persist the URL.
+   * Works for solo users too — the file is keyed by userId (not coupleId), so
+   * pairing isn't required to set a profile picture.
+   */
+  async updateAvatar(userId: string, file: Express.Multer.File) {
+    const stored = await this.storage.store(file, userId, 'avatar');
+
+    const [updated] = await this.db
+      .update(schema.users)
+      .set({ avatarUrl: stored.cdnUrl, updatedAt: new Date() })
+      .where(eq(schema.users.id, userId))
+      .returning({
+        id: schema.users.id,
+        email: schema.users.email,
+        username: schema.users.username,
+        displayName: schema.users.displayName,
+        avatarUrl: schema.users.avatarUrl,
+        bio: schema.users.bio,
       });
 
     if (!updated) {

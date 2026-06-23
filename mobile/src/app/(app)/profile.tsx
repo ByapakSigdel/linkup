@@ -35,8 +35,6 @@ import {
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
-import { useAuthStore } from '@/stores/auth-store';
-import { useMediaStore } from '@/stores/media-store';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/env';
 
@@ -127,17 +125,16 @@ export default function ProfileScreen() {
     }
   };
 
-  const couple = useAuthStore((s) => s.couple);
-  const uploadFile = useMediaStore((s) => s.uploadFile);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  // Set the profile picture. Works whether or not you're paired — the avatar is
+  // stored per-user on the backend, so a solo account can change it too.
   const changeAvatar = useCallback(async () => {
-    if (!couple?.id) {
-      Alert.alert('Link up first', 'Pair with your partner to set a profile picture.');
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to set a profile picture.');
       return;
     }
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -148,21 +145,22 @@ export default function ProfileScreen() {
     const asset = result.assets[0];
     setUploadingAvatar(true);
     try {
-      const media = await uploadFile(couple.id, {
+      const form = new FormData();
+      form.append('file', {
         uri: asset.uri,
         name: asset.fileName || `avatar-${asset.assetId ?? 'img'}.jpg`,
         type: asset.mimeType || 'image/jpeg',
+      } as unknown as Blob);
+      await api.post('/users/me/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      if (media?.cdnUrl) {
-        await api.patch('/users/me', { avatarUrl: media.cdnUrl });
-        await fetchProfile();
-      }
+      await fetchProfile();
     } catch {
       Alert.alert('Upload failed', 'Could not update your photo. Please try again.');
     } finally {
       setUploadingAvatar(false);
     }
-  }, [couple?.id, uploadFile, fetchProfile]);
+  }, [fetchProfile]);
 
   const daysTogether = profile?.coupleStats?.couple.createdAt
     ? Math.floor(
@@ -306,11 +304,35 @@ export default function ProfileScreen() {
           <View style={{ gap: 16 }}>
             {/* You */}
             <Row gap={16}>
-              <Avatar
-                uri={resolveMediaUrl(user.avatarUrl)}
-                name={user.displayName}
-                size={56}
-              />
+              <Pressable onPress={changeAvatar} disabled={uploadingAvatar}>
+                <Avatar
+                  uri={resolveMediaUrl(user.avatarUrl)}
+                  name={user.displayName}
+                  size={56}
+                />
+                {/* Paired users get the camera badge on the couple header above;
+                    solo users get it here so they can still set a photo. */}
+                {!partner && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: -2,
+                      bottom: -2,
+                      backgroundColor: colors.primary,
+                      borderRadius: 999,
+                      padding: 5,
+                      borderWidth: 2,
+                      borderColor: colors.surface,
+                    }}
+                  >
+                    {uploadingAvatar ? (
+                      <ActivityIndicator size="small" color={colors.textOnPrimary} />
+                    ) : (
+                      <Camera size={12} color={colors.textOnPrimary} />
+                    )}
+                  </View>
+                )}
+              </Pressable>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 {isEditing ? (
                   <View style={{ gap: 8 }}>

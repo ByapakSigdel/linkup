@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
-import { useMediaStore } from '@/stores/media-store';
 import {
   Card,
   CardHeader,
@@ -119,26 +118,21 @@ export default function ProfilePage() {
     }
   };
 
-  const couple = useAuthStore((s) => s.couple);
-  const uploadFile = useMediaStore((s) => s.uploadFile);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Set the profile picture. Works whether or not you're paired — the avatar is
+  // stored per-user on the backend, so a solo account can change it too.
   const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!couple?.id) {
-      alert('Link up with your partner to set a profile picture.');
-      return;
-    }
     setUploadingAvatar(true);
     try {
-      const media = await uploadFile(couple.id, file);
-      if (media?.cdnUrl) {
-        await api.patch('/users/me', { avatarUrl: media.cdnUrl });
-        await fetchProfile();
-      }
+      const form = new FormData();
+      form.append('file', file);
+      await api.post('/users/me/avatar', form);
+      await fetchProfile();
     } catch {
       alert('Could not update your photo. Please try again.');
     } finally {
@@ -174,6 +168,15 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
+      {/* Shared hidden picker — triggered from any avatar button below. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onAvatarFile}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold text-text">Profile</h1>
@@ -211,13 +214,6 @@ export default function ProfilePage() {
                   )}
                 </span>
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onAvatarFile}
-              />
               <Heart className="h-6 w-6 text-primary" />
               <Avatar
                 src={partner.avatarUrl}
@@ -252,11 +248,30 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {/* Your profile */}
             <div className="flex items-center gap-4">
-              <Avatar
-                src={user.avatarUrl}
-                name={user.displayName}
-                size="lg"
-              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="group relative shrink-0 rounded-full"
+                title="Change profile picture"
+              >
+                <Avatar
+                  src={user.avatarUrl}
+                  name={user.displayName}
+                  size="lg"
+                />
+                {/* Paired users get the badge on the couple header above; solo
+                    users get it here so they can still set a photo. */}
+                {!partner && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-primary text-text-on-primary">
+                    {uploadingAvatar ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <Camera className="h-3 w-3" />
+                    )}
+                  </span>
+                )}
+              </button>
               <div className="flex-1 min-w-0">
                 {isEditing ? (
                   <div className="space-y-2">

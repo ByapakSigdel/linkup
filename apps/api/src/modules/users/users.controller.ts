@@ -9,6 +9,7 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -61,6 +62,24 @@ export class UsersController {
   ) {
     const settings = await this.usersService.updateSettings(userId, body);
     return { success: true, data: { settings } };
+  }
+
+  @Post('me/avatar')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
+  async uploadAvatar(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Avatar must be an image');
+    }
+    const user = await this.usersService.updateAvatar(userId, file);
+    return { success: true, data: { user } };
   }
 
   @Post('me/push-token')
