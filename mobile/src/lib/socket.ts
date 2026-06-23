@@ -19,11 +19,15 @@ export function connectSocket(token: string): Socket {
   }
   socket = io(SOCKET_URL, {
     auth: { token },
-    transports: ['websocket'],
+    // Prefer WebSocket, but allow HTTP long-polling to fall back to — over the
+    // Cloudflare tunnel a websocket-only client can fail to connect on-device,
+    // which silently breaks presence, notifications and theme sync.
+    transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: 20,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
+    timeout: 20000,
   });
   currentToken = token;
   return socket;
