@@ -52,3 +52,6 @@ uploads/
 # Scratch
 tmpcrops/
 releases/
+
+# Firebase client config (kept local; provided per build machine)
+**/google-services.json
