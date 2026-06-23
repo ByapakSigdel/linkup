@@ -15,9 +15,11 @@
 	}
 
 	# In-app updates: serves the APK + latest.json from the releases volume.
-	#   /downloads/latest.json , /downloads/LinkUp.apk
+	# APKs are versioned (LinkUp-<build>.apk) so each release is a unique URL;
+	# no-store stops Cloudflare/edge from serving a stale APK or manifest.
 	handle_path /downloads/* {
 		root * /srv/downloads
+		header Cache-Control "no-store, must-revalidate"
 		file_server
 	}
 
