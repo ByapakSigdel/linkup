@@ -104,6 +104,23 @@ services:
     depends_on:
       - router
 
+  # Database admin panel (pgweb) — browse/query Postgres from the browser.
+  # Protected by HTTP basic auth (PGWEB_AUTH_USER/PGWEB_AUTH_PASS in .env.production)
+  # and locked to this DB. Start with `--profile tools up -d pgweb` and expose via a
+  # Cloudflare Tunnel public hostname: db.mahansigdel.com.np -> http://pgweb:8081
+  pgweb:
+    image: sosedoff/pgweb:latest
+    profiles: ['tools']
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-linkup}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-linkup}?sslmode=disable
+      PGWEB_AUTH_USER: ${PGWEB_AUTH_USER:-admin}
+      PGWEB_AUTH_PASS: ${PGWEB_AUTH_PASS:-}
+      PGWEB_LOCK_SESSION: 'true'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Optional: HTTPS reverse proxy with automatic Let's Encrypt certs.
   # Enable with `--profile tls` and set DOMAIN in .env.production + DNS A record.
   caddy:
