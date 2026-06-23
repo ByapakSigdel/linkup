@@ -24,6 +24,7 @@ import Animated, {
 
 import { Screen, AppText, Card, Button, Avatar, Skeleton, Row, Touchable } from '@/components/ui';
 import { AppBar } from '@/components/top-bar';
+import { LinkUpPanel } from '@/components/link-up-panel';
 import { useTheme } from '@/theme';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/env';
@@ -467,16 +468,13 @@ function NotPaired({ displayName }: { displayName?: string }) {
       <AppText variant="title" center>
         Welcome to LinkUp, {displayName}
       </AppText>
-      <AppText muted center style={{ maxWidth: 320 }}>
+      <AppText muted center style={{ maxWidth: 340 }}>
         You&apos;re one step away. Create your private couple space or join with your partner&apos;s
         code to unlock chat, streaks, watch parties and more.
       </AppText>
-      <Button
-        variant="primary"
-        onPress={() => router.push('/pair')}
-        label="Link up with your partner"
-        style={{ marginTop: 8 }}
-      />
+      <View style={{ marginTop: 8, width: '100%', maxWidth: 420 }}>
+        <LinkUpPanel />
+      </View>
     </View>
   );
 }
