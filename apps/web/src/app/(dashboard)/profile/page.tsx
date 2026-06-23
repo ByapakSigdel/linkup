@@ -131,7 +131,11 @@ export default function ProfilePage() {
     try {
       const form = new FormData();
       form.append('file', file);
-      await api.post('/users/me/avatar', form);
+      // Must override the client's default application/json so axios sets the
+      // multipart boundary — otherwise the backend can't parse the file.
+      await api.post('/users/me/avatar', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       await fetchProfile();
     } catch {
       alert('Could not update your photo. Please try again.');
