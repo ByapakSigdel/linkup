@@ -100,7 +100,11 @@ export class FcmService {
     }
   }
 
-  /** Send a notification to a single device token. Returns true if accepted. */
+  /**
+   * Send a DATA-ONLY message (no `notification` block) so the app's RNFirebase
+   * background handler always fires and renders a rich Notifee notification
+   * (avatar large icon, MessagingStyle, accent). All data values must be strings.
+   */
   async sendToToken(
     token: string,
     title: string,
@@ -110,6 +114,10 @@ export class FcmService {
     if (!this.sa || !token) return false;
     const accessToken = await this.getAccessToken();
     if (!accessToken) return false;
+    const stringData: Record<string, string> = { title, body };
+    for (const [k, v] of Object.entries(data ?? {})) {
+      if (v != null) stringData[k] = String(v);
+    }
     try {
       const res = await fetch(
         `https://fcm.googleapis.com/v1/projects/${this.sa.project_id}/messages:send`,
@@ -122,21 +130,8 @@ export class FcmService {
           body: JSON.stringify({
             message: {
               token,
-              notification: { title, body },
-              data: data ?? {},
-              android: {
-                priority: 'high',
-                notification: {
-                  sound: 'default',
-                  channel_id: 'default',
-                  // Brand accent (lilac) — tints the small icon, title + app name.
-                  color: '#c4a8e0',
-                  notification_priority: 'PRIORITY_HIGH',
-                  default_sound: true,
-                  default_vibrate_timings: true,
-                  visibility: 'PRIVATE',
-                },
-              },
+              data: stringData,
+              android: { priority: 'high', ttl: '600s' },
             },
           }),
         },

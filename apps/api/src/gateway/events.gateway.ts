@@ -194,7 +194,7 @@ export class EventsGateway
       if (!receiver?.fcmToken) return;
 
       const [sender] = await this.db
-        .select({ displayName: schema.users.displayName })
+        .select({ displayName: schema.users.displayName, avatarUrl: schema.users.avatarUrl })
         .from(schema.users)
         .where(eq(schema.users.id, senderId))
         .limit(1);
@@ -205,7 +205,15 @@ export class EventsGateway
           ? `Sent you a ${messageType}`
           : (content || '').slice(0, 120) || 'Sent you a message';
 
-      await this.fcm.sendToToken(receiver.fcmToken, title, body, { type: 'message' });
+      const data: Record<string, string> = { type: 'message' };
+      if (sender?.avatarUrl) {
+        const base = this.configService.get<string>('API_URL', '') || '';
+        data.avatarUrl = /^https?:\/\//.test(sender.avatarUrl)
+          ? sender.avatarUrl
+          : `${base}${sender.avatarUrl}`;
+      }
+
+      await this.fcm.sendToToken(receiver.fcmToken, title, body, data);
     } catch (e) {
       this.logger.warn(`Message push failed: ${(e as Error).message}`);
     }

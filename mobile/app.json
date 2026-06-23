@@ -59,13 +59,8 @@
       "expo-audio",
       "@config-plugins/react-native-webrtc",
       "@react-native-google-signin/google-signin",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#070a11"
-        }
-      ]
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": false,

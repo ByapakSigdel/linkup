@@ -1,62 +1,113 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
+import messaging, {
+  FirebaseMessagingTypes,
+} from '@react-native-firebase/messaging';
+import notifee, {
+  AndroidImportance,
+  AndroidStyle,
+  AndroidVisibility,
+  EventType,
+} from '@notifee/react-native';
 import api from '@/lib/api';
 
-// How notifications behave while the app is foregrounded. (The backend only
-// pushes to *offline* recipients, so foreground rarely hits this — but be sane.)
-Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      // legacy key for older expo-notifications versions
-      shouldShowAlert: true,
-    }) as Notifications.NotificationBehavior,
-});
+const CHANNEL_ID = 'messages';
+const ACCENT = '#c4a8e0';
 
-// Tapping a message notification opens the chat.
-Notifications.addNotificationResponseReceivedListener(() => {
-  try {
-    router.navigate('/chat');
-  } catch {
-    /* router not ready yet */
-  }
-});
+/** Ensure the high-importance "Messages" channel exists (Android). */
+async function ensureChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await notifee.createChannel({
+    id: CHANNEL_ID,
+    name: 'Messages',
+    importance: AndroidImportance.HIGH,
+    sound: 'default',
+    vibration: true,
+    vibrationPattern: [300, 250, 300, 250],
+    lights: true,
+    lightColor: ACCENT,
+  });
+}
+
+/**
+ * Render a rich, chat-style notification from an FCM data message. Shared by the
+ * foreground (onMessage) and background/killed (setBackgroundMessageHandler)
+ * paths so the look is identical in every app state.
+ *
+ * Expected data: { title (sender name), body (message), avatarUrl?, type }.
+ */
+export async function displayPushNotification(
+  remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+): Promise<void> {
+  const data = (remoteMessage?.data ?? {}) as Record<string, string>;
+  const title = data.title || 'New message';
+  const body = data.body || 'Sent you a message';
+  const avatar = data.avatarUrl || undefined;
+
+  await ensureChannel();
+
+  await notifee.displayNotification({
+    title,
+    body,
+    data,
+    android: {
+      channelId: CHANNEL_ID,
+      smallIcon: 'ic_notification',
+      color: ACCENT,
+      largeIcon: avatar,
+      circularLargeIcon: true,
+      pressAction: { id: 'default', launchActivity: 'default' },
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PRIVATE,
+      // WhatsApp-style conversation layout: sender (name + avatar) + the message.
+      style: {
+        type: AndroidStyle.MESSAGING,
+        person: { name: title, icon: avatar },
+        messages: [{ text: body, timestamp: Date.now() }],
+      },
+    },
+  });
+}
 
 let registered = false;
 
 /**
- * Ask for notification permission, get this device's FCM token, and register it
- * with the backend so it can push "new message" notifications when the app is
- * closed. Best-effort + idempotent (runs once per session).
+ * Request notification permission, register this device's FCM token with the
+ * backend, create the channel, and wire foreground display + tap-to-open.
  */
 export async function registerForPushNotifications(): Promise<void> {
   if (registered) return;
   try {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Messages',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
-      });
-    }
+    const status = await messaging().requestPermission();
+    const ok =
+      status === messaging.AuthorizationStatus.AUTHORIZED ||
+      status === messaging.AuthorizationStatus.PROVISIONAL;
+    if (!ok) return;
 
-    let granted = (await Notifications.getPermissionsAsync()).granted;
-    if (!granted) {
-      granted = (await Notifications.requestPermissionsAsync()).granted;
-    }
-    if (!granted) return;
+    await ensureChannel();
 
-    const tokenResp = await Notifications.getDevicePushTokenAsync();
-    const token = tokenResp?.data ? String(tokenResp.data) : '';
+    const token = await messaging().getToken();
     if (token) {
       await api.post('/users/me/push-token', { token });
       registered = true;
     }
+
+    // Foreground messages: show the same rich notification.
+    messaging().onMessage(displayPushNotification);
+
+    // Tap (foreground/background-resumed) → open the chat.
+    notifee.onForegroundEvent(({ type }) => {
+      if (type === EventType.PRESS) openChat();
+    });
   } catch {
     // best-effort — never block app start on notification setup
+  }
+}
+
+function openChat() {
+  try {
+    router.navigate('/chat');
+  } catch {
+    /* router not ready */
   }
 }
