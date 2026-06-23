@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "LinkUp",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "default",
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#070a11",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -31,7 +31,7 @@
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
       ],
-      "package": "com.anonymous.mobile"
+      "package": "com.linkup.app"
     },
     "web": {
       "output": "static",
@@ -42,17 +42,22 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "android": {
+          "backgroundColor": "#070a11",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#070a11",
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "imageWidth": 220
           }
         }
       ],
       "expo-secure-store",
       "expo-video",
       "expo-audio",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": false,

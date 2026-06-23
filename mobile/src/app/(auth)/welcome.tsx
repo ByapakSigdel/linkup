@@ -18,6 +18,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useResponsive } from '@/hooks/use-responsive';
 import { apiErrorMessage } from '@/lib/api';
 import { CELESTIAL as C, CELESTIAL_FONTS as F } from '@/theme/celestial';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { LinkupMark } from '@/components/brand-mark';
 import { ConstellationSky } from '@/components/brand/constellation-sky';
 import { ConstellationOfTwo } from '@/components/brand/constellation-of-two';
@@ -337,6 +338,10 @@ function AuthPanel({
                 <Animated.Text style={{ fontFamily: F.body, fontSize: 13, color: C.error }}>{error}</Animated.Text>
               </View>
             ) : null}
+
+            <View style={{ marginTop: 16 }}>
+              <GoogleSignInButton onError={setError} />
+            </View>
 
             <View style={{ gap: 14, marginTop: 14 }}>
               <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />

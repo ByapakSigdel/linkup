@@ -36,6 +36,15 @@ export const SOCKET_URL = API_ORIGIN;
 export const AUTH_STORAGE_KEY = 'auth-storage';
 
 /**
+ * Google OAuth Web client ID. Native Google Sign-In uses this as `webClientId`
+ * so the returned ID token's audience is the web client — which the backend
+ * (/auth/google) accepts. Public value (also embedded in the web bundle).
+ */
+export const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '522265029111-9n0a26dkeovi6fh3e9l4q2745pe14a4b.apps.googleusercontent.com';
+
+/**
  * Resolve a possibly-relative media path returned by the API into an absolute
  * URL the device can load. The API returns paths like `/media/files/abc.png`.
  */
