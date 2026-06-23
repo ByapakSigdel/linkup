@@ -66,7 +66,8 @@ export class UsersController {
 
   @Post('me/avatar')
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+    // 25MB — generous enough for unedited phone/camera photos.
+    FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }),
   )
   async uploadAvatar(
     @CurrentUser('id') userId: string,

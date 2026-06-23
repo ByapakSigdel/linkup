@@ -78,6 +78,43 @@ interface ProfileData {
   } | null;
 }
 
+/**
+ * Downscale an image File to a max dimension and re-encode as JPEG so avatar
+ * uploads stay small regardless of the source photo (raw camera shots can be
+ * 10-20MB). Throws if the browser can't decode it; callers fall back to the raw
+ * file.
+ */
+async function downscaleImage(file: File, max = 512, quality = 0.85): Promise<Blob> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.readAsDataURL(file);
+  });
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('decode failed'));
+    image.src = dataUrl;
+  });
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no canvas context');
+  ctx.drawImage(img, 0, 0, w, h);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('encode failed'))),
+      'image/jpeg',
+      quality,
+    );
+  });
+}
+
 export default function ProfilePage() {
   const authUser = useAuthStore((s) => s.user);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -129,8 +166,12 @@ export default function ProfilePage() {
     if (!file) return;
     setUploadingAvatar(true);
     try {
+      // Downscale to a square-ish thumbnail before upload — raw camera/phone
+      // photos can be 10-20MB, which is slow and wasteful for an avatar. Mobile
+      // does the same via its image picker.
+      const upload = await downscaleImage(file).catch(() => file);
       const form = new FormData();
-      form.append('file', file);
+      form.append('file', upload, 'avatar.jpg');
       // Let axios set the multipart boundary itself for FormData (it strips the
       // client's default application/json), so the backend can parse the file.
       await api.post('/users/me/avatar', form);
