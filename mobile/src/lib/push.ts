@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { router } from 'expo-router';
 import api from '@/lib/api';
 
 // How notifications behave while the app is foregrounded. (The backend only
@@ -14,6 +15,15 @@ Notifications.setNotificationHandler({
       // legacy key for older expo-notifications versions
       shouldShowAlert: true,
     }) as Notifications.NotificationBehavior,
+});
+
+// Tapping a message notification opens the chat.
+Notifications.addNotificationResponseReceivedListener(() => {
+  try {
+    router.navigate('/chat');
+  } catch {
+    /* router not ready yet */
+  }
 });
 
 let registered = false;
