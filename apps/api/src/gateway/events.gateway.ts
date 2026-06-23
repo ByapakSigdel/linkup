@@ -37,9 +37,11 @@ interface ReadMessagePayload {
 }
 
 @WebSocketGateway({
+  // Token (not cookie) auth → no credentials; '*' + credentials:true is invalid
+  // per the CORS spec and breaks the Socket.IO polling fallback in browsers.
   cors: {
     origin: '*',
-    credentials: true,
+    credentials: false,
   },
   namespace: '/',
 })
@@ -169,8 +171,10 @@ export class EventsGateway
       void this.sendMessagePush(userId, receiverId, content, messageType);
     }
 
-    // Confirm delivery back to sender
-    return { event: 'message:sent', data: message };
+    // Confirm delivery back to the sender via the emit acknowledgement callback.
+    // (Returning a WsResponse {event,data} would EMIT an event instead of acking,
+    // leaving the sender's optimistic message stuck on the "sending" clock.)
+    return { data: message };
   }
 
   /** Push a "new message" notification to an offline recipient via FCM. */

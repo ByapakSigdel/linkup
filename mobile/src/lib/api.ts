@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, AUTH_STORAGE_KEY } from './env';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Axios client for the LinkUp API — mirrors the web client's behaviour, but
@@ -60,6 +61,13 @@ api.interceptors.response.use(
             };
             parsed.state.tokens = tokens;
             await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsed));
+            // Sync the in-memory store too so the live socket (keyed on the
+            // store token) reconnects with the fresh token after expiry.
+            try {
+              useAuthStore.setState({ tokens });
+            } catch {
+              /* store not ready — AsyncStorage is enough */
+            }
             originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
             return api(originalRequest);
           }
