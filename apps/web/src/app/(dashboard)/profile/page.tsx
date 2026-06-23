@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   MessageCircle,
   Image as ImageIcon,
@@ -11,9 +11,11 @@ import {
   Edit3,
   Heart,
   Settings,
+  Camera,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
+import { useMediaStore } from '@/stores/media-store';
 import {
   Card,
   CardHeader,
@@ -117,6 +119,33 @@ export default function ProfilePage() {
     }
   };
 
+  const couple = useAuthStore((s) => s.couple);
+  const uploadFile = useMediaStore((s) => s.uploadFile);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!couple?.id) {
+      alert('Link up with your partner to set a profile picture.');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const media = await uploadFile(couple.id, file);
+      if (media?.cdnUrl) {
+        await api.patch('/users/me', { avatarUrl: media.cdnUrl });
+        await fetchProfile();
+      }
+    } catch {
+      alert('Could not update your photo. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   // Calculate days together
   const daysTogether = profile?.coupleStats?.couple.createdAt
     ? Math.floor(
@@ -161,11 +190,33 @@ export default function ProfilePage() {
         <Card cardStyle="elevated" padding="lg">
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center gap-4">
-              <Avatar
-                src={user.avatarUrl}
-                name={user.displayName}
-                size="xl"
-                status={user.isOnline ? 'online' : 'offline'}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="group relative rounded-full"
+                title="Change profile picture"
+              >
+                <Avatar
+                  src={user.avatarUrl}
+                  name={user.displayName}
+                  size="xl"
+                  status={user.isOnline ? 'online' : 'offline'}
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-surface bg-primary text-text-on-primary">
+                  {uploadingAvatar ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                </span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onAvatarFile}
               />
               <Heart className="h-6 w-6 text-primary" />
               <Avatar

@@ -2,6 +2,8 @@ import React from 'react';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   type PressableProps,
   ScrollView,
@@ -59,17 +61,23 @@ export function Screen({
   return (
     <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: colors.background }, style]}>
       <ThemedBackground />
-      {scroll ? (
-        <ScrollView
-          contentContainerStyle={[pad, { flexGrow: 1 }, contentStyle]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {inner}
-        </ScrollView>
-      ) : (
-        <View style={[{ flex: 1 }, pad, contentStyle]}>{inner}</View>
-      )}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {scroll ? (
+          <ScrollView
+            contentContainerStyle={[pad, { flexGrow: 1 }, contentStyle]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+          >
+            {inner}
+          </ScrollView>
+        ) : (
+          <View style={[{ flex: 1 }, pad, contentStyle]}>{inner}</View>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

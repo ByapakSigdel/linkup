@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, ScrollView, type DimensionValue } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, Alert, type DimensionValue } from 'react-native';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   MessageCircle,
@@ -13,6 +14,7 @@ import {
   Heart,
   Settings,
   ChevronRight,
+  Camera,
 } from 'lucide-react-native';
 
 import {
@@ -33,6 +35,8 @@ import {
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useAuthStore } from '@/stores/auth-store';
+import { useMediaStore } from '@/stores/media-store';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/env';
 
@@ -123,6 +127,43 @@ export default function ProfileScreen() {
     }
   };
 
+  const couple = useAuthStore((s) => s.couple);
+  const uploadFile = useMediaStore((s) => s.uploadFile);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const changeAvatar = useCallback(async () => {
+    if (!couple?.id) {
+      Alert.alert('Link up first', 'Pair with your partner to set a profile picture.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setUploadingAvatar(true);
+    try {
+      const media = await uploadFile(couple.id, {
+        uri: asset.uri,
+        name: asset.fileName || `avatar-${asset.assetId ?? 'img'}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+      });
+      if (media?.cdnUrl) {
+        await api.patch('/users/me', { avatarUrl: media.cdnUrl });
+        await fetchProfile();
+      }
+    } catch {
+      Alert.alert('Upload failed', 'Could not update your photo. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }, [couple?.id, uploadFile, fetchProfile]);
+
   const daysTogether = profile?.coupleStats?.couple.createdAt
     ? Math.floor(
         (Date.now() - new Date(profile.coupleStats.couple.createdAt).getTime()) /
@@ -199,12 +240,32 @@ export default function ProfileScreen() {
             <Card variant="elevated">
               <View style={{ alignItems: 'center', gap: 12 }}>
                 <Row gap={16}>
-                  <Avatar
-                    uri={resolveMediaUrl(user.avatarUrl)}
-                    name={user.displayName}
-                    size={64}
-                    online={!!user.isOnline}
-                  />
+                  <Pressable onPress={changeAvatar} disabled={uploadingAvatar}>
+                    <Avatar
+                      uri={resolveMediaUrl(user.avatarUrl)}
+                      name={user.displayName}
+                      size={64}
+                      online={!!user.isOnline}
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        right: -2,
+                        bottom: -2,
+                        backgroundColor: colors.primary,
+                        borderRadius: 999,
+                        padding: 5,
+                        borderWidth: 2,
+                        borderColor: colors.surface,
+                      }}
+                    >
+                      {uploadingAvatar ? (
+                        <ActivityIndicator size="small" color={colors.textOnPrimary} />
+                      ) : (
+                        <Camera size={12} color={colors.textOnPrimary} />
+                      )}
+                    </View>
+                  </Pressable>
                   <Heart color={colors.primary} size={24} fill={colors.primary} />
                   <Avatar
                     uri={resolveMediaUrl(partner.avatarUrl)}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -53,7 +53,21 @@ export default function ChatScreen() {
         ? couple.partner2Id
         : couple.partner1Id
       : null;
-  const partnerName = couple?.coupleName || 'Partner';
+
+  // The couple object only has IDs — fetch the partner's real name + avatar.
+  const [partner, setPartner] = useState<{
+    displayName?: string;
+    avatarUrl?: string | null;
+  } | null>(null);
+  useEffect(() => {
+    api
+      .get('/users/me/profile')
+      .then(({ data }) => setPartner(data.data?.partner ?? null))
+      .catch(() => {});
+  }, []);
+
+  const partnerName = partner?.displayName || couple?.coupleName || 'Partner';
+  const partnerAvatar = partner?.avatarUrl ?? couple?.coupleAvatarUrl ?? null;
 
   // Load messages on mount; clear unread; refresh presence.
   useEffect(() => {
@@ -163,7 +177,7 @@ export default function ChatScreen() {
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
       <ChatHeader
         partnerName={partnerName}
-        partnerAvatar={couple?.coupleAvatarUrl}
+        partnerAvatar={partnerAvatar}
         partnerId={partnerId}
         isOnline={isPartnerOnline}
         lastSeenAt={partnerLastSeenAt}

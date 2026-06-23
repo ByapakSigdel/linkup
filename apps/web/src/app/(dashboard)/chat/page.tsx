@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
@@ -48,9 +48,21 @@ export default function ChatPage() {
         : couple.partner1Id
       : null;
 
-  // We don't have partner user object directly in auth store,
-  // so we use couple name or a placeholder
-  const partnerName = couple?.coupleName || 'Partner';
+  // Fetch the partner's real profile (name + avatar) — the couple object only
+  // has IDs, so /users/me/profile is the source of the partner's display name.
+  const [partner, setPartner] = useState<{
+    displayName?: string;
+    avatarUrl?: string | null;
+  } | null>(null);
+  useEffect(() => {
+    api
+      .get('/users/me/profile')
+      .then(({ data }) => setPartner(data.data?.partner ?? null))
+      .catch(() => {});
+  }, []);
+
+  const partnerName = partner?.displayName || couple?.coupleName || 'Partner';
+  const partnerAvatar = partner?.avatarUrl ?? couple?.coupleAvatarUrl ?? null;
 
   // Load messages on mount
   useEffect(() => {
@@ -203,7 +215,7 @@ export default function ChatPage() {
       {/* Header */}
       <ChatHeader
         partnerName={partnerName}
-        partnerAvatar={couple?.coupleAvatarUrl}
+        partnerAvatar={partnerAvatar}
         partnerId={partnerId}
         isOnline={isPartnerOnline}
         lastSeenAt={partnerLastSeenAt}
