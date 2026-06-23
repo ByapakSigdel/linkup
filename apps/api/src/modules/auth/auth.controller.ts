@@ -42,6 +42,14 @@ export class AuthController {
     return { success: true, data: result };
   }
 
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async google(@Body() body: { idToken?: string; credential?: string }) {
+    // Web (Google Identity Services) returns `credential`; mobile returns `idToken`.
+    const result = await this.authService.loginWithGoogle(body.idToken || body.credential);
+    return { success: true, data: result };
+  }
+
   @Post('verify/resend')
   @HttpCode(HttpStatus.OK)
   async resendVerification(@Body() body: { email: string }) {

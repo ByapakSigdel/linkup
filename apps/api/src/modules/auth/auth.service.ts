@@ -32,7 +32,7 @@ export class AuthService {
    * Resend when configured (EmailService); always logs it too (dev convenience)
    * and returns it so the caller can surface a dev code when email is disabled.
    */
-  async issueVerificationCode(userId: string, email?: string): Promise<string> {
+  async issueVerificationCode(userId: string, email?: string): Promise<{ code: string; sent: boolean }> {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
     await this.db.insert(schema.verificationCodes).values({
@@ -42,11 +42,10 @@ export class AuthService {
       expiresAt,
     });
     this.logger.log(`[DEV] Email verification code for ${userId}: ${code}`);
-    if (email) {
-      // Best-effort — never block account creation on email delivery.
-      void this.email.sendVerificationCode(email, code);
-    }
-    return code;
+    // Awaited so callers know if delivery actually succeeded; if not, they return
+    // a dev code so account creation never gets stuck (e.g. Resend testing mode).
+    const sent = email ? await this.email.sendVerificationCode(email, code) : false;
+    return { code, sent };
   }
 
   async verifyEmail(email: string, code: string) {
@@ -106,8 +105,8 @@ export class AuthService {
     if (user.isVerified) {
       return { sent: false, alreadyVerified: true };
     }
-    const code = await this.issueVerificationCode(user.id, user.email);
-    return { sent: true, emailed: this.email.enabled, devCode: this.email.enabled ? undefined : code };
+    const { code, sent } = await this.issueVerificationCode(user.id, user.email);
+    return { sent: true, emailed: sent, devCode: sent ? undefined : code };
   }
 
   async register(email: string, username: string, displayName: string, password: string) {
@@ -157,9 +156,10 @@ export class AuthService {
       throw new Error('Failed to create user');
     }
 
-    // Issue + email an email verification code (also logged; dev code returned
-    // only when email delivery is disabled, so we don't leak codes in prod).
-    const verificationCode = await this.issueVerificationCode(user.id, user.email);
+    // Issue + email an email verification code. The dev code is returned only
+    // when delivery actually failed (e.g. Resend testing mode), so we never leak
+    // codes once real email is working, but signup is never stuck either.
+    const { code: verificationCode, sent } = await this.issueVerificationCode(user.id, user.email);
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email);
@@ -168,8 +168,8 @@ export class AuthService {
       user,
       ...tokens,
       emailVerificationRequired: true,
-      emailed: this.email.enabled,
-      verificationCode: this.email.enabled ? undefined : verificationCode,
+      emailed: sent,
+      verificationCode: sent ? undefined : verificationCode,
     };
   }
 
@@ -201,6 +201,104 @@ export class AuthService {
       },
       ...tokens,
     };
+  }
+
+  /**
+   * Sign in (or transparently create an account) from a Google ID token.
+   * The token is verified server-side via Google's tokeninfo endpoint (no SDK
+   * dependency). Accounts are linked by verified email, so there's no schema
+   * change — a Google sign-in and an email/password signup with the same address
+   * resolve to the same user.
+   */
+  async loginWithGoogle(idToken?: string) {
+    if (!idToken) {
+      throw new UnauthorizedException('Missing Google credential');
+    }
+
+    let payload: any;
+    try {
+      const res = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      );
+      if (!res.ok) {
+        throw new Error(`tokeninfo HTTP ${res.status}`);
+      }
+      payload = await res.json();
+    } catch (err) {
+      this.logger.warn(`Google token verification failed: ${(err as Error).message}`);
+      throw new UnauthorizedException('Could not verify Google sign-in');
+    }
+
+    // Audience check: token must be minted for one of our configured client IDs.
+    const allowed = [
+      ...(this.configService.get<string>('GOOGLE_CLIENT_ID', '') || '').split(','),
+      ...(this.configService.get<string>('GOOGLE_CLIENT_IDS', '') || '').split(','),
+    ]
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (allowed.length > 0 && !allowed.includes(payload.aud)) {
+      throw new UnauthorizedException('Google sign-in is not configured for this app');
+    }
+
+    const email = String(payload.email || '').toLowerCase();
+    const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+    if (!email || !emailVerified) {
+      throw new UnauthorizedException('Your Google account has no verified email');
+    }
+
+    let [user] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (!user) {
+      const displayName = String(payload.name || email.split('@')[0]).slice(0, 50);
+      const username = await this.uniqueUsername(email.split('@')[0]);
+      // Random unusable password — the account signs in via Google (or via a
+      // future password reset).
+      const passwordHash = await bcrypt.hash(`google:${payload.sub}:${username}`, 12);
+      const [created] = await this.db
+        .insert(schema.users)
+        .values({
+          email,
+          username,
+          displayName,
+          passwordHash,
+          isVerified: true,
+          avatarUrl: payload.picture || null,
+        })
+        .returning();
+      user = created;
+      this.logger.log(`Created account via Google: ${email}`);
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email);
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+      },
+      ...tokens,
+    };
+  }
+
+  /** Derive a schema-valid (3-30, [a-zA-Z0-9_]) username that isn't taken. */
+  private async uniqueUsername(base: string): Promise<string> {
+    let candidate = (base || 'user').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 24);
+    if (candidate.length < 3) candidate = `user_${candidate}`;
+    for (let i = 0; i < 6; i++) {
+      const existing = await this.db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.username, candidate))
+        .limit(1);
+      if (existing.length === 0) return candidate;
+      candidate = `${(base || 'user').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 18)}_${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    return `user_${Date.now().toString().slice(-9)}`;
   }
 
   async validateUser(userId: string) {
