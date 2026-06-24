@@ -257,9 +257,13 @@ export class AuthService {
     }
 
     // Audience check: token must be minted for one of our configured client IDs.
+    // Both web and mobile sign-in send an ID token whose `aud` is the WEB client
+    // ID, so accept that source too (GOOGLE_WEB_CLIENT_ID / the public web var).
     const allowed = [
       ...(this.configService.get<string>('GOOGLE_CLIENT_ID', '') || '').split(','),
       ...(this.configService.get<string>('GOOGLE_CLIENT_IDS', '') || '').split(','),
+      ...(this.configService.get<string>('GOOGLE_WEB_CLIENT_ID', '') || '').split(','),
+      ...(this.configService.get<string>('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '') || '').split(','),
     ]
       .map((s) => s.trim())
       .filter(Boolean);

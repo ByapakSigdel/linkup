@@ -249,7 +249,9 @@ export function CallManager() {
   // can play/watch/draw together while the call keeps running.
   function openActivities() {
     setMinimized(true);
-    router.push('/games');
+    // navigate (not push) so repeated minimize/expand/Activities cycles don't
+    // stack duplicate Games screens on the back stack.
+    router.navigate('/games');
   }
 
   if (phase === 'idle') return null;

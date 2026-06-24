@@ -26,6 +26,9 @@ import type { Message, HighlightCategory } from '@/types';
 
 /** Surface a failed chat action instead of silently swallowing it. */
 function toastError(title: string, error: unknown) {
+  // 401s are handled centrally (the api interceptor shows "Session expired" and
+  // logs out) — don't stack a second, confusing technical toast on top.
+  if ((error as { response?: { status?: number } })?.response?.status === 401) return;
   useToastStore.getState().push({ title, body: apiErrorMessage(error), variant: 'info' });
 }
 

@@ -1,6 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, AUTH_STORAGE_KEY } from './env';
+import { API_URL } from './env';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
 
@@ -21,9 +20,10 @@ function endExpiredSession() {
 }
 
 /**
- * Axios client for the LinkUp API — mirrors the web client's behaviour, but
- * reads/writes tokens from AsyncStorage (where the zustand auth store persists
- * them) instead of localStorage. Token refresh on 401 is handled here too.
+ * Axios client for the LinkUp API. Tokens are read from the in-memory auth store
+ * (the source of truth, kept on disk by the store's persist middleware) — NOT by
+ * read-modify-writing the persisted blob, which would race the store's own writer
+ * and could resurrect a session after logout.
  */
 const api = axios.create({
   baseURL: API_URL,
@@ -31,25 +31,11 @@ const api = axios.create({
   timeout: 20000,
 });
 
-async function readPersistedTokens(): Promise<{
-  accessToken?: string;
-  refreshToken?: string;
-} | null> {
-  try {
-    const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    return parsed?.state?.tokens ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// Request: attach the access token.
-api.interceptors.request.use(async (config) => {
-  const tokens = await readPersistedTokens();
-  if (tokens?.accessToken) {
-    config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+// Request: attach the current access token from the store (always up to date).
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().tokens?.accessToken;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -63,56 +49,74 @@ type Tokens = { accessToken: string; refreshToken: string; expiresIn: number };
 let refreshInFlight: Promise<Tokens | null> | null = null;
 
 async function refreshTokens(): Promise<Tokens | null> {
-  const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-  if (!stored) return null;
-  const parsed = JSON.parse(stored);
-  const refreshToken = parsed?.state?.tokens?.refreshToken;
+  const before = useAuthStore.getState();
+  const epochBefore = before.sessionEpoch;
+  const refreshToken = before.tokens?.refreshToken;
   if (!refreshToken) return null;
 
-  const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+  const { data } = await axios.post(
+    `${API_URL}/auth/refresh`,
+    { refreshToken },
+    { timeout: 20000 },
+  );
   const d = data.data ?? data;
   const tokens: Tokens = {
     accessToken: d.accessToken,
     refreshToken: d.refreshToken,
     expiresIn: d.expiresIn ?? 900,
   };
-  parsed.state.tokens = tokens;
-  await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsed));
-  // Sync the in-memory store too so the live socket (keyed on the store token)
-  // reconnects with the fresh token after expiry.
-  try {
-    useAuthStore.setState({ tokens });
-  } catch {
-    /* store not ready — AsyncStorage is enough */
+
+  // If the user logged out (or the session was otherwise cleared) while this
+  // refresh was in flight, do NOT write the tokens back — that would resurrect a
+  // session the user just ended.
+  const after = useAuthStore.getState();
+  if (!after.isAuthenticated || after.sessionEpoch !== epochBefore) {
+    return null;
   }
+  after.setTokens(tokens); // store owns serialization to disk
   return tokens;
 }
 
-// Response: refresh once on 401, then retry. On genuine refresh failure, clear
-// the session so the app shows login instead of looping on broken screens.
+// Response: refresh once on 401, then retry.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    const status = error.response?.status;
+
+    if (status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
+      let tokens: Tokens | null;
       try {
         if (!refreshInFlight) {
           refreshInFlight = refreshTokens().finally(() => {
             refreshInFlight = null;
           });
         }
-        const tokens = await refreshInFlight;
-        if (tokens?.accessToken) {
-          originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
-          return api(originalRequest);
-        }
-        // No refresh token at all — fall through to a clean logout.
-        endExpiredSession();
-      } catch {
-        // Refresh token is expired/revoked — log out cleanly + tell the user.
-        endExpiredSession();
+        tokens = await refreshInFlight;
+      } catch (refreshErr) {
+        // Only end the session if the refresh token itself was rejected. A
+        // transient failure (offline, timeout, 5xx) must NOT log out a user whose
+        // refresh token is still valid — a flaky network shouldn't end a session
+        // that's meant to last months.
+        const rs = (refreshErr as { response?: { status?: number } })?.response?.status;
+        if (rs === 401 || rs === 403) endExpiredSession();
+        return Promise.reject(error);
       }
+      if (tokens?.accessToken) {
+        originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
+        return api(originalRequest);
+      }
+      // No refresh token (or the session was cleared mid-flight) → logged out.
+      endExpiredSession();
+      return Promise.reject(error);
+    }
+
+    // A request already retried with a fresh token that STILL 401s means the new
+    // token is rejected (deactivated account, clock skew, backend change) — end
+    // the session instead of leaving the user on perpetually-401ing screens.
+    if (status === 401 && originalRequest?._retry) {
+      endExpiredSession();
     }
     return Promise.reject(error);
   },

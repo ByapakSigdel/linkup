@@ -31,6 +31,12 @@ interface AuthState {
   /** Clear the session locally (no network) — used when a token refresh fails. */
   forceLogout: () => void;
   refreshToken: () => Promise<void>;
+  /** Persist freshly-refreshed tokens, but only while still signed in (guards
+   *  against a refresh that resolves after the user has logged out). */
+  setTokens: (tokens: AuthTokens) => void;
+  /** Bumped on every session clear; refreshers compare it to detect a logout
+   *  that happened mid-flight and avoid resurrecting the session. */
+  sessionEpoch: number;
   hydrate: () => Promise<void>;
   setUser: (user: User) => void;
   setCouple: (couple: Couple | null) => void;
@@ -50,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       ...initialState,
       hydrated: false,
+      sessionEpoch: 0,
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -165,15 +172,22 @@ export const useAuthStore = create<AuthState>()(
           // Logout endpoint failure is not critical.
         } finally {
           disconnectSocket();
-          set(initialState);
+          set((s) => ({ ...initialState, sessionEpoch: s.sessionEpoch + 1 }));
         }
       },
 
       forceLogout: () => {
         // The refresh token is dead (expired/revoked). Drop the session so the
-        // app routes back to login instead of looping on 401s.
+        // app routes back to login instead of looping on 401s. Bumping the epoch
+        // tells any in-flight refresh not to resurrect what we just cleared.
         disconnectSocket();
-        set(initialState);
+        set((s) => ({ ...initialState, sessionEpoch: s.sessionEpoch + 1 }));
+      },
+
+      setTokens: (tokens) => {
+        // Ignore late-arriving refreshes once the user is logged out.
+        if (!get().isAuthenticated) return;
+        set({ tokens });
       },
 
       refreshToken: async () => {
