@@ -37,7 +37,42 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response: refresh once on 401, then retry.
+// Single-flight refresh: the refresh token ROTATES on the server (the old one is
+// revoked when a new pair is issued). If several requests 401 at once — common on
+// cold start — and each refreshes independently, the first revokes the token the
+// others are about to use, and everyone gets logged out. So all concurrent 401s
+// share ONE in-flight refresh.
+type Tokens = { accessToken: string; refreshToken: string; expiresIn: number };
+let refreshInFlight: Promise<Tokens | null> | null = null;
+
+async function refreshTokens(): Promise<Tokens | null> {
+  const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+  if (!stored) return null;
+  const parsed = JSON.parse(stored);
+  const refreshToken = parsed?.state?.tokens?.refreshToken;
+  if (!refreshToken) return null;
+
+  const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+  const d = data.data ?? data;
+  const tokens: Tokens = {
+    accessToken: d.accessToken,
+    refreshToken: d.refreshToken,
+    expiresIn: d.expiresIn ?? 900,
+  };
+  parsed.state.tokens = tokens;
+  await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsed));
+  // Sync the in-memory store too so the live socket (keyed on the store token)
+  // reconnects with the fresh token after expiry.
+  try {
+    useAuthStore.setState({ tokens });
+  } catch {
+    /* store not ready — AsyncStorage is enough */
+  }
+  return tokens;
+}
+
+// Response: refresh once on 401, then retry. On genuine refresh failure, clear
+// the session so the app shows login instead of looping on broken screens.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -45,35 +80,25 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const refreshToken = parsed?.state?.tokens?.refreshToken;
-          if (refreshToken) {
-            const { data } = await axios.post(`${API_URL}/auth/refresh`, {
-              refreshToken,
-            });
-            const d = data.data ?? data;
-            const tokens = {
-              accessToken: d.accessToken,
-              refreshToken: d.refreshToken,
-              expiresIn: d.expiresIn ?? 900,
-            };
-            parsed.state.tokens = tokens;
-            await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(parsed));
-            // Sync the in-memory store too so the live socket (keyed on the
-            // store token) reconnects with the fresh token after expiry.
-            try {
-              useAuthStore.setState({ tokens });
-            } catch {
-              /* store not ready — AsyncStorage is enough */
-            }
-            originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
-            return api(originalRequest);
-          }
+        if (!refreshInFlight) {
+          refreshInFlight = refreshTokens().finally(() => {
+            refreshInFlight = null;
+          });
         }
+        const tokens = await refreshInFlight;
+        if (tokens?.accessToken) {
+          originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
+          return api(originalRequest);
+        }
+        // No refresh token at all — fall through to a clean logout.
+        useAuthStore.getState().forceLogout();
       } catch {
-        // Refresh failed — leave it to the auth store / UI to handle logout.
+        // Refresh token is expired/revoked — log out cleanly.
+        try {
+          useAuthStore.getState().forceLogout();
+        } catch {
+          /* store not ready */
+        }
       }
     }
     return Promise.reject(error);

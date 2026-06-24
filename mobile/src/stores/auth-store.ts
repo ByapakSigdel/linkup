@@ -28,6 +28,8 @@ interface AuthState {
   joinCouple: (pairingCode: string) => Promise<void>;
   refreshCouple: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Clear the session locally (no network) — used when a token refresh fails. */
+  forceLogout: () => void;
   refreshToken: () => Promise<void>;
   hydrate: () => Promise<void>;
   setUser: (user: User) => void;
@@ -165,6 +167,13 @@ export const useAuthStore = create<AuthState>()(
           disconnectSocket();
           set(initialState);
         }
+      },
+
+      forceLogout: () => {
+        // The refresh token is dead (expired/revoked). Drop the session so the
+        // app routes back to login instead of looping on 401s.
+        disconnectSocket();
+        set(initialState);
       },
 
       refreshToken: async () => {

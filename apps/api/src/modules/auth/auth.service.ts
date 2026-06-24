@@ -346,14 +346,18 @@ export class AuthService {
   private async generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
 
+    // Long-lived sessions: the refresh token lasts ~6 months and rotates on every
+    // use, so an active user effectively stays signed in (Discord/Netflix-style)
+    // until they explicitly log out. The short access token is refreshed silently.
+    const REFRESH_DAYS = 180;
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', `${REFRESH_DAYS}d`),
     });
 
     // Store refresh token
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_DAYS);
 
     await this.db.insert(schema.refreshTokens).values({
       userId,
