@@ -203,27 +203,31 @@ function GuessAnswers({
         </View>
       )}
 
-      {/* The guess */}
-      {ans.guess && (
-        <View
-          style={{
-            padding: 12,
-            borderRadius: radius.card,
-            backgroundColor: !iAmSubject ? colors.primaryLight : colors.surfaceHover,
-            borderWidth: 1,
-            borderColor: !iAmSubject ? colors.primary : colors.border,
-            gap: 4,
-          }}
-        >
-          <AppText
-            variant="label"
-            color={!iAmSubject ? colors.primary : colors.textMuted}
-          >
-            {iAmSubject ? `${partnerName}'s guess` : 'Your guess'}
-          </AppText>
-          <AppText>{ans.guess.text ?? ''}</AppText>
-        </View>
-      )}
+      {/* The guess — labelled by who actually wrote it (guess.by). */}
+      {ans.guess &&
+        (() => {
+          const guessIsMine = ans.guess?.by === userId;
+          return (
+            <View
+              style={{
+                padding: 12,
+                borderRadius: radius.card,
+                backgroundColor: guessIsMine ? colors.primaryLight : colors.surfaceHover,
+                borderWidth: 1,
+                borderColor: guessIsMine ? colors.primary : colors.border,
+                gap: 4,
+              }}
+            >
+              <AppText
+                variant="label"
+                color={guessIsMine ? colors.primary : colors.textMuted}
+              >
+                {guessIsMine ? 'Your guess' : `${partnerName}'s guess`}
+              </AppText>
+              <AppText>{ans.guess.text ?? ''}</AppText>
+            </View>
+          );
+        })()}
 
       {/* Self-judge: show only if I am the subject AND a guess exists AND not yet judged */}
       {iAmSubject && ans.guess && ans.matched == null && (
