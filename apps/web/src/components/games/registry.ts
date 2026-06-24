@@ -16,6 +16,7 @@ import { EmojiRiddles } from './emoji-riddles';
 import { MindMeld } from './mind-meld';
 import { TwentyQuestions } from './twenty-questions';
 import { ReactionDuel } from './reaction-duel';
+import { ConstellationOfUs } from './constellation';
 
 export type GameCategory = 'classic' | 'couple' | 'creative' | 'luck';
 
@@ -39,6 +40,7 @@ export const GAMES: GameDef[] = [
   { key: 'tic-tac-toe', name: 'Tic-Tac-Toe', tagline: 'Three in a row', emoji: '⭕', category: 'classic', Component: TicTacToe },
   { key: 'connect-four', name: 'Connect Four', tagline: 'Line up four', emoji: '🔵', category: 'classic', Component: ConnectFour },
   { key: 'rock-paper-scissors', name: 'Rock Paper Scissors', tagline: 'Best of five', emoji: '✊', category: 'classic', Component: RockPaperScissors },
+  { key: 'constellation-of-us', name: 'Constellation of Us', tagline: 'Your star-chart, together', emoji: '✦', category: 'couple', Component: ConstellationOfUs },
   { key: 'would-you-rather', name: 'Would You Rather', tagline: 'Do your answers match?', emoji: '🤔', category: 'couple', Component: WouldYouRather },
   { key: 'partner-quiz', name: 'How Well Do You Know Me', tagline: 'Guess each other', emoji: '💞', category: 'couple', Component: PartnerQuiz },
   { key: 'truth-or-dare', name: 'Truth or Dare', tagline: 'Spin and dare', emoji: '🎯', category: 'couple', Component: TruthOrDare },
