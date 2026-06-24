@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "constellation_prompt_unique" ON "constellation_stars" USING btree ("couple_id","prompt_key") WHERE "constellation_stars"."prompt_key" is not null;

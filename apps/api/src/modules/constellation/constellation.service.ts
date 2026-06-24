@@ -127,23 +127,61 @@ export class ConstellationService {
     }
 
     const pos = placeStar(dto.constellationKey, dto.promptKey ?? `${userId}-${Date.now()}`);
-    const [created] = await this.db
-      .insert(schema.constellationStars)
-      .values({
-        coupleId,
-        constellationKey: dto.constellationKey,
-        promptKey: dto.promptKey ?? null,
-        kind: dto.kind,
-        title: dto.title,
-        status: merged.status,
-        answers: merged.answers,
-        posX: pos.posX,
-        posY: pos.posY,
-        createdBy: userId,
-        litAt: merged.litAt,
-      })
-      .returning();
-    return { star: created, coupleId };
+    try {
+      const [created] = await this.db
+        .insert(schema.constellationStars)
+        .values({
+          coupleId,
+          constellationKey: dto.constellationKey,
+          promptKey: dto.promptKey ?? null,
+          kind: dto.kind,
+          title: dto.title,
+          status: merged.status,
+          answers: merged.answers,
+          posX: pos.posX,
+          posY: pos.posY,
+          createdBy: userId,
+          litAt: merged.litAt,
+        })
+        .returning();
+      return { star: created, coupleId };
+    } catch (err: unknown) {
+      // Concurrent insert by the partner hit the unique index first — re-select and update.
+      const isUniqueViolation =
+        (err as { code?: string })?.code === '23505' ||
+        String((err as { message?: string })?.message).includes('duplicate key');
+      if (!isUniqueViolation || !dto.promptKey) throw err;
+
+      const [race] = await this.db
+        .select()
+        .from(schema.constellationStars)
+        .where(
+          and(
+            eq(schema.constellationStars.coupleId, coupleId),
+            eq(schema.constellationStars.promptKey, dto.promptKey),
+          ),
+        )
+        .limit(1);
+      if (!race) throw err;
+
+      const raceMerged = applyContribution(
+        (race.answers as Answers) ?? {},
+        dto.kind,
+        userId,
+        dto.contribution,
+      );
+      const [updated] = await this.db
+        .update(schema.constellationStars)
+        .set({
+          answers: raceMerged.answers,
+          status: raceMerged.status,
+          litAt: race.litAt ?? raceMerged.litAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.constellationStars.id, race.id))
+        .returning();
+      return { star: updated, coupleId };
+    }
   }
 
   async updateStar(

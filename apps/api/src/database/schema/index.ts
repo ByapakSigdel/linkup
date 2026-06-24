@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   pgTable,
@@ -744,7 +744,11 @@ export const constellationStars = pgTable('constellation_stars', {
   litAt: timestamp('lit_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (t) => ({
+  promptUnique: uniqueIndex('constellation_prompt_unique')
+    .on(t.coupleId, t.promptKey)
+    .where(sql`${t.promptKey} is not null`),
+}));
 
 // ─── Push Devices ───────────────────────────────────────────────────────────────
 

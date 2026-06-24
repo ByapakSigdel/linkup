@@ -342,6 +342,7 @@ export function StarDetail({
   const { colors, radius } = useTheme();
   const userId = useAuthStore((s) => s.user?.id ?? '');
   const partnerName = usePartnerName();
+  const live = useConstellationStore((s) => s.stars.find((x) => x.id === star.id)) ?? star;
 
   return (
     <Modal
@@ -400,7 +401,7 @@ export function StarDetail({
             }}
           >
             <AppText variant="subtitle" style={{ flex: 1, marginRight: 8 }}>
-              {star.title}
+              {live.title}
             </AppText>
             <Touchable onPress={onClose} hitSlop={8} accessibilityRole="button">
               <AppText color={colors.textMuted} style={{ fontSize: 24, lineHeight: 28 }}>
@@ -412,7 +413,7 @@ export function StarDetail({
           {/* Kind chip */}
           <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
             <AppText variant="caption" color={colors.textMuted} style={{ textTransform: 'capitalize' }}>
-              {star.kind === 'guess' ? 'Guess the answer' : star.kind === 'custom' ? 'Your story' : 'Shared memory'}
+              {live.kind === 'guess' ? 'Guess the answer' : live.kind === 'custom' ? 'Your story' : 'Shared memory'}
             </AppText>
           </View>
 
@@ -423,14 +424,14 @@ export function StarDetail({
             showsVerticalScrollIndicator={false}
           >
             {/* Answers section */}
-            {star.kind === 'guess' ? (
-              <GuessAnswers star={star} userId={userId} partnerName={partnerName} />
+            {live.kind === 'guess' ? (
+              <GuessAnswers star={live} userId={userId} partnerName={partnerName} />
             ) : (
-              <SharedAnswers star={star} userId={userId} partnerName={partnerName} />
+              <SharedAnswers star={live} userId={userId} partnerName={partnerName} />
             )}
 
             {/* Photo section */}
-            <PhotoSection star={star} />
+            <PhotoSection star={live} />
           </ScrollView>
         </Card>
       </KeyboardAvoidingView>

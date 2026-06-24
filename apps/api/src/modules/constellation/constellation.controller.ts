@@ -30,7 +30,7 @@ export class ConstellationController {
   @Post('stars')
   async upsert(@CurrentUser('id') userId: string, @Body() dto: UpsertStarDto) {
     const { star, coupleId } = await this.service.upsertStar(userId, dto);
-    await this.relay(userId, coupleId, star);
+    await this.relay(userId, coupleId, star, true);
     return { success: true, data: { star } };
   }
 
@@ -41,12 +41,12 @@ export class ConstellationController {
     @Body() patch: { photoUrl?: string; matched?: boolean; text?: string },
   ) {
     const { star, coupleId } = await this.service.updateStar(userId, id, patch);
-    await this.relay(userId, coupleId, star);
+    await this.relay(userId, coupleId, star, false);
     return { success: true, data: { star } };
   }
 
-  /** Notify the partner in real time + a push nudge when a star is touched. */
-  private async relay(userId: string, coupleId: string, star: unknown) {
+  /** Notify the partner in real time; optionally send a push nudge (only on add). */
+  private async relay(userId: string, coupleId: string, star: unknown, notify: boolean) {
     const [couple] = await this.db
       .select({ p1: schema.couples.partner1Id, p2: schema.couples.partner2Id })
       .from(schema.couples)
@@ -57,6 +57,8 @@ export class ConstellationController {
     if (!partnerId) return;
 
     this.gateway.emitToUser(partnerId, 'constellation:star', star);
+
+    if (!notify) return;
 
     try {
       const [me] = await this.db

@@ -301,6 +301,7 @@ export function StarDetail({
 }) {
   const userId = useAuthStore((s) => s.user?.id ?? '');
   const partnerName = usePartnerName();
+  const live = useConstellationStore((s) => s.stars.find((x) => x.id === star.id)) ?? star;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -320,7 +321,7 @@ export function StarDetail({
 
         {/* Header */}
         <div className="flex items-center justify-between gap-2 px-4 pb-1">
-          <p className="flex-1 text-base font-semibold text-text">{star.title}</p>
+          <p className="flex-1 text-base font-semibold text-text">{live.title}</p>
           <button
             type="button"
             onClick={onClose}
@@ -334,9 +335,9 @@ export function StarDetail({
         {/* Kind chip */}
         <div className="px-4 pb-2">
           <span className="text-xs capitalize text-text-muted">
-            {star.kind === 'guess'
+            {live.kind === 'guess'
               ? 'Guess the answer'
-              : star.kind === 'custom'
+              : live.kind === 'custom'
                 ? 'Your story'
                 : 'Shared memory'}
           </span>
@@ -345,14 +346,14 @@ export function StarDetail({
         {/* Scrollable content */}
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-10 pt-2">
           {/* Answers section */}
-          {star.kind === 'guess' ? (
-            <GuessAnswers star={star} userId={userId} partnerName={partnerName} />
+          {live.kind === 'guess' ? (
+            <GuessAnswers star={live} userId={userId} partnerName={partnerName} />
           ) : (
-            <SharedAnswers star={star} userId={userId} partnerName={partnerName} />
+            <SharedAnswers star={live} userId={userId} partnerName={partnerName} />
           )}
 
           {/* Photo section */}
-          <PhotoSection star={star} />
+          <PhotoSection star={live} />
         </div>
       </div>
     </div>
