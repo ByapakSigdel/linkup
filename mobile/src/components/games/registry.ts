@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { ConstellationOfUs } from './constellation';
 import { TicTacToe } from './tic-tac-toe';
 import { ConnectFour } from './connect-four';
 import { RockPaperScissors } from './rock-paper-scissors';
@@ -36,6 +37,7 @@ export const CATEGORY_LABELS: Record<GameCategory, string> = {
 };
 
 export const GAMES: GameDef[] = [
+  { key: 'constellation-of-us', name: 'Constellation of Us', tagline: 'Your star-chart, together', emoji: '✦', category: 'couple', Component: ConstellationOfUs },
   { key: 'tic-tac-toe', name: 'Tic-Tac-Toe', tagline: 'Three in a row', emoji: '⭕', category: 'classic', Component: TicTacToe },
   { key: 'connect-four', name: 'Connect Four', tagline: 'Line up four', emoji: '🔵', category: 'classic', Component: ConnectFour },
   { key: 'rock-paper-scissors', name: 'Rock Paper Scissors', tagline: 'Best of five', emoji: '✊', category: 'classic', Component: RockPaperScissors },
