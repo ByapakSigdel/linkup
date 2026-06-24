@@ -101,13 +101,13 @@ export class FcmService {
   }
 
   /**
-   * Send a DATA-ONLY, high-priority message so the app's RNFirebase background
-   * handler fires and renders a rich Notifee notification — including the
-   * sender's CIRCULAR AVATAR (FCM's own `notification` block has no large-icon
-   * field, so the avatar is only achievable by rendering client-side). High
-   * priority wakes a killed app's handler on most devices; aggressive OEMs may
-   * still need battery-optimization disabled (the app prompts for that). All
-   * data values must be strings.
+   * Send a NOTIFICATION message (notification block + Android channel) so the OS
+   * renders it directly — reliable even when the app is killed or battery-
+   * optimized, where DATA-ONLY messages get silently dropped (proven on-device:
+   * data-only = no notifications; notification messages = delivered). FCM's
+   * notification has no circular large-icon field, so the sender avatar is
+   * attached as `image` (shown when the notification is expanded). The `data`
+   * block rides along for tap routing. All data values must be strings.
    */
   async sendToToken(
     token: string,
@@ -122,7 +122,17 @@ export class FcmService {
     for (const [k, v] of Object.entries(data ?? {})) {
       if (v != null) stringData[k] = String(v);
     }
+    const avatarUrl = stringData.avatarUrl;
     try {
+      const androidNotification: Record<string, unknown> = {
+        channelId: 'messages',
+        sound: 'default',
+        defaultSound: true,
+        notificationPriority: 'PRIORITY_HIGH',
+        icon: 'ic_notification',
+        color: '#c4a8e0',
+      };
+      if (avatarUrl) androidNotification.image = avatarUrl;
       const res = await fetch(
         `https://fcm.googleapis.com/v1/projects/${this.sa.project_id}/messages:send`,
         {
@@ -134,8 +144,13 @@ export class FcmService {
           body: JSON.stringify({
             message: {
               token,
+              notification: { title, body },
               data: stringData,
-              android: { priority: 'high', ttl: '600s' },
+              android: {
+                priority: 'high',
+                ttl: '600s',
+                notification: androidNotification,
+              },
             },
           }),
         },
