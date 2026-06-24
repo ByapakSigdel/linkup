@@ -59,6 +59,25 @@ export function promptsFor(constellationKey: string): Prompt[] {
   return PROMPTS.filter((p) => p.constellationKey === constellationKey);
 }
 
+/** Mirror of the server's placeStar so pending markers sit where the lit star will appear. */
+export function placeStar(constellationKey: string, seed: string): { posX: number; posY: number } {
+  const REGIONS: Record<string, { x: number; y: number }> = {
+    firsts: { x: 250, y: 200 }, inside_jokes: { x: 700, y: 250 },
+    little_things: { x: 200, y: 600 }, what_i_admire: { x: 500, y: 450 },
+    dreams: { x: 780, y: 620 }, hard_times: { x: 450, y: 800 },
+    just_us: { x: 850, y: 850 }, custom: { x: 500, y: 500 },
+  };
+  const base = REGIONS[constellationKey] ?? REGIONS.custom ?? { x: 500, y: 500 };
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const jitterX = (h % 200) - 100;
+  const jitterY = ((h >> 8) % 200) - 100;
+  return {
+    posX: Math.max(20, Math.min(980, base.x + jitterX)),
+    posY: Math.max(20, Math.min(980, base.y + jitterY)),
+  };
+}
+
 /** Deterministic daily prompt: stable per (coupleId, date), skips already-lit prompts. */
 export function dailyPrompt(coupleId: string, dateISO: string, litKeys: string[]): Prompt | null {
   const pool = PROMPTS.filter((p) => !litKeys.includes(p.key));
