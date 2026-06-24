@@ -92,8 +92,12 @@ export async function registerForPushNotifications(): Promise<void> {
       registered = true;
     }
 
-    // Foreground messages: show the same rich notification.
-    messaging().onMessage(displayPushNotification);
+    // Foreground messages are surfaced in-app by the realtime provider (live chat
+    // + an in-app toast when you're not in the chat), so we deliberately DON'T pop
+    // a system notification here — that would double up and even notify you about
+    // the chat you're actively reading. The background/killed path
+    // (background-message.ts) is what shows the rich notification.
+    messaging().onMessage(async () => {});
 
     // Tap (foreground/background-resumed) → open the chat.
     notifee.onForegroundEvent(({ type }) => {

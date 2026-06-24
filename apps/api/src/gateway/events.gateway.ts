@@ -166,10 +166,13 @@ export class EventsGateway
     // Emit the new message to the receiver
     this.emitToUser(receiverId, 'message:new', message);
 
-    // If the receiver is offline, send a push notification (best-effort).
-    if (!this.connectedUsers.has(receiverId)) {
-      void this.sendMessagePush(userId, receiverId, content, messageType);
-    }
+    // Always fire the push (best-effort). We can't rely on socket presence to
+    // decide: React Native keeps the socket connected while the app is merely
+    // backgrounded, so gating on "offline" meant a backgrounded device never got
+    // notified. The CLIENT decides whether to surface it — the foreground path is
+    // a no-op (the in-app UI handles it) while the background/killed path shows
+    // the rich notification.
+    void this.sendMessagePush(userId, receiverId, content, messageType);
 
     // Confirm delivery back to the sender via the emit acknowledgement callback.
     // (Returning a WsResponse {event,data} would EMIT an event instead of acking,

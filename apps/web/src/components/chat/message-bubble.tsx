@@ -51,6 +51,23 @@ function renderMessageText(
 ): React.ReactNode {
   if (!content.includes(':')) return content;
   const parts = content.split(/(:[a-zA-Z0-9_+-]+:)/g);
+
+  // Discord/Slack-style "jumbo" emoji: when the whole message is only custom
+  // emoji(s), render them large; mixed-with-text stays small inline.
+  const tokens = parts.filter((p) => p.trim().length > 0);
+  const emojiCount = tokens.filter((p) => {
+    const m = /^:([a-zA-Z0-9_+-]+):$/.exec(p);
+    return !!(m && byName[m[1]!]);
+  }).length;
+  const emojiOnly = tokens.length > 0 && emojiCount === tokens.length;
+  const sizeClass = emojiOnly
+    ? emojiCount === 1
+      ? 'h-16 w-16'
+      : emojiCount <= 3
+        ? 'h-12 w-12'
+        : 'h-9 w-9'
+    : 'h-5 w-5 align-[-0.3em]';
+
   return parts.map((part, i) => {
     const match = /^:([a-zA-Z0-9_+-]+):$/.exec(part);
     const emoji = match ? byName[match[1]!] : undefined;
@@ -61,7 +78,7 @@ function renderMessageText(
           src={emoji.imageUrl}
           alt={part}
           title={part}
-          className="inline-block h-5 w-5 align-[-0.3em] object-contain"
+          className={cn('inline-block object-contain', sizeClass)}
           loading="lazy"
         />
       );

@@ -40,6 +40,36 @@ function MessageText({
     return <AppText variant="body" color={color}>{content}</AppText>;
   }
   const parts = content.split(/(:[a-zA-Z0-9_+-]+:)/g);
+
+  // Discord/Slack-style "jumbo" emoji: if the whole message is just custom
+  // emoji(s), render them large instead of tiny inline glyphs.
+  const tokens = parts.filter((p) => p.trim().length > 0);
+  const emojiTokens = tokens.filter((p) => {
+    const m = /^:([a-zA-Z0-9_+-]+):$/.exec(p);
+    return !!(m && byName[m[1]!]);
+  });
+  const emojiOnly = tokens.length > 0 && emojiTokens.length === tokens.length;
+
+  if (emojiOnly) {
+    const size = emojiTokens.length === 1 ? 64 : emojiTokens.length <= 3 ? 44 : 32;
+    return (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+        {emojiTokens.map((part, i) => {
+          const m = /^:([a-zA-Z0-9_+-]+):$/.exec(part)!;
+          const uri = resolveMediaUrl(byName[m[1]!]!.imageUrl);
+          return (
+            <Image
+              key={i}
+              source={{ uri }}
+              style={{ width: size, height: size }}
+              contentFit="contain"
+            />
+          );
+        })}
+      </View>
+    );
+  }
+
   return (
     <AppText variant="body" color={color}>
       {parts.map((part, i) => {
