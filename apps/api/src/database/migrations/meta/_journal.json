@@ -43,6 +43,13 @@
       "when": 1782197624209,
       "tag": "0005_blushing_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782297044792,
+      "tag": "0006_slim_hydra",
+      "breakpoints": true
     }
   ]
 }

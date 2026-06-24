@@ -723,6 +723,29 @@ export const callSessions = pgTable('call_sessions', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// ─── Constellation of Us ─────────────────────────────────────────────────────
+export const constellationStars = pgTable('constellation_stars', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  coupleId: uuid('couple_id')
+    .notNull()
+    .references((): AnyPgColumn => couples.id),
+  constellationKey: varchar('constellation_key', { length: 40 }).notNull(),
+  promptKey: varchar('prompt_key', { length: 80 }),
+  kind: varchar('kind', { length: 16 }).notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  status: varchar('status', { length: 16 }).notNull().default('pending'),
+  answers: jsonb('answers').notNull().default({}),
+  photoUrl: varchar('photo_url', { length: 512 }),
+  posX: integer('pos_x').notNull().default(500),
+  posY: integer('pos_y').notNull().default(500),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  litAt: timestamp('lit_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // ─── Push Devices ───────────────────────────────────────────────────────────────
 
 export const devices = pgTable('devices', {
