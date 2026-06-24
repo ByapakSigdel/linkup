@@ -16,6 +16,7 @@ import { MusicModule } from './modules/music/music.module';
 import { SearchModule } from './modules/search/search.module';
 import { EntertainmentModule } from './modules/entertainment/entertainment.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { ConstellationModule } from './modules/constellation/constellation.module';
 import { EmailModule } from './modules/email/email.module';
 import { PushModule } from './modules/push/push.module';
 
@@ -43,6 +44,7 @@ import { PushModule } from './modules/push/push.module';
     SearchModule,
     EntertainmentModule,
     AchievementsModule,
+    ConstellationModule,
   ],
 })
 export class AppModule {}
