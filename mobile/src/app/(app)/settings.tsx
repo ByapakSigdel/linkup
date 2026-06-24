@@ -144,9 +144,11 @@ export default function SettingsScreen() {
 
   const updateSetting = useCallback(
     async (key: keyof UserSettings, value: boolean | string) => {
-      if (!settings) return;
+      // Work even if the initial settings fetch failed (settings === null): the
+      // backend upserts, so the toggle still saves instead of silently doing
+      // nothing. Optimistically merge onto whatever we have (or an empty base).
       const prev = settings;
-      setSettings({ ...settings, [key]: value });
+      setSettings((s) => ({ ...((s ?? {}) as UserSettings), [key]: value }));
       try {
         await api.patch('/users/me/settings', { [key]: value });
       } catch {
@@ -202,7 +204,8 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 16 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Couple */}
