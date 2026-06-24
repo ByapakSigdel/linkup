@@ -168,15 +168,23 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps): JSX
     }).filter((c): c is NonNullable<typeof c> => Boolean(c));
   }, [litByPrompt]);
 
-  // Pending markers: every non-spicy curated prompt without a lit star yet.
+  // Every prompt that already has a star (lit OR in-progress) — so we don't draw
+  // a dim pending marker stacked under an in-progress star at the same spot.
+  const starredPrompts = useMemo(() => {
+    const s = new Set<string>();
+    for (const st of stars) if (st.promptKey) s.add(st.promptKey);
+    return s;
+  }, [stars]);
+
+  // Pending markers: every non-spicy curated prompt with no star of any kind yet.
   const pendingMarkers = useMemo(() => {
     return PROMPTS.filter(
-      (p) => p.tier !== 'spicy' && !litByPrompt.has(p.key),
+      (p) => p.tier !== 'spicy' && !starredPrompts.has(p.key),
     ).map((p) => {
       const pos = placeStar(p.constellationKey, p.key);
       return { key: p.key, x: pos.posX, y: pos.posY };
     });
-  }, [litByPrompt]);
+  }, [starredPrompts]);
 
   return (
     <View style={styles.root}>
@@ -200,8 +208,7 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps): JSX
               y={0}
               width={SKY}
               height={SKY}
-              fill={colors.background}
-              opacity={0}
+              fill="transparent"
               onPress={() => onPressEmpty?.()}
             />
 
