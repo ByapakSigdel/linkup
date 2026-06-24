@@ -110,6 +110,15 @@ export default function DashboardScreen() {
     })();
   }, [fetchDashboard, fetchStreak]);
 
+  // Pull-to-refresh: re-pull presence, partner, dates and streak on demand.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    requestPresence();
+    await Promise.all([fetchDashboard(), fetchStreak()]);
+    setRefreshing(false);
+  }, [fetchDashboard, fetchStreak, requestPresence]);
+
   // Ask for the partner's current status now, then keep it fresh.
   useEffect(() => {
     requestPresence();
@@ -151,7 +160,7 @@ export default function DashboardScreen() {
   const hasStreak = !!streak && streak.currentStreak > 0;
 
   return (
-    <Screen scroll padded={false} maxWidth={contentMaxWidth}>
+    <Screen scroll padded={false} maxWidth={contentMaxWidth} onRefresh={onRefresh} refreshing={refreshing}>
       <View style={styles.container}>
         <AppBar title="Home" />
 

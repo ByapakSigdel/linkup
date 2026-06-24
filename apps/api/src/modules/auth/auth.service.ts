@@ -263,7 +263,10 @@ export class AuthService {
     ]
       .map((s) => s.trim())
       .filter(Boolean);
-    if (allowed.length > 0 && !allowed.includes(payload.aud)) {
+    // Fail CLOSED: if no client IDs are configured, reject — otherwise a token
+    // minted for *any* Google client would pass the audience check, letting an
+    // attacker sign in as any verified email.
+    if (allowed.length === 0 || !allowed.includes(payload.aud)) {
       throw new UnauthorizedException('Google sign-in is not configured for this app');
     }
 

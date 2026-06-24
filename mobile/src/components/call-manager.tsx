@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react-native';
+import { router } from 'expo-router';
+import {
+  Phone,
+  PhoneOff,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Minimize2,
+  Gamepad2,
+} from 'lucide-react-native';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { useCallStore } from '@/stores/call-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -33,6 +43,8 @@ export function CallManager() {
   const peer = useCallStore((s) => s.peer);
   const muted = useCallStore((s) => s.muted);
   const cameraOff = useCallStore((s) => s.cameraOff);
+  const minimized = useCallStore((s) => s.minimized);
+  const setMinimized = useCallStore((s) => s.setMinimized);
   const token = useAuthStore((s) => s.tokens?.accessToken);
 
   const pcRef = useRef<any>(null);
@@ -233,6 +245,13 @@ export function CallManager() {
     useCallStore.getState().setCameraOff(next);
   }
 
+  // Shrink the call to a floating bubble and jump to the games hub so the couple
+  // can play/watch/draw together while the call keeps running.
+  function openActivities() {
+    setMinimized(true);
+    router.push('/games');
+  }
+
   if (phase === 'idle') return null;
 
   const showVideo = callType === 'video' || callType === 'screen';
@@ -293,9 +312,69 @@ export function CallManager() {
     );
   }
 
+  // Minimized: a floating bubble that keeps the call alive while the couple uses
+  // the rest of the app. Tap to expand; the WebRTC connection is untouched.
+  if (minimized) {
+    return (
+      <View
+        pointerEvents="box-none"
+        style={{ position: 'absolute', top: 60, right: 16, zIndex: 9999 }}
+      >
+        <Pressable
+          onPress={() => setMinimized(false)}
+          accessibilityRole="button"
+          accessibilityLabel={`Return to call with ${peer?.displayName || 'partner'}`}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: 'rgba(12,12,16,0.94)',
+            borderRadius: 999,
+            paddingVertical: 8,
+            paddingLeft: 8,
+            paddingRight: 12,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.15)',
+          }}
+        >
+          <Avatar uri={peer?.avatarUrl} name={peer?.displayName} size={36} />
+          <View>
+            <AppText color="#fff" variant="label">
+              {peer?.displayName || 'Partner'}
+            </AppText>
+            <AppText color={colors.success} variant="caption">
+              {phase === 'in-call'
+                ? fmt(elapsed)
+                : phase === 'connecting'
+                  ? 'Connecting…'
+                  : 'Calling…'}
+            </AppText>
+          </View>
+          <Pressable
+            onPress={() => endCall(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="End call"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              backgroundColor: colors.error,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 2,
+            }}
+          >
+            <PhoneOff color="#fff" size={16} />
+          </Pressable>
+        </Pressable>
+      </View>
+    );
+  }
+
   // Active / calling window
   return (
-    <Modal transparent={false} animationType="slide" visible onRequestClose={() => endCall(true)}>
+    <Modal transparent={false} animationType="slide" visible onRequestClose={() => setMinimized(true)}>
       <View style={{ flex: 1, backgroundColor: '#0c0c10' }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           {showVideo && RTCView && remoteStream ? (
@@ -326,7 +405,10 @@ export function CallManager() {
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 26 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 26 }}>
+          <RoundBtn onPress={() => setMinimized(true)} bg="rgba(255,255,255,0.16)">
+            <Minimize2 color="#fff" size={22} />
+          </RoundBtn>
           {RTC_AVAILABLE && (
             <RoundBtn onPress={toggleMute} bg="rgba(255,255,255,0.16)">
               {muted ? <MicOff color="#fff" size={22} /> : <Mic color="#fff" size={22} />}
@@ -337,6 +419,10 @@ export function CallManager() {
               {cameraOff ? <VideoOff color="#fff" size={22} /> : <Video color="#fff" size={22} />}
             </RoundBtn>
           )}
+          {/* Shrink the call and open games/watch/draw — keep talking while you play. */}
+          <RoundBtn onPress={openActivities} bg="rgba(255,255,255,0.16)">
+            <Gamepad2 color="#fff" size={22} />
+          </RoundBtn>
           <RoundBtn onPress={() => endCall(true)} bg={colors.error} big>
             <PhoneOff color="#fff" size={26} />
           </RoundBtn>

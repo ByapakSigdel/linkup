@@ -87,6 +87,9 @@ const initialState = {
   highlightingMessage: null as Message | null,
 };
 
+// Safety timer so a lost typing:stop event doesn't leave the indicator stuck on.
+let typingClearTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useChatStore = create<ChatState>()((set, get) => ({
   ...initialState,
 
@@ -150,7 +153,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     })),
 
   // Partner
-  setPartnerTyping: (isTyping) => set({ isPartnerTyping: isTyping }),
+  setPartnerTyping: (isTyping) => {
+    if (typingClearTimer) {
+      clearTimeout(typingClearTimer);
+      typingClearTimer = null;
+    }
+    // If typing:stop never arrives (network drop/crash), auto-clear after 6s.
+    if (isTyping) {
+      typingClearTimer = setTimeout(() => {
+        useChatStore.setState({ isPartnerTyping: false });
+        typingClearTimer = null;
+      }, 6000);
+    }
+    set({ isPartnerTyping: isTyping });
+  },
 
   setPartnerPresence: (isOnline, lastSeenAt) =>
     set({ isPartnerOnline: isOnline, partnerLastSeenAt: lastSeenAt }),

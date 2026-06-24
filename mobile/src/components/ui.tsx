@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   type PressableProps,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -38,6 +39,8 @@ export function Screen({
   contentStyle,
   style,
   maxWidth,
+  onRefresh,
+  refreshing,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
@@ -47,6 +50,9 @@ export function Screen({
   style?: ViewStyle;
   /** Center single-column content at this width on big (tablet) screens. */
   maxWidth?: number;
+  /** Enable pull-to-refresh on a scrolling screen. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const { colors } = useTheme();
   const pad: ViewStyle = padded ? { padding: 16 } : {};
@@ -71,6 +77,16 @@ export function Screen({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={!!refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={colors.primary}
+                  colors={[colors.primary]}
+                />
+              ) : undefined
+            }
           >
             {inner}
           </ScrollView>

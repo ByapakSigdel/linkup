@@ -20,8 +20,14 @@ import { TypingIndicator } from '@/components/chat/typing-indicator';
 import { HighlightPicker } from '@/components/chat/highlight-picker';
 import { resolveMediaUrl } from '@/lib/env';
 import { useResponsive } from '@/hooks/use-responsive';
-import api from '@/lib/api';
+import api, { apiErrorMessage } from '@/lib/api';
+import { useToastStore } from '@/stores/toast-store';
 import type { Message, HighlightCategory } from '@/types';
+
+/** Surface a failed chat action instead of silently swallowing it. */
+function toastError(title: string, error: unknown) {
+  useToastStore.getState().push({ title, body: apiErrorMessage(error), variant: 'info' });
+}
 
 // Comfortable reading column for the conversation on tablets so bubbles don't
 // stretch edge-to-edge. Phones (isWide === false) keep full width.
@@ -108,6 +114,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error('Failed to edit message:', error);
+      toastError("Couldn't edit message", error);
     }
   }, []);
 
@@ -117,6 +124,7 @@ export default function ChatScreen() {
       useChatStore.getState().removeMessage(messageId);
     } catch (error) {
       console.error('Failed to delete message:', error);
+      toastError("Couldn't delete message", error);
     }
   }, []);
 
@@ -135,8 +143,9 @@ export default function ChatScreen() {
         await api.post(`/messages/${target.id}/highlight`, { category, color });
         highlightMessage(target.id, category, color);
       } catch (error) {
+        // Don't fake success — the highlight didn't save, so surface it.
         console.error('Failed to highlight message:', error);
-        highlightMessage(target.id, category, color);
+        toastError("Couldn't highlight message", error);
       }
       setHighlightingMessage(null);
     },
@@ -155,6 +164,7 @@ export default function ChatScreen() {
         });
       } catch (error) {
         console.error('Failed to add reaction:', error);
+        toastError("Couldn't add reaction", error);
       }
     },
     [user],

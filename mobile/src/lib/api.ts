@@ -2,6 +2,23 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, AUTH_STORAGE_KEY } from './env';
 import { useAuthStore } from '@/stores/auth-store';
+import { useToastStore } from '@/stores/toast-store';
+
+/** Clear the session and tell the user why, then let the layout route to login. */
+function endExpiredSession() {
+  try {
+    if (useAuthStore.getState().isAuthenticated) {
+      useToastStore.getState().push({
+        title: 'Session expired',
+        body: 'Please log in again.',
+        variant: 'info',
+      });
+    }
+    useAuthStore.getState().forceLogout();
+  } catch {
+    /* store not ready */
+  }
+}
 
 /**
  * Axios client for the LinkUp API — mirrors the web client's behaviour, but
@@ -91,14 +108,10 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
         // No refresh token at all — fall through to a clean logout.
-        useAuthStore.getState().forceLogout();
+        endExpiredSession();
       } catch {
-        // Refresh token is expired/revoked — log out cleanly.
-        try {
-          useAuthStore.getState().forceLogout();
-        } catch {
-          /* store not ready */
-        }
+        // Refresh token is expired/revoked — log out cleanly + tell the user.
+        endExpiredSession();
       }
     }
     return Promise.reject(error);

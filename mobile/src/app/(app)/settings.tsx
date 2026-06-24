@@ -41,6 +41,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
+import { useToastStore } from '@/stores/toast-store';
 
 interface UserSettings {
   id: string;
@@ -150,6 +151,11 @@ export default function SettingsScreen() {
         await api.patch('/users/me/settings', { [key]: value });
       } catch {
         setSettings(prev);
+        useToastStore.getState().push({
+          title: "Couldn't save setting",
+          body: 'Check your connection and try again.',
+          variant: 'info',
+        });
       }
     },
     [settings],

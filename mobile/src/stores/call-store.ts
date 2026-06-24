@@ -18,6 +18,9 @@ interface CallState {
   cameraOff: boolean;
   startedAt: number | null;
   callRecordId: string | null;
+  /** When true the full-screen call UI collapses to a floating bubble so the
+   *  couple can use the rest of the app (games, watch, draw) mid-call. */
+  minimized: boolean;
 
   setIncoming: (callType: CallType, peer: CallPeer) => void;
   setCalling: (callType: CallType, peer: CallPeer) => void;
@@ -26,6 +29,7 @@ interface CallState {
   setMuted: (m: boolean) => void;
   setCameraOff: (c: boolean) => void;
   setCallRecordId: (id: string | null) => void;
+  setMinimized: (m: boolean) => void;
   reset: () => void;
 }
 
@@ -38,16 +42,18 @@ export const useCallStore = create<CallState>()((set) => ({
   cameraOff: false,
   startedAt: null,
   callRecordId: null,
+  minimized: false,
 
   setIncoming: (callType, peer) =>
-    set({ phase: 'incoming', callType, peer, isCaller: false }),
+    set({ phase: 'incoming', callType, peer, isCaller: false, minimized: false }),
   setCalling: (callType, peer) =>
-    set({ phase: 'calling', callType, peer, isCaller: true }),
+    set({ phase: 'calling', callType, peer, isCaller: true, minimized: false }),
   setConnecting: () => set({ phase: 'connecting' }),
   setInCall: () => set({ phase: 'in-call', startedAt: Date.now() }),
   setMuted: (m) => set({ muted: m }),
   setCameraOff: (c) => set({ cameraOff: c }),
   setCallRecordId: (id) => set({ callRecordId: id }),
+  setMinimized: (m) => set({ minimized: m }),
   reset: () =>
     set({
       phase: 'idle',
@@ -57,5 +63,6 @@ export const useCallStore = create<CallState>()((set) => ({
       cameraOff: false,
       startedAt: null,
       callRecordId: null,
+      minimized: false,
     }),
 }));
