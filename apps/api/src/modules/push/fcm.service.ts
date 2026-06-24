@@ -101,9 +101,12 @@ export class FcmService {
   }
 
   /**
-   * Send a DATA-ONLY message (no `notification` block) so the app's RNFirebase
-   * background handler always fires and renders a rich Notifee notification
-   * (avatar large icon, MessagingStyle, accent). All data values must be strings.
+   * Send a NOTIFICATION message (with a `notification` block + Android channel)
+   * so the OS displays it directly when the app is backgrounded or killed. This
+   * is far more reliable than data-only messages, which OEM battery optimization
+   * routinely drops before the app can wake to render its own notification. The
+   * `data` block rides along for in-app handling / tap routing. All data values
+   * must be strings.
    */
   async sendToToken(
     token: string,
@@ -130,8 +133,20 @@ export class FcmService {
           body: JSON.stringify({
             message: {
               token,
+              notification: { title, body },
               data: stringData,
-              android: { priority: 'high', ttl: '600s' },
+              android: {
+                priority: 'high',
+                ttl: '600s',
+                notification: {
+                  channelId: 'messages',
+                  sound: 'default',
+                  defaultSound: true,
+                  notificationPriority: 'PRIORITY_HIGH',
+                  icon: 'ic_notification',
+                  color: '#c4a8e0',
+                },
+              },
             },
           }),
         },

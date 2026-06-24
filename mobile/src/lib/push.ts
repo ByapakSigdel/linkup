@@ -1,20 +1,17 @@
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
-import messaging, {
-  FirebaseMessagingTypes,
-} from '@react-native-firebase/messaging';
-import notifee, {
-  AndroidImportance,
-  AndroidStyle,
-  AndroidVisibility,
-  EventType,
-} from '@notifee/react-native';
+import messaging from '@react-native-firebase/messaging';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 import api from '@/lib/api';
 
 const CHANNEL_ID = 'messages';
 const ACCENT = '#c4a8e0';
 
-/** Ensure the high-importance "Messages" channel exists (Android). */
+/**
+ * Ensure the high-importance "Messages" channel exists (Android 8+). FCM
+ * notification messages target this channel id, so it must exist for them to
+ * pop with sound/heads-up.
+ */
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await notifee.createChannel({
@@ -29,51 +26,16 @@ async function ensureChannel(): Promise<void> {
   });
 }
 
-/**
- * Render a rich, chat-style notification from an FCM data message. Shared by the
- * foreground (onMessage) and background/killed (setBackgroundMessageHandler)
- * paths so the look is identical in every app state.
- *
- * Expected data: { title (sender name), body (message), avatarUrl?, type }.
- */
-export async function displayPushNotification(
-  remoteMessage: FirebaseMessagingTypes.RemoteMessage,
-): Promise<void> {
-  const data = (remoteMessage?.data ?? {}) as Record<string, string>;
-  const title = data.title || 'New message';
-  const body = data.body || 'Sent you a message';
-  const avatar = data.avatarUrl || undefined;
-
-  await ensureChannel();
-
-  await notifee.displayNotification({
-    title,
-    body,
-    data,
-    android: {
-      channelId: CHANNEL_ID,
-      smallIcon: 'ic_notification',
-      color: ACCENT,
-      largeIcon: avatar,
-      circularLargeIcon: true,
-      pressAction: { id: 'default', launchActivity: 'default' },
-      importance: AndroidImportance.HIGH,
-      visibility: AndroidVisibility.PRIVATE,
-      // WhatsApp-style conversation layout: sender (name + avatar) + the message.
-      style: {
-        type: AndroidStyle.MESSAGING,
-        person: { name: title, icon: avatar },
-        messages: [{ text: body, timestamp: Date.now() }],
-      },
-    },
-  });
-}
-
 let registered = false;
 
 /**
- * Request notification permission, register this device's FCM token with the
- * backend, create the channel, and wire foreground display + tap-to-open.
+ * Request notification permission, create the channel, register this device's
+ * FCM token with the backend, and wire tap-to-open-chat.
+ *
+ * Display itself is left to the OS: the server sends NOTIFICATION messages, which
+ * Android renders directly when the app is backgrounded/killed (reliable even
+ * under battery optimization). Foreground messages are surfaced in-app by the
+ * realtime provider, so we intentionally don't pop a system notification then.
  */
 export async function registerForPushNotifications(): Promise<void> {
   if (registered) return;
@@ -92,17 +54,16 @@ export async function registerForPushNotifications(): Promise<void> {
       registered = true;
     }
 
-    // Foreground messages are surfaced in-app by the realtime provider (live chat
-    // + an in-app toast when you're not in the chat), so we deliberately DON'T pop
-    // a system notification here — that would double up and even notify you about
-    // the chat you're actively reading. The background/killed path
-    // (background-message.ts) is what shows the rich notification.
+    // Foreground messages: handled in-app (live chat + toast), so don't also pop
+    // a system notification — that would double up and notify you about the chat
+    // you're already reading.
     messaging().onMessage(async () => {});
 
-    // Tap (foreground/background-resumed) → open the chat.
-    notifee.onForegroundEvent(({ type }) => {
-      if (type === EventType.PRESS) openChat();
-    });
+    // Tap on a notification while the app is backgrounded → open the chat.
+    messaging().onNotificationOpenedApp(() => openChat());
+    // Tap that cold-launched the app from a killed state → open the chat.
+    const initial = await messaging().getInitialNotification();
+    if (initial) openChat();
   } catch {
     // best-effort — never block app start on notification setup
   }
