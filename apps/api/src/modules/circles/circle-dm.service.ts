@@ -423,7 +423,10 @@ export class CircleDmService {
       senderCircleId: m.senderCircleId,
       content: m.content ?? undefined,
       mediaUrls: m.mediaUrls ?? [],
-      createdAt: m.createdAt,
+      // Emit an ISO string (not a raw Date) so the realtime socket payload —
+      // which bypasses NestJS JSON serialization — matches the HTTP response and
+      // the client's `createdAt: string | null` type.
+      createdAt: m.createdAt?.toISOString() ?? null,
       senderName: m.senderName ?? null,
       senderAvatarUrl: m.senderAvatarUrl ?? null,
     };

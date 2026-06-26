@@ -47,6 +47,12 @@ export default function CircleMessagesScreen() {
   const loadingMoreRef = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // My own circle id — needed so the circle:dm:read handler can tell MY read
+  // (clear my badge) apart from the OTHER circle's read (the gateway fans the
+  // event to all participants, including the reader's couple). Held in a ref so
+  // the stable socket handler always sees the resolved value.
+  const myCircleIdRef = useRef<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -67,6 +73,15 @@ export default function CircleMessagesScreen() {
       return;
     }
     void load();
+    // Resolve my own circle id once so the read handler can scope to MY reads.
+    circlesApi
+      .getMyCircle()
+      .then((res) => {
+        myCircleIdRef.current = res.circle?.id ?? null;
+      })
+      .catch(() => {
+        // Non-fatal: without it the read handler conservatively skips clearing.
+      });
   }, [couple?.isPaired, load]);
 
   const loadMore = useCallback(async () => {
@@ -136,8 +151,12 @@ export default function CircleMessagesScreen() {
     };
 
     const onRead = (payload: { conversationId: string; circleId: string }) => {
-      // My own circle's read marker advanced (e.g. read on another device) —
-      // clear the unread badge for that conversation.
+      // The gateway fans circle:dm:read to ALL participants (both circles), so
+      // only clear the badge when it's MY circle's read marker that advanced
+      // (e.g. the thread was read on another device). Ignore the OTHER circle
+      // reading the thread — that must not zero my own unread count.
+      const mine = myCircleIdRef.current;
+      if (!mine || payload.circleId !== mine) return;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === payload.conversationId ? { ...c, unreadCount: 0 } : c,
