@@ -12,8 +12,17 @@ import { create } from 'zustand';
 interface CircleDmState {
   byConversation: Record<string, number>;
   totalUnread: number;
+  /**
+   * The viewer's OWN circle id, resolved once (RealtimeProvider seeds it via
+   * getMyCircle). A `circle:dm:read` event fans out to ALL participants, so any
+   * read handler must check `payload.circleId === myCircleId` before clearing an
+   * unread — the OTHER couple reading must not zero our badge/rows.
+   */
+  myCircleId: string | null;
   /** Replace the whole map from a fresh inbox fetch. */
   setFromInbox: (entries: { id: string; unreadCount: number }[]) => void;
+  /** Record the viewer's own circle id (for read-receipt ownership checks). */
+  setMyCircleId: (id: string | null) => void;
   /** Increment one conversation's unread count (incoming message). */
   bump: (conversationId: string, by?: number) => void;
   /** Zero a single conversation's unread (opened / marked read). */
@@ -33,6 +42,7 @@ function sum(map: Record<string, number>): number {
 export const useCircleDmStore = create<CircleDmState>()((set) => ({
   byConversation: {},
   totalUnread: 0,
+  myCircleId: null,
 
   setFromInbox: (entries) =>
     set(() => {
@@ -42,6 +52,8 @@ export const useCircleDmStore = create<CircleDmState>()((set) => ({
       }
       return { byConversation, totalUnread: sum(byConversation) };
     }),
+
+  setMyCircleId: (id) => set({ myCircleId: id }),
 
   bump: (conversationId, by = 1) =>
     set((state) => {
@@ -68,5 +80,5 @@ export const useCircleDmStore = create<CircleDmState>()((set) => ({
       return { byConversation, totalUnread: sum(byConversation) };
     }),
 
-  reset: () => set({ byConversation: {}, totalUnread: 0 }),
+  reset: () => set({ byConversation: {}, totalUnread: 0, myCircleId: null }),
 }));

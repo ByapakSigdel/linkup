@@ -16,11 +16,6 @@ import { ToastContainer } from '@/components/realtime/toast-container';
 import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
 import type { CircleDmMessage } from '@/components/circles/types';
 
-// §Phase2 DM — the viewer's own circle id, resolved once and read by the
-// `circle:dm:read` handler. A `read` event fans out to ALL participants, so we
-// must ignore the OTHER couple's reads when clearing OUR unread badge.
-let circleDmMyCircleId: string | null = null;
-
 /**
  * Owns the single shared socket connection and all inbound realtime event
  * wiring for the whole authenticated app. Feature-specific hooks may attach
@@ -36,7 +31,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!token || !isPaired) {
       useCircleDmStore.getState().reset();
-      circleDmMyCircleId = null;
       return;
     }
     let cancelled = false;
@@ -44,7 +38,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       .getMyCircle()
       .then((res) => {
         if (cancelled) return;
-        circleDmMyCircleId = res.circle?.id ?? null;
+        useCircleDmStore.getState().setMyCircleId(res.circle?.id ?? null);
       })
       .catch(() => {});
     void circlesApi
@@ -102,7 +96,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (!payload?.conversationId) return;
       // Only OUR circle's read marker clears OUR unread. The other couple
       // reading must not zero our badge.
-      if (circleDmMyCircleId && payload.circleId !== circleDmMyCircleId) return;
+      const myCircleId = useCircleDmStore.getState().myCircleId;
+      if (myCircleId && payload.circleId !== myCircleId) return;
       useCircleDmStore.getState().clear(payload.conversationId);
     };
     const onPresence = (presence: PresenceUpdate) => {

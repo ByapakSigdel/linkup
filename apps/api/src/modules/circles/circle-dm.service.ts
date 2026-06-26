@@ -236,6 +236,56 @@ export class CircleDmService {
     return { conversations, nextCursor };
   }
 
+  // ─── GET /circles/conversations/:id ──────────────────────────────────────────
+
+  /**
+   * A single conversation summary for the caller's circle. Used by the thread
+   * header so it can resolve the other circle directly instead of scanning the
+   * paginated inbox (which may not contain it past the first page).
+   */
+  async getConversation(conversationId: string, coupleId: string) {
+    const myCircle = await this.circles.requireMyCirclePublic(coupleId);
+    const conv = await this.loadParticipantConversation(conversationId, myCircle.id);
+    const otherId = this.otherCircleId(conv, myCircle.id);
+
+    const [other] = await this.db
+      .select({
+        id: schema.circles.id,
+        handle: schema.circles.handle,
+        name: schema.circles.name,
+        avatarUrl: schema.circles.avatarUrl,
+      })
+      .from(schema.circles)
+      .where(eq(schema.circles.id, otherId))
+      .limit(1);
+
+    const [read] = await this.db
+      .select({ lastReadAt: schema.circleConversationReads.lastReadAt })
+      .from(schema.circleConversationReads)
+      .where(
+        and(
+          eq(schema.circleConversationReads.circleId, myCircle.id),
+          eq(schema.circleConversationReads.conversationId, conv.id),
+        ),
+      )
+      .limit(1);
+
+    const readByConv = new Map<string, Date | null>([
+      [conv.id, read?.lastReadAt ?? null],
+    ]);
+    const unreadByConv = await this.unreadCounts([conv.id], myCircle.id, readByConv);
+
+    return {
+      conversation: {
+        id: conv.id,
+        otherCircle: other ? this.circles.circleSummaryPublic(other) : null,
+        lastMessagePreview: conv.lastMessagePreview ?? null,
+        lastMessageAt: conv.lastMessageAt,
+        unreadCount: unreadByConv.get(conv.id) ?? 0,
+      },
+    };
+  }
+
   /** Per-conversation unread counts for the caller's circle. */
   private async unreadCounts(
     conversationIds: string[],

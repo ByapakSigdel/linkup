@@ -27,7 +27,6 @@ import { ArrowLeft, ImagePlus, Loader2, MessageCircle, Send } from 'lucide-react
 import { Avatar, Spinner } from '@/components/ui';
 import { TypingIndicator } from '@/components/chat/typing-indicator';
 import {
-  type CircleConversation,
   type CircleDmMessage,
   type CircleSummary,
 } from '@/components/circles';
@@ -122,11 +121,10 @@ export default function CircleThreadPage() {
   const loadHeader = useCallback(async () => {
     if (!conversationId) return;
     try {
-      const { conversations } = await circlesApi.getConversations({ limit: 50 });
-      const match = conversations.find(
-        (c: CircleConversation) => c.id === conversationId,
-      );
-      if (match?.otherCircle) setOther(match.otherCircle);
+      // Resolve the other circle directly — scanning the paginated inbox would
+      // miss conversations past the first page (viewer with >50 conversations).
+      const { conversation } = await circlesApi.getConversation(conversationId);
+      if (conversation?.otherCircle) setOther(conversation.otherCircle);
     } catch {
       // Header falls back to a generic title.
     }

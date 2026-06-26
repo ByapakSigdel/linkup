@@ -143,8 +143,11 @@ export default function CircleMessagesPage() {
     };
 
     const onRead = (payload: { conversationId: string; circleId: string }) => {
-      // The global store decides (via the viewer's circle id) whether this read
-      // is ours; here we optimistically clear the row badge to match.
+      // A `circle:dm:read` fans out to ALL participants (both couples). Only OUR
+      // circle's read clears the row badge — the OTHER couple reading must not
+      // zero it. Mirror the RealtimeProvider's ownership guard.
+      const myCircleId = useCircleDmStore.getState().myCircleId;
+      if (myCircleId && payload.circleId !== myCircleId) return;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === payload.conversationId ? { ...c, unreadCount: 0 } : c,

@@ -323,6 +323,13 @@ export function getConversations(
   return unwrap(api.get('/circles/conversations', { params: pageQuery(params) }));
 }
 
+/** GET /circles/conversations/:id — single conversation summary (header resolve). */
+export function getConversation(
+  conversationId: string,
+): Promise<{ conversation: CircleConversation }> {
+  return unwrap(api.get(`/circles/conversations/${conversationId}`));
+}
+
 /**
  * POST /circles/:idOrHandle/conversations — find-or-create a DM with that circle.
  * 403 unless both circles mutually follow each other (accepted both ways).

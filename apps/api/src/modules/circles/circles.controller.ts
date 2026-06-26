@@ -260,6 +260,16 @@ export class CirclesController {
     return { success: true, data };
   }
 
+  // GET /circles/conversations/:id — single conversation summary (participant-only).
+  @Get('conversations/:id')
+  async getConversation(
+    @Param('id') id: string,
+    @CurrentUser('coupleId') coupleId: string,
+  ) {
+    const data = await this.circleDmService.getConversation(id, coupleId);
+    return { success: true, data };
+  }
+
   // GET /circles/conversations/:id/messages — keyset, participant-only.
   @Get('conversations/:id/messages')
   async listMessages(
