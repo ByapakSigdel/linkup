@@ -98,7 +98,9 @@ function PostVideo({
   contentFit: 'contain' | 'cover';
 }) {
   const player = useVideoPlayer(uri, (p) => {
-    p.muted = !controls;
+    // Autoplay (feed / grid previews) → always muted so it starts silently.
+    // Controls (lightbox / story) → unmuted, no autoplay loop.
+    p.muted = autoplay ? true : !controls;
     p.loop = autoplay;
     if (autoplay) p.play();
   });

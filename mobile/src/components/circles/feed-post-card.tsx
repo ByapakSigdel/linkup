@@ -4,7 +4,7 @@
 // comment toggle, counts, caption, and an expandable comments section. Stays in
 // sync with the shared socket for live like updates.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Heart, MessageCircle, Trash2 } from 'lucide-react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming, FadeIn, FadeOut } from 'react-native-reanimated';
 import { Avatar, AppText, Row, Spinner } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { resolveMediaUrl } from '@/lib/env';
@@ -55,6 +55,12 @@ export function FeedPostCard({ post, onUpdate, onDelete }: FeedPostCardProps) {
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
+
+  // Double-tap-to-like: track last tap timestamp + overlay visibility.
+  const lastTapRef = useRef<number>(0);
+  const [doubleTapHeart, setDoubleTapHeart] = useState(false);
+  const doubleTapScale = useSharedValue(0);
+  const doubleTapStyle = useAnimatedStyle(() => ({ transform: [{ scale: doubleTapScale.value }] }));
 
   const media = post.mediaUrls ?? [];
   const isCarousel = media.length > 1;
@@ -103,6 +109,27 @@ export function FeedPostCard({ post, onUpdate, onDelete }: FeedPostCardProps) {
       onUpdate?.(post.id, { likedByMe: prevLiked, likeCount: prevCount });
     } finally {
       setLiking(false);
+    }
+  };
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const delta = now - lastTapRef.current;
+    lastTapRef.current = now;
+    if (delta < 300) {
+      // Second tap within 300 ms → like (only if not already liked; Instagram
+      // also does nothing on double-tap when already liked).
+      if (!liked) {
+        void handleLike();
+      }
+      // Always show the heart pop so the gesture feels acknowledged.
+      setDoubleTapHeart(true);
+      doubleTapScale.value = withSequence(
+        withTiming(1, { duration: 150 }),
+        withTiming(1.3, { duration: 100 }),
+        withTiming(1, { duration: 100 }),
+      );
+      setTimeout(() => setDoubleTapHeart(false), 700);
     }
   };
 
@@ -189,7 +216,11 @@ export function FeedPostCard({ post, onUpdate, onDelete }: FeedPostCardProps) {
 
       {/* Media */}
       {media.length > 0 ? (
-        <View style={{ width: mediaSize, height: mediaSize, backgroundColor: colors.background }}>
+        <Pressable
+          onPress={handleDoubleTap}
+          accessibilityLabel="Double-tap to like"
+          style={{ width: mediaSize, height: mediaSize, backgroundColor: colors.background }}
+        >
           {isCarousel ? (
             <>
               <FlatList
@@ -239,9 +270,32 @@ export function FeedPostCard({ post, onUpdate, onDelete }: FeedPostCardProps) {
               size="medium"
               resizeMode="cover"
               controls={isVideoSingle(media[0]!)}
+              autoplay={isVideoSingle(media[0]!)}
             />
           )}
-        </View>
+
+          {/* Double-tap heart overlay */}
+          {doubleTapHeart ? (
+            <Animated.View
+              entering={FadeIn.duration(80)}
+              exiting={FadeOut.duration(300)}
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Animated.View style={doubleTapStyle}>
+                <Heart size={80} color={colors.error} fill={colors.error} />
+              </Animated.View>
+            </Animated.View>
+          ) : null}
+        </Pressable>
       ) : null}
 
       {/* Actions */}

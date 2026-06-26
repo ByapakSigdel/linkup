@@ -9,7 +9,7 @@
 // Avatar images use expo-image (memory-disk cache + recyclingKey) for the
 // thumb (~256px) variant so small ring images are cheaply recycled.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, ScrollView, Pressable, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -98,17 +98,35 @@ export function StoryRing() {
     void loadTray();
   }, [loadTray]);
 
+  // Debounced refresh: coalesce bursty circle:story:new / circle:self:updated
+  // events so getStoryTray isn't refetched on every individual emission.
+  // We use a trailing debounce of 500 ms — the first burst of events within
+  // that window collapses into a single fetch fired after the burst settles.
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedRefresh = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      void loadTray();
+    }, 500);
+  }, [loadTray]);
+
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
-    const refresh = () => void loadTray();
-    socket.on('circle:story:new', refresh);
-    socket.on('circle:self:updated', refresh);
+    socket.on('circle:story:new', debouncedRefresh);
+    socket.on('circle:self:updated', debouncedRefresh);
     return () => {
-      socket.off('circle:story:new', refresh);
-      socket.off('circle:self:updated', refresh);
+      socket.off('circle:story:new', debouncedRefresh);
+      socket.off('circle:self:updated', debouncedRefresh);
+      // Cancel any pending debounced fetch on unmount.
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-  }, [loadTray]);
+  }, [debouncedRefresh]);
 
   const ownTray = couple?.id ? trays.find((t) => isOwnTray(t, couple.id)) : undefined;
   const ownCircleId = ownTray?.circle.id ?? null;
