@@ -42,7 +42,7 @@ import { getSocket } from '@/lib/socket';
 import { resolveMediaUrl } from '@/lib/env';
 import * as circlesApi from '@/lib/circles-api';
 import { errMessage, assetToUploadFile, isVideoUrl } from '@/components/circles/helpers';
-import type { CircleConversation, CircleDmMessage, CircleSummary } from '@/components/circles/types';
+import type { CircleDmMessage, CircleSummary } from '@/components/circles/types';
 
 const THREAD_MAX_WIDTH = 760;
 const PAGE_LIMIT = 30;
@@ -136,13 +136,14 @@ export default function CircleThreadScreen() {
     }
   }, [conversationId]);
 
-  // Resolve the other circle's summary for the header (best-effort, from inbox).
+  // Resolve the other circle's summary for the header via the dedicated
+  // single-conversation endpoint (works for any thread, incl. deep-links to
+  // older conversations not on the first inbox page).
   const loadHeader = useCallback(async () => {
     if (!conversationId) return;
     try {
-      const { conversations } = await circlesApi.getConversations({ limit: 50 });
-      const match = conversations.find((c: CircleConversation) => c.id === conversationId);
-      if (match?.otherCircle) setOther(match.otherCircle);
+      const { conversation } = await circlesApi.getConversation(conversationId);
+      if (conversation?.otherCircle) setOther(conversation.otherCircle);
     } catch {
       // Header falls back to a generic title.
     }
