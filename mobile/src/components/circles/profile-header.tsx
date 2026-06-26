@@ -7,8 +7,8 @@ import { useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Globe, Lock, Pencil } from 'lucide-react-native';
-import { Avatar, AppText, Row } from '@/components/ui';
+import { Globe, Lock, Pencil, MessageCircle } from 'lucide-react-native';
+import { Avatar, AppText, Row, Button } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { resolveMediaUrl } from '@/lib/env';
 import { useToastStore } from '@/stores/toast-store';
@@ -28,6 +28,14 @@ interface ProfileHeaderProps {
   onOpenFollowers?: () => void;
   /** Owner-only: tap the following stat to open the following list. */
   onOpenFollowing?: () => void;
+  /**
+   * §Phase2 DM: find-or-create + open a conversation. Rendered ONLY when the
+   * profile is mutual (profile.isMutual) and not the owner. Receives whether a
+   * find-or-create is in flight so the caller can show a busy state.
+   */
+  onMessage?: () => void;
+  /** Whether the Message action is currently opening a conversation. */
+  messaging?: boolean;
 }
 
 function Stat({
@@ -72,9 +80,12 @@ export function ProfileHeader({
   onFollowChange,
   onOpenFollowers,
   onOpenFollowing,
+  onMessage,
+  messaging = false,
 }: ProfileHeaderProps) {
   const { colors, radius } = useTheme();
   const { circle, isOwner, followState } = profile;
+  const isMutual = profile.isMutual ?? false;
   const pushToast = useToastStore((s) => s.push);
   const coverUrl = resolveMediaUrl(circle.coverImageUrl);
 
@@ -201,12 +212,26 @@ export function ProfileHeader({
                 ) : null}
               </Row>
             ) : (
-              <FollowButton
-                idOrHandle={circle.handle ?? circle.id}
-                followState={followState}
-                isPrivate={isPrivate}
-                onStateChange={handleFollowChange}
-              />
+              <Row gap={8} style={{ flexWrap: 'wrap' }}>
+                <FollowButton
+                  idOrHandle={circle.handle ?? circle.id}
+                  followState={followState}
+                  isPrivate={isPrivate}
+                  onStateChange={handleFollowChange}
+                />
+                {/* §Phase2 DM: Message — mutuals only. */}
+                {isMutual && onMessage ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onPress={onMessage}
+                    loading={messaging}
+                    disabled={messaging}
+                    leftIcon={<MessageCircle size={14} color={colors.text} />}
+                    label="Message"
+                  />
+                ) : null}
+              </Row>
             )}
           </Row>
 

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { Compass, Heart, Inbox, Sparkles, UserCircle } from 'lucide-react-native';
+import { Compass, Heart, Inbox, MessageCircle, Sparkles, UserCircle } from 'lucide-react-native';
 import { Screen, AppText, Button, Card, Spinner, EmptyState, Touchable, Row, Badge, Skeleton } from '@/components/ui';
 import { AppBar } from '@/components/top-bar';
 import { useTheme } from '@/theme';
@@ -36,8 +36,10 @@ export default function CirclesScreen() {
   const couple = useAuthStore((s) => s.couple);
   const pushToast = useToastStore((s) => s.push);
 
+  const user = useAuthStore((s) => s.user);
   const [myCircle, setMyCircle] = useState<CircleProfileResponse['circle'] | null>(null);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [unreadDmCount, setUnreadDmCount] = useState(0);
   const [meLoading, setMeLoading] = useState(true);
   const [meError, setMeError] = useState<string | null>(null);
 
@@ -63,6 +65,16 @@ export default function CirclesScreen() {
     }
   }, []);
 
+  // §Phase2 DM: total unread across the inbox, for the header badge.
+  const loadUnreadDms = useCallback(async () => {
+    try {
+      const { conversations } = await circlesApi.getConversations({ limit: 50 });
+      setUnreadDmCount(conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0));
+    } catch {
+      // Non-fatal — badge just stays as-is.
+    }
+  }, []);
+
   useEffect(() => {
     if (!couple?.isPaired) {
       setMeLoading(false);
@@ -70,6 +82,10 @@ export default function CirclesScreen() {
     }
     void loadMyCircle();
   }, [couple?.isPaired, loadMyCircle]);
+
+  useEffect(() => {
+    if (myCircle) void loadUnreadDms();
+  }, [myCircle, loadUnreadDms]);
 
   const loadFeed = useCallback(async () => {
     setFeedLoading(true);
@@ -111,11 +127,11 @@ export default function CirclesScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([loadMyCircle(), loadFeed()]);
+      await Promise.all([loadMyCircle(), loadFeed(), loadUnreadDms()]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadMyCircle, loadFeed]);
+  }, [loadMyCircle, loadFeed, loadUnreadDms]);
 
   // Realtime.
   useEffect(() => {
@@ -133,15 +149,27 @@ export default function CirclesScreen() {
     };
     const onFollowAccepted = () => void loadFeed();
 
+    // §Phase2 DM: keep the inbox badge live.
+    const onDmNew = (payload: { message?: { senderUserId?: string } }) => {
+      const me = user?.id;
+      const incoming = !!me && payload?.message?.senderUserId !== me;
+      if (incoming) setUnreadDmCount((c) => c + 1);
+    };
+    const onDmRead = () => void loadUnreadDms();
+
     socket.on('circle:post:new', onNewPost);
     socket.on('circle:post:deleted', onPostDeleted);
     socket.on('follow:accepted', onFollowAccepted);
+    socket.on('circle:dm:new', onDmNew);
+    socket.on('circle:dm:read', onDmRead);
     return () => {
       socket.off('circle:post:new', onNewPost);
       socket.off('circle:post:deleted', onPostDeleted);
       socket.off('follow:accepted', onFollowAccepted);
+      socket.off('circle:dm:new', onDmNew);
+      socket.off('circle:dm:read', onDmRead);
     };
-  }, [myCircle, loadFeed]);
+  }, [myCircle, loadFeed, loadUnreadDms, user?.id]);
 
   const handlePostUpdate = useCallback((postId: string, patch: Partial<FeedPost>) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...patch } : p)));
@@ -239,6 +267,16 @@ export default function CirclesScreen() {
     <Row gap={4}>
       <Touchable onPress={() => router.push('/circles/discover')} accessibilityLabel="Discover circles" style={{ padding: 6 }}>
         <Compass size={22} color={colors.textMuted} />
+      </Touchable>
+      <Touchable onPress={() => router.push('/circles/messages')} accessibilityLabel="Messages" style={{ padding: 6 }}>
+        <View>
+          <MessageCircle size={22} color={colors.textMuted} />
+          {unreadDmCount > 0 ? (
+            <View style={{ position: 'absolute', top: -6, right: -6 }}>
+              <Badge label={unreadDmCount > 9 ? '9+' : unreadDmCount} />
+            </View>
+          ) : null}
+        </View>
       </Touchable>
       <Touchable onPress={() => router.push('/circles/requests')} accessibilityLabel="Follow requests" style={{ padding: 6 }}>
         <View>

@@ -66,6 +66,7 @@ export default function CircleProfileScreen() {
   const [addStoryOpen, setAddStoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [messaging, setMessaging] = useState(false);
 
   const circleId = profile?.circle.id ?? null;
   const isOwner = profile?.isOwner ?? false;
@@ -289,6 +290,21 @@ export default function CircleProfileScreen() {
     }
   }, [loadProfile]);
 
+  // §Phase2 DM: find-or-create a conversation with this circle (403 unless
+  // mutual — the button only renders for mutuals) and open the thread.
+  const handleMessage = useCallback(async () => {
+    if (!idOrHandle || messaging) return;
+    setMessaging(true);
+    try {
+      const { conversation } = await circlesApi.openConversation(idOrHandle);
+      router.push(`/circles/messages/${conversation.id}`);
+    } catch (err) {
+      pushToast({ title: 'Could not open chat', body: errMessage(err, 'Please try again.') });
+    } finally {
+      setMessaging(false);
+    }
+  }, [idOrHandle, messaging, pushToast]);
+
   // ─── Not paired ──────────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
     return (
@@ -356,6 +372,8 @@ export default function CircleProfileScreen() {
         onFollowChange={handleFollowChange}
         onOpenFollowers={isOwner ? () => router.push(`/circles/${encodeURIComponent(routeKey)}/followers`) : undefined}
         onOpenFollowing={isOwner ? () => router.push(`/circles/${encodeURIComponent(routeKey)}/following`) : undefined}
+        onMessage={handleMessage}
+        messaging={messaging}
       />
 
       {/* Owner action bar */}

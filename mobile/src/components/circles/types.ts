@@ -62,6 +62,37 @@ export interface CircleProfileResponse {
   isOwner: boolean;
   followState: FollowState;
   canViewPosts: boolean;
+  /** §Phase2 DM: the TARGET circle has an accepted follow toward the viewer. */
+  followsYou?: boolean;
+  /** §Phase2 DM: accepted follow in BOTH directions — gates the Message button. */
+  isMutual?: boolean;
+}
+
+// ─── Direct messages (mutuals-only, couple-to-couple) ──────────────────────────
+
+/**
+ * Inbox row: a conversation with another circle. Mirrors the
+ * CircleDmService.listConversations / openConversation serializer.
+ */
+export interface CircleConversation {
+  id: string;
+  otherCircle: CircleSummary | null;
+  lastMessagePreview: string | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
+/** A single DM message. Mirrors CircleDmService.serializeMessage. */
+export interface CircleDmMessage {
+  id: string;
+  conversationId: string;
+  senderUserId: string;
+  senderCircleId: string;
+  content?: string;
+  mediaUrls: string[];
+  createdAt: string | null;
+  senderName: string | null;
+  senderAvatarUrl: string | null;
 }
 
 /** Owner-stats payload from GET /circles/me. */

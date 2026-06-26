@@ -29,4 +29,6 @@ export type {
   StoryTray,
   FollowRequest,
   StoryViewer as StoryViewerEntry,
+  CircleConversation,
+  CircleDmMessage,
 } from './types';
