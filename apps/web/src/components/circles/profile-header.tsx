@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Globe, Lock, Pencil } from 'lucide-react';
+import { Globe, Lock, MessageCircle, Pencil } from 'lucide-react';
 import { Avatar, Badge } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { useToastStore } from '@/stores/toast-store';
@@ -35,6 +35,13 @@ interface ProfileHeaderProps {
   followersHref?: string;
   /** Owner-only: href for the following list (makes the stat a link). */
   followingHref?: string;
+  /**
+   * §Phase2 DM — open/find-or-create a conversation. The Message button renders
+   * only when the profile is mutual (profile.isMutual) and not the owner.
+   */
+  onMessage?: () => void;
+  /** Whether the Message action is currently opening a conversation. */
+  messaging?: boolean;
 }
 
 function formatCount(n: number): string {
@@ -82,8 +89,11 @@ export function ProfileHeader({
   onFollowChange,
   followersHref,
   followingHref,
+  onMessage,
+  messaging = false,
 }: ProfileHeaderProps) {
   const { circle, isOwner, followState } = profile;
+  const isMutual = profile.isMutual ?? false;
   const pushToast = useToastStore((s) => s.push);
 
   // Owner-side optimistic privacy + live counts.
@@ -219,12 +229,26 @@ export function ProfileHeader({
                 )}
               </div>
             ) : (
-              <FollowButton
-                idOrHandle={circle.handle ?? circle.id}
-                followState={followState}
-                isPrivate={isPrivate}
-                onStateChange={handleFollowChange}
-              />
+              <div className="flex items-center gap-2">
+                <FollowButton
+                  idOrHandle={circle.handle ?? circle.id}
+                  followState={followState}
+                  isPrivate={isPrivate}
+                  onStateChange={handleFollowChange}
+                />
+                {/* §Phase2 DM: Message — mutuals only. */}
+                {isMutual && onMessage && (
+                  <button
+                    type="button"
+                    onClick={onMessage}
+                    disabled={messaging}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-sm font-medium text-text transition-colors hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Message
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

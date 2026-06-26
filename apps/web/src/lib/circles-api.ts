@@ -10,6 +10,8 @@ import type {
   MyCircleResponse,
   CircleProfile,
   CircleSummary,
+  CircleConversation,
+  CircleDmMessage,
   CirclePost,
   FeedPost,
   Comment,
@@ -310,6 +312,56 @@ export function getStoryViewers(
 /** DELETE /circles/me/stories/:storyId — owner deletes own story. */
 export function deleteStory(storyId: string): Promise<{ success: boolean }> {
   return unwrap(api.delete(`/circles/me/stories/${storyId}`));
+}
+
+// ─── Direct messages (§Phase2 — mutuals-only, couple-to-couple) ────────────────
+
+/** GET /circles/conversations — the caller's circle's inbox (cursor-paginated). */
+export function getConversations(
+  params?: PageParams,
+): Promise<{ conversations: CircleConversation[]; nextCursor: string | null }> {
+  return unwrap(api.get('/circles/conversations', { params: pageQuery(params) }));
+}
+
+/**
+ * POST /circles/:idOrHandle/conversations — find-or-create a DM with that circle.
+ * 403 unless both circles mutually follow each other (accepted both ways).
+ */
+export function openConversation(
+  idOrHandle: string,
+): Promise<{ conversation: CircleConversation }> {
+  return unwrap(
+    api.post(`/circles/${encodeURIComponent(idOrHandle)}/conversations`),
+  );
+}
+
+/** GET /circles/conversations/:id/messages — keyset page (newest first). */
+export function getMessages(
+  conversationId: string,
+  params?: PageParams,
+): Promise<{ messages: CircleDmMessage[]; nextCursor: string | null }> {
+  return unwrap(
+    api.get(`/circles/conversations/${conversationId}/messages`, {
+      params: pageQuery(params),
+    }),
+  );
+}
+
+/** POST /circles/conversations/:id/messages — send text and/or media. */
+export function sendMessage(
+  conversationId: string,
+  input: { content?: string; mediaUrls?: string[] },
+): Promise<{ message: CircleDmMessage }> {
+  return unwrap(
+    api.post(`/circles/conversations/${conversationId}/messages`, input),
+  );
+}
+
+/** POST /circles/conversations/:id/read — mark read for the caller's circle. */
+export function markRead(
+  conversationId: string,
+): Promise<{ success: boolean; lastReadAt: string }> {
+  return unwrap(api.post(`/circles/conversations/${conversationId}/read`));
 }
 
 // ─── Media upload (reused existing endpoint) ───────────────────────────────────

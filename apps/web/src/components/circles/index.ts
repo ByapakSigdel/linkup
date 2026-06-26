@@ -23,6 +23,8 @@ export type {
   CircleProfileResponse,
   MyCircleResponse,
   CircleSummary,
+  CircleConversation,
+  CircleDmMessage,
   CirclePost,
   FeedPost,
   Comment,

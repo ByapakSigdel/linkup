@@ -20,7 +20,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Heart, Inbox, Sparkles, UserCircle } from 'lucide-react';
+import {
+  Compass,
+  Heart,
+  Inbox,
+  MessageCircle,
+  Sparkles,
+  UserCircle,
+} from 'lucide-react';
 import { Button, buttonVariants, Card, Spinner } from '@/components/ui';
 import {
   CreateCircleForm,
@@ -30,11 +37,13 @@ import {
   type FeedPost,
 } from '@/components/circles';
 import { useAuthStore } from '@/stores/auth-store';
+import { useCircleDmStore } from '@/stores/circle-dm-store';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
 
 export default function CirclesPage() {
   const couple = useAuthStore((s) => s.couple);
+  const dmUnread = useCircleDmStore((s) => s.totalUnread);
 
   // My-circle profile gate (null circle => show the opt-in CTA).
   const [myCircle, setMyCircle] =
@@ -290,6 +299,18 @@ export default function CirclesPage() {
           <h1 className="font-display text-2xl font-bold text-text">Home</h1>
         </div>
         <div className="flex items-center gap-1">
+          <Link
+            href="/circles/messages"
+            aria-label="Messages"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
+          >
+            <MessageCircle className="h-5 w-5" />
+            {dmUnread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-text-on-primary">
+                {dmUnread > 9 ? '9+' : dmUnread}
+              </span>
+            )}
+          </Link>
           <Link
             href="/circles/discover"
             aria-label="Discover circles"

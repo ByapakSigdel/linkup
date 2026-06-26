@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { connectSocket, getSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useCircleDmStore } from '@/stores/circle-dm-store';
+import * as circlesApi from '@/lib/circles-api';
 import { useNotificationsStore } from '@/stores/notifications-store';
 import { useCallStore, type CallType } from '@/stores/call-store';
 import { useToastStore } from '@/stores/toast-store';
@@ -12,6 +14,12 @@ import { useGamesStore } from '@/stores/games-store';
 import { CallManager } from '@/components/call/call-manager';
 import { ToastContainer } from '@/components/realtime/toast-container';
 import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
+import type { CircleDmMessage } from '@/components/circles/types';
+
+// §Phase2 DM — the viewer's own circle id, resolved once and read by the
+// `circle:dm:read` handler. A `read` event fans out to ALL participants, so we
+// must ignore the OTHER couple's reads when clearing OUR unread badge.
+let circleDmMyCircleId: string | null = null;
 
 /**
  * Owns the single shared socket connection and all inbound realtime event
@@ -20,6 +28,36 @@ import type { Message, PresenceUpdate, TypingIndicator } from '@linkup/types';
  */
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.tokens?.accessToken);
+  const isPaired = useAuthStore((s) => s.couple?.isPaired ?? false);
+
+  // §Phase2 DM — seed the global Circle-DM unread badge from the inbox, and
+  // resolve the viewer's own circle id so we can tell which `circle:dm:read`
+  // events are ours (and should clear our badge) vs the other couple's.
+  useEffect(() => {
+    if (!token || !isPaired) {
+      useCircleDmStore.getState().reset();
+      circleDmMyCircleId = null;
+      return;
+    }
+    let cancelled = false;
+    void circlesApi
+      .getMyCircle()
+      .then((res) => {
+        if (cancelled) return;
+        circleDmMyCircleId = res.circle?.id ?? null;
+      })
+      .catch(() => {});
+    void circlesApi
+      .getConversations({ limit: 50 })
+      .then((res) => {
+        if (cancelled) return;
+        useCircleDmStore.getState().setFromInbox(res.conversations);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isPaired]);
 
   useEffect(() => {
     if (!token) return;
@@ -42,6 +80,30 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
     const onTyping = (indicator: TypingIndicator) => {
       useChatStore.getState().setPartnerTyping(indicator.isTyping);
+    };
+
+    // §Phase2 DM — keep the global Circle-DM unread badge live app-wide. The
+    // thread/inbox screens own their own in-screen state; this only drives the
+    // chrome badges (sidebar + Circles header).
+    const onCircleDmNew = (payload: {
+      conversationId: string;
+      message: CircleDmMessage;
+    }) => {
+      if (!payload?.message?.conversationId) return;
+      const me = useAuthStore.getState().user?.id;
+      // Only incoming messages (not our own echo) raise the badge.
+      if (me && payload.message.senderUserId === me) return;
+      useCircleDmStore.getState().bump(payload.conversationId);
+    };
+    const onCircleDmRead = (payload: {
+      conversationId: string;
+      circleId: string;
+    }) => {
+      if (!payload?.conversationId) return;
+      // Only OUR circle's read marker clears OUR unread. The other couple
+      // reading must not zero our badge.
+      if (circleDmMyCircleId && payload.circleId !== circleDmMyCircleId) return;
+      useCircleDmStore.getState().clear(payload.conversationId);
     };
     const onPresence = (presence: PresenceUpdate) => {
       useChatStore.getState().setPartnerPresence(presence.isOnline, presence.lastSeenAt);
@@ -145,6 +207,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('message:edited', onMessageEdited);
     socket.on('message:deleted', onMessageDeleted);
     socket.on('typing:update', onTyping);
+    socket.on('circle:dm:new', onCircleDmNew);
+    socket.on('circle:dm:read', onCircleDmRead);
     socket.on('presence:update', onPresence);
     socket.on('reaction:added', onReaction);
     socket.on('notification:new', onNotification);
@@ -165,6 +229,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('message:edited', onMessageEdited);
       socket.off('message:deleted', onMessageDeleted);
       socket.off('typing:update', onTyping);
+      socket.off('circle:dm:new', onCircleDmNew);
+      socket.off('circle:dm:read', onCircleDmRead);
       socket.off('presence:update', onPresence);
       socket.off('reaction:added', onReaction);
       socket.off('notification:new', onNotification);

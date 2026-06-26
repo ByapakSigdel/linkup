@@ -70,6 +70,13 @@ export interface CircleProfileResponse {
   };
   isOwner: boolean;
   followState: FollowState;
+  /** §Phase2: the TARGET has an accepted follow toward the viewer's circle. */
+  followsYou?: boolean;
+  /**
+   * §Phase2: accepted follow in BOTH directions — gates the DM "Message" button.
+   * Absent/false for the owner or when the viewer has no circle.
+   */
+  isMutual?: boolean;
   canViewPosts: boolean;
 }
 
@@ -92,6 +99,36 @@ export interface CircleSummary {
   avatarUrl?: string;
   /** Present on discover results. */
   followState?: FollowState;
+}
+
+/**
+ * §Phase2 DM — a couple-to-couple conversation row (the caller's circle's inbox).
+ * Mirrors CircleDmService.listConversations / openConversation. `otherCircle` is
+ * the other couple in the pair (null only if it was deleted).
+ */
+export interface CircleConversation {
+  id: string;
+  otherCircle: CircleSummary | null;
+  lastMessagePreview: string | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
+/**
+ * §Phase2 DM — a single message. Mirrors CircleDmService.serializeMessage.
+ * `senderUserId` decides own-vs-other (a thread has up to 4 participants);
+ * `senderCircleId` distinguishes the two couples (drives read receipts).
+ */
+export interface CircleDmMessage {
+  id: string;
+  conversationId: string;
+  senderUserId: string;
+  senderCircleId: string;
+  content?: string;
+  mediaUrls: string[];
+  createdAt: string | null;
+  senderName: string | null;
+  senderAvatarUrl: string | null;
 }
 
 /**

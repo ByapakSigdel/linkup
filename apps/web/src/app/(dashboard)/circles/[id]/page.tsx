@@ -76,6 +76,9 @@ export default function CircleProfilePage() {
   // Story viewer.
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
 
+  // §Phase2 DM — opening a conversation from the Message button.
+  const [messaging, setMessaging] = useState(false);
+
   // The resolved circle id (uuid) once we have the profile — used to match
   // realtime payloads that always carry the canonical id (not the handle).
   const circleId = profile?.circle.id ?? null;
@@ -412,6 +415,26 @@ export default function CircleProfilePage() {
     [],
   );
 
+  // §Phase2 DM — find-or-create the conversation, then open the thread. 403 if
+  // mutual follow was lost since the button rendered.
+  const handleMessage = useCallback(async () => {
+    if (!idOrHandle || messaging) return;
+    setMessaging(true);
+    try {
+      const { conversation } = await circlesApi.openConversation(idOrHandle);
+      router.push(`/circles/messages/${conversation.id}`);
+    } catch (err) {
+      pushToast({
+        title: 'Could not open chat',
+        body:
+          (err as { response?: { data?: { error?: { message?: string } } } })
+            ?.response?.data?.error?.message || 'Please try again.',
+      });
+    } finally {
+      setMessaging(false);
+    }
+  }, [idOrHandle, messaging, router, pushToast]);
+
   // ─── Not paired ──────────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
     return (
@@ -483,6 +506,8 @@ export default function CircleProfilePage() {
             ? `/circles/${encodeURIComponent(routeKey)}/following`
             : undefined
         }
+        onMessage={!isOwner ? handleMessage : undefined}
+        messaging={messaging}
       />
 
       {/* Owner action bar */}

@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
+import { useCircleDmStore } from '@/stores/circle-dm-store';
 import { Avatar } from '@/components/ui';
 import { LinkupMark, LinkupWordmark } from '@/components/brand/logo';
 
@@ -76,6 +77,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
   const unread = useChatStore((s) => s.unread);
+  const circleDmUnread = useCircleDmStore((s) => s.totalUnread);
 
   return (
     <aside
@@ -126,6 +128,13 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                   pathname === item.href ||
                   pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
+                // Per-item unread badge: Chat (intra-couple) + Circles (DMs).
+                const badgeCount =
+                  item.href === '/chat'
+                    ? unread
+                    : item.href === '/circles'
+                      ? circleDmUnread
+                      : 0;
 
                 return (
                   <Link
@@ -155,12 +164,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                       strokeWidth={isActive ? 2.4 : 1.9}
                     />
                     {!collapsed && <span className="truncate">{item.label}</span>}
-                    {item.href === '/chat' && unread > 0 &&
+                    {badgeCount > 0 &&
                       (collapsed ? (
                         <span className="absolute right-2 top-1.5 h-2.5 w-2.5 rounded-full border border-surface bg-primary" />
                       ) : (
                         <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1.5 text-[0.65rem] font-bold text-text-on-primary">
-                          {unread > 9 ? '9+' : unread}
+                          {badgeCount > 9 ? '9+' : badgeCount}
                         </span>
                       ))}
                   </Link>
