@@ -16,6 +16,7 @@ import {
   ImagePlus,
   Lock,
   Plus,
+  Trash2,
   X,
 } from 'lucide-react';
 import { Button, Card, Input, Spinner } from '@/components/ui';
@@ -62,6 +63,11 @@ export default function CircleProfilePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Infinite-scroll plumbing for the post grid (mirrors the home feed).
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const cursorRef = useRef<string | null>(null);
+  const loadingMoreRef = useRef(false);
+
   // Owner affordances.
   const [showComposer, setShowComposer] = useState(false);
   const [addStoryOpen, setAddStoryOpen] = useState(false);
@@ -93,10 +99,12 @@ export default function CircleProfilePage() {
         ]);
         setPosts(list);
         setNextCursor(cur);
+        cursorRef.current = cur;
         setStories(storyRes.stories);
       } else {
         setPosts([]);
         setNextCursor(null);
+        cursorRef.current = null;
         setStories([]);
       }
     } catch (err) {
@@ -309,24 +317,92 @@ export default function CircleProfilePage() {
   );
 
   const loadMore = useCallback(async () => {
-    if (!idOrHandle || !nextCursor || loadingMore) return;
+    if (!idOrHandle || loadingMoreRef.current) return;
+    const cursor = cursorRef.current;
+    if (!cursor) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const { posts: more, nextCursor: cur } = await circlesApi.getCirclePosts(
         idOrHandle,
-        { cursor: nextCursor },
+        { cursor },
       );
       setPosts((prev) => {
         const seen = new Set(prev.map((p) => p.id));
         return [...prev, ...more.filter((p) => !seen.has(p.id))];
       });
       setNextCursor(cur);
+      cursorRef.current = cur;
     } catch {
-      pushToast({ title: 'Could not load more posts', body: 'Please try again.' });
+      // Non-fatal: leave the existing grid; the sentinel can retry on re-scroll.
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [idOrHandle, nextCursor, loadingMore, pushToast]);
+  }, [idOrHandle]);
+
+  // Infinite scroll via an IntersectionObserver on the sentinel (matches feed).
+  useEffect(() => {
+    if (!canViewPosts) return;
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadMore();
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [canViewPosts, loadMore, nextCursor]);
+
+  const handleDeletePost = useCallback(
+    async (post: CirclePost) => {
+      const snapshot = posts;
+      // Optimistically remove the post + decrement the profile count.
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              circle: {
+                ...prev.circle,
+                postCount: Math.max(prev.circle.postCount - 1, 0),
+              },
+            }
+          : prev,
+      );
+      try {
+        await circlesApi.deletePost(post.id);
+        pushToast({
+          title: 'Post deleted',
+          body: 'Your post has been removed.',
+          variant: 'success',
+        });
+      } catch (err) {
+        // Roll back on failure.
+        setPosts(snapshot);
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                circle: {
+                  ...prev.circle,
+                  postCount: prev.circle.postCount + 1,
+                },
+              }
+            : prev,
+        );
+        pushToast({
+          title: 'Could not delete post',
+          body:
+            (err as { response?: { data?: { error?: { message?: string } } } })
+              ?.response?.data?.error?.message || 'Please try again.',
+        });
+      }
+    },
+    [posts, pushToast],
+  );
 
   const handleEdited = useCallback(
     (circle: CircleProfileResponse['circle']) => {
@@ -384,6 +460,8 @@ export default function CircleProfilePage() {
     );
   }
 
+  const routeKey = profile.circle.handle ?? profile.circle.id;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <BackLink />
@@ -395,6 +473,16 @@ export default function CircleProfilePage() {
         onOpenStories={tray ? () => setStoryViewerOpen(true) : undefined}
         onEdit={isOwner ? () => setEditOpen(true) : undefined}
         onFollowChange={handleFollowChange}
+        followersHref={
+          isOwner
+            ? `/circles/${encodeURIComponent(routeKey)}/followers`
+            : undefined
+        }
+        followingHref={
+          isOwner
+            ? `/circles/${encodeURIComponent(routeKey)}/following`
+            : undefined
+        }
       />
 
       {/* Owner action bar */}
@@ -451,23 +539,25 @@ export default function CircleProfilePage() {
             <PostGrid
               posts={posts}
               loading={postsLoading}
+              onDeletePost={isOwner ? handleDeletePost : undefined}
               emptyLabel={
                 isOwner
                   ? 'Share your first photo with your followers.'
                   : 'No posts yet.'
               }
             />
-            {nextCursor && (
+
+            {/* Infinite-scroll sentinel + loader (matches the home feed). */}
+            <div ref={sentinelRef} className="h-1 w-full" aria-hidden />
+            {loadingMore && (
               <div className="flex justify-center pt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void loadMore()}
-                  loading={loadingMore}
-                >
-                  Load more
-                </Button>
+                <Spinner size="md" className="text-primary" />
               </div>
+            )}
+            {posts.length > 0 && !nextCursor && (
+              <p className="pt-6 text-center text-xs text-text-muted">
+                You&apos;re all caught up.
+              </p>
             )}
           </>
         ) : (
@@ -545,17 +635,50 @@ function EditCircleForm({
   onCancel: () => void;
 }) {
   const pushToast = useToastStore((s) => s.push);
+  const coupleId = useAuthStore((s) => s.couple?.id ?? null);
   const [handle, setHandle] = useState(circle.handle ?? '');
   const [name, setName] = useState(circle.name);
   const [bio, setBio] = useState(circle.bio ?? '');
+  const [cover, setCover] = useState<string | null>(circle.coverImageUrl ?? null);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const handleValid = HANDLE_RE.test(handle);
+  const coverChanged = (cover ?? '') !== (circle.coverImageUrl ?? '');
   const dirty =
     handle !== (circle.handle ?? '') ||
     name.trim() !== circle.name ||
-    bio.trim() !== (circle.bio ?? '');
+    bio.trim() !== (circle.bio ?? '') ||
+    coverChanged;
+
+  const handleCoverSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ''; // allow re-selecting the same file
+      if (!file || !file.type.startsWith('image/')) return;
+      if (!coupleId) {
+        setErr('We could not find your couple. Please reload and try again.');
+        return;
+      }
+      setUploadingCover(true);
+      setErr(null);
+      try {
+        const uploaded = await circlesApi.uploadMedia(file, coupleId);
+        setCover(uploaded.media.cdnUrl);
+      } catch (error) {
+        setErr(
+          (error as { response?: { data?: { error?: { message?: string } } } })
+            ?.response?.data?.error?.message ||
+            'Could not upload the cover image. Please try again.',
+        );
+      } finally {
+        setUploadingCover(false);
+      }
+    },
+    [coupleId],
+  );
 
   const submit = useCallback(
     async (e: React.FormEvent) => {
@@ -571,6 +694,7 @@ function EditCircleForm({
           handle: handle !== (circle.handle ?? '') ? handle : undefined,
           name: name.trim() || undefined,
           bio: bio.trim(),
+          coverImageUrl: coverChanged ? cover : undefined,
         });
         pushToast({
           title: 'Profile updated',
@@ -588,7 +712,7 @@ function EditCircleForm({
         setSaving(false);
       }
     },
-    [handle, handleValid, name, bio, circle.handle, onSaved, pushToast],
+    [handle, handleValid, name, bio, cover, coverChanged, circle.handle, onSaved, pushToast],
   );
 
   return (
@@ -597,6 +721,72 @@ function EditCircleForm({
         <h3 className="font-display text-base font-semibold text-text">
           Edit profile
         </h3>
+
+        {/* Cover image (§1.7) */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text">
+            Cover image{' '}
+            <span className="font-normal text-text-muted">(optional)</span>
+          </label>
+          {cover ? (
+            <div className="relative overflow-hidden rounded-xl bg-surface-active">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cover}
+                alt="Cover preview"
+                className="h-32 w-full object-cover sm:h-40"
+              />
+              <div className="absolute right-2 top-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploadingCover || saving}
+                  aria-label="Change cover image"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-background/60 text-white backdrop-blur-sm transition-colors hover:bg-background/80 disabled:opacity-50"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCover(null)}
+                  disabled={uploadingCover || saving}
+                  aria-label="Remove cover image"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-background/60 text-white backdrop-blur-sm transition-colors hover:bg-background/80 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              {uploadingCover && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/40">
+                  <Spinner size="md" className="text-white" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={uploadingCover || saving}
+              className="flex h-32 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border text-text-muted transition-colors hover:border-primary/60 hover:bg-surface-hover disabled:opacity-50 sm:h-40"
+            >
+              {uploadingCover ? (
+                <Spinner size="md" className="text-primary" />
+              ) : (
+                <>
+                  <ImagePlus className="h-6 w-6" />
+                  <span className="text-xs">Add a cover banner</span>
+                </>
+              )}
+            </button>
+          )}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
+            onChange={handleCoverSelect}
+            className="hidden"
+          />
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="edit-handle" className="text-sm font-medium text-text">
@@ -666,7 +856,7 @@ function EditCircleForm({
             type="submit"
             size="sm"
             loading={saving}
-            disabled={!handleValid || !dirty}
+            disabled={!handleValid || !dirty || uploadingCover}
           >
             Save changes
           </Button>

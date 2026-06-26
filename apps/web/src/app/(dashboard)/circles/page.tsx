@@ -185,6 +185,21 @@ export default function CirclesPage() {
     [],
   );
 
+  // Owner-only: delete one of my own posts straight from the feed.
+  const handleDeletePost = useCallback(
+    async (post: FeedPost) => {
+      const snapshot = posts;
+      // Optimistically remove from the feed.
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      try {
+        await circlesApi.deletePost(post.id);
+      } catch {
+        setPosts(snapshot); // roll back on failure
+      }
+    },
+    [posts],
+  );
+
   // ─── Not paired ──────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
     return (
@@ -349,6 +364,9 @@ export default function CirclesPage() {
               key={post.id}
               post={post}
               onUpdate={handlePostUpdate}
+              onDelete={
+                post.circleId === myCircle.id ? handleDeletePost : undefined
+              }
             />
           ))}
 

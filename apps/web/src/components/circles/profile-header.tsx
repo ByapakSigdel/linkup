@@ -9,6 +9,7 @@
 // of `circle`.
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Globe, Lock, Pencil } from 'lucide-react';
 import { Avatar, Badge } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -30,6 +31,10 @@ interface ProfileHeaderProps {
   onEdit?: () => void;
   /** Bubble follow-state changes up so the page can refetch posts/counts. */
   onFollowChange?: (state: FollowState) => void;
+  /** Owner-only: href for the followers list (makes the stat a link). */
+  followersHref?: string;
+  /** Owner-only: href for the following list (makes the stat a link). */
+  followingHref?: string;
 }
 
 function formatCount(n: number): string {
@@ -38,15 +43,34 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col items-center sm:items-start">
+function Stat({
+  value,
+  label,
+  href,
+}: {
+  value: number;
+  label: string;
+  href?: string;
+}) {
+  const body = (
+    <>
       <span className="font-display text-lg font-semibold leading-none text-text">
         {formatCount(value)}
       </span>
       <span className="text-xs text-text-muted">{label}</span>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="flex flex-col items-center rounded-md transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:items-start"
+      >
+        {body}
+      </Link>
+    );
+  }
+  return <div className="flex flex-col items-center sm:items-start">{body}</div>;
 }
 
 export function ProfileHeader({
@@ -56,6 +80,8 @@ export function ProfileHeader({
   onOpenStories,
   onEdit,
   onFollowChange,
+  followersHref,
+  followingHref,
 }: ProfileHeaderProps) {
   const { circle, isOwner, followState } = profile;
   const pushToast = useToastStore((s) => s.push);
@@ -107,6 +133,17 @@ export function ProfileHeader({
 
   return (
     <header className="flex flex-col gap-5">
+      {/* Cover banner (§1.7) — rendered only when set. */}
+      {circle.coverImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={circle.coverImageUrl}
+          alt=""
+          loading="lazy"
+          className="h-32 w-full rounded-2xl bg-surface-active object-cover sm:h-40"
+        />
+      )}
+
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
         {/* Avatar + story-ring slot */}
         <button
@@ -194,8 +231,12 @@ export function ProfileHeader({
           {/* Counts */}
           <div className="flex items-center gap-8 sm:gap-10">
             <Stat value={circle.postCount} label="posts" />
-            <Stat value={followerCount} label="followers" />
-            <Stat value={circle.followingCount} label="following" />
+            <Stat value={followerCount} label="followers" href={followersHref} />
+            <Stat
+              value={circle.followingCount}
+              label="following"
+              href={followingHref}
+            />
           </div>
 
           {/* Name + bio */}

@@ -14,10 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ImageOff,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Spinner } from '@/components/ui';
-import type { CirclePost } from '@/components/circles/types';
+import type { CirclePost, MediaVariants } from '@/components/circles/types';
+import { isVideoUrl, pickVariantUrl, type MediaSize } from './media-helpers';
 
 export interface PostGridProps {
   posts: CirclePost[];
@@ -25,21 +27,27 @@ export interface PostGridProps {
   loading?: boolean;
   /** Optional empty-state copy. */
   emptyLabel?: string;
+  /** Owner-only: when set, the lightbox shows a delete affordance. */
+  onDeletePost?: (post: CirclePost) => void | Promise<void>;
   className?: string;
-}
-
-function isVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
 }
 
 function PostMedia({
   url,
+  variants,
+  size = 'full',
   className,
   controls = false,
+  lazy = false,
 }: {
   url: string;
+  /** Per-URL variant map (§1.1 pipeline). Falls back to `url` when absent. */
+  variants?: MediaVariants;
+  /** Which pipeline variant to prefer (ignored for videos). Default: 'full'. */
+  size?: MediaSize;
   className?: string;
   controls?: boolean;
+  lazy?: boolean;
 }) {
   if (isVideoUrl(url)) {
     return (
@@ -54,8 +62,9 @@ function PostMedia({
       />
     );
   }
+  const src = pickVariantUrl(url, variants, size);
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="" className={className} />;
+  return <img src={src} alt="" className={className} loading={lazy ? 'lazy' : undefined} />;
 }
 
 function GridThumb({
@@ -66,6 +75,7 @@ function GridThumb({
   onOpen: () => void;
 }) {
   const cover = post.mediaUrls[0];
+  const coverVariants = post.mediaObjects?.[0];
   const isMulti = post.mediaUrls.length > 1;
 
   return (
@@ -78,6 +88,9 @@ function GridThumb({
       {cover ? (
         <PostMedia
           url={cover}
+          variants={coverVariants}
+          size="thumb"
+          lazy
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         />
       ) : (
@@ -111,12 +124,32 @@ function GridThumb({
 function Lightbox({
   post,
   onClose,
+  onDeletePost,
 }: {
   post: CirclePost;
   onClose: () => void;
+  onDeletePost?: (post: CirclePost) => void | Promise<void>;
 }) {
   const [index, setIndex] = useState(0);
+  const [deleting, setDeleting] = useState(false);
   const count = post.mediaUrls.length;
+
+  const handleDelete = useCallback(async () => {
+    if (!onDeletePost || deleting) return;
+    if (
+      !window.confirm(
+        'Delete this post? This will permanently remove it from your circle. This cannot be undone.',
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      await onDeletePost(post);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }, [onDeletePost, deleting, post, onClose]);
 
   const prev = useCallback(
     () => setIndex((i) => (i - 1 + count) % count),
@@ -145,6 +178,7 @@ function Lightbox({
   }, []);
 
   const current = post.mediaUrls[index];
+  const currentVariants = post.mediaObjects?.[index];
 
   return (
     <div
@@ -154,6 +188,18 @@ function Lightbox({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
+      {onDeletePost && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          aria-label="Delete post"
+          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-background/20 text-white transition-colors hover:bg-error/80 disabled:opacity-50"
+        >
+          {deleting ? <Spinner size="sm" /> : <Trash2 className="h-5 w-5" />}
+        </button>
+      )}
+
       <button
         type="button"
         onClick={onClose}
@@ -172,6 +218,8 @@ function Lightbox({
           {current ? (
             <PostMedia
               url={current}
+              variants={currentVariants}
+              size="full"
               controls
               className="max-h-[55vh] w-full object-contain md:max-h-[88vh]"
             />
@@ -255,6 +303,7 @@ export function PostGrid({
   posts,
   loading = false,
   emptyLabel = 'No posts yet',
+  onDeletePost,
   className,
 }: PostGridProps) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -292,7 +341,11 @@ export function PostGrid({
       </div>
 
       {openPost && (
-        <Lightbox post={openPost} onClose={() => setOpenId(null)} />
+        <Lightbox
+          post={openPost}
+          onClose={() => setOpenId(null)}
+          onDeletePost={onDeletePost}
+        />
       )}
     </>
   );

@@ -9,6 +9,7 @@ export { PostGrid } from './post-grid';
 export { FeedPostCard } from './feed-post-card';
 export { CommentsSection } from './comments-section';
 export { CircleCard } from './circle-card';
+export { ConnectionsList } from './connections-list';
 export { StoryRing } from './story-ring';
 export { StoryViewer } from './story-viewer';
 export { AddStorySheet } from './add-story-sheet';
@@ -17,6 +18,7 @@ export type {
   FollowState,
   PostType,
   StoryMediaType,
+  MediaVariants,
   CircleProfile,
   CircleProfileResponse,
   MyCircleResponse,

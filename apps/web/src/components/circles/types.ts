@@ -13,6 +13,19 @@ export type PostType = 'photo' | 'video' | 'carousel';
 export type StoryMediaType = 'image' | 'video';
 
 /**
+ * Per-item image variant map returned by the image pipeline (§1.1).
+ * `variants.original` is always the full-resolution CDN URL.
+ * `thumb` (~256px longest edge) and `medium` (~1080px) are populated for new
+ * uploads; absent on older posts (clients must fall back to the plain URL).
+ */
+export interface MediaVariants {
+  original?: string;
+  thumb?: string;
+  medium?: string;
+  [key: string]: string | undefined;
+}
+
+/**
  * A couple's profile (one per couple). Combines the serialized `circle` row with
  * the viewer-relative flags returned alongside it by GET /circles/:idOrHandle.
  * (`isOwner`, `followState`, `canViewPosts` are returned as siblings of `circle`
@@ -95,6 +108,12 @@ export interface CirclePost {
   caption?: string;
   type: PostType | string;
   mediaUrls: string[];
+  /**
+   * Optional per-item variant maps from the image pipeline (§1.1).
+   * Index-aligned with `mediaUrls`. Absent on old posts — always fall back
+   * to `mediaUrls[i]` when the desired variant is missing.
+   */
+  mediaObjects?: MediaVariants[];
   metadata?: Record<string, unknown>;
   likeCount: number;
   commentCount: number;

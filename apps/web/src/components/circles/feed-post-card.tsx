@@ -7,27 +7,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Avatar } from '@/components/ui';
+import {
+  Heart,
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+} from 'lucide-react';
+import { Avatar, Spinner } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { timeAgo } from '@linkup/utils';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
 import { CommentsSection } from './comments-section';
+import { isVideoUrl, pickVariantUrl } from './media-helpers';
 import type { CirclePost } from './types';
 
 interface FeedPostCardProps {
   post: CirclePost;
   /** Bubble like/comment count changes up so a parent feed list can persist them. */
   onUpdate?: (postId: string, patch: Partial<CirclePost>) => void;
+  /** Owner-only: when set, the card shows a delete affordance in its header. */
+  onDelete?: (post: CirclePost) => void | Promise<void>;
   className?: string;
 }
 
-function isVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
-}
-
-export function FeedPostCard({ post, onUpdate, className }: FeedPostCardProps) {
+export function FeedPostCard({ post, onUpdate, onDelete, className }: FeedPostCardProps) {
   // Route key: prefer the @handle, fall back to the circle id.
   const routeKey = post.circle?.handle ?? post.circleId;
   const profileHref = `/circles/${encodeURIComponent(routeKey)}`;
@@ -41,6 +46,7 @@ export function FeedPostCard({ post, onUpdate, className }: FeedPostCardProps) {
   const [liking, setLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [slide, setSlide] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
   const media = post.mediaUrls ?? [];
   const isCarousel = media.length > 1;
@@ -108,6 +114,22 @@ export function FeedPostCard({ post, onUpdate, className }: FeedPostCardProps) {
   const goPrev = () => setSlide((s) => Math.max(0, s - 1));
   const goNext = () => setSlide((s) => Math.min(media.length - 1, s + 1));
 
+  const handleDelete = async () => {
+    if (!onDelete || deleting) return;
+    if (
+      !window.confirm(
+        'Delete this post? This will permanently remove it from your circle. This cannot be undone.',
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      await onDelete(post);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <article
       className={cn(
@@ -133,6 +155,21 @@ export function FeedPostCard({ post, onUpdate, className }: FeedPostCardProps) {
           </Link>
           <p className="text-xs text-text-muted">{timeAgo(post.createdAt)}</p>
         </div>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label="Delete post"
+            className="shrink-0 rounded-full p-1.5 text-text-muted transition-colors hover:text-error disabled:opacity-50"
+          >
+            {deleting ? (
+              <Spinner size="sm" />
+            ) : (
+              <Trash2 className="h-5 w-5" />
+            )}
+          </button>
+        )}
       </header>
 
       {/* Media */}
@@ -155,7 +192,7 @@ export function FeedPostCard({ post, onUpdate, className }: FeedPostCardProps) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={`${post.id}-m-${i}`}
-                  src={url}
+                  src={pickVariantUrl(url, post.mediaObjects?.[i], 'medium')}
                   alt={post.caption ? post.caption : 'Post media'}
                   className="h-full w-full shrink-0 object-cover"
                   loading="lazy"
