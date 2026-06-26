@@ -1,18 +1,26 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, desc, sql, ilike, inArray } from 'drizzle-orm';
+import sharp from 'sharp';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
 import { StorageService } from './storage.service';
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
+
+  // Longest-edge sizes for the generated downscaled variants.
+  private static readonly THUMB_EDGE = 256;
+  private static readonly MEDIUM_EDGE = 1080;
+
   constructor(
     @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<typeof schema>,
     private readonly storageService: StorageService,
@@ -41,8 +49,36 @@ export class MediaService {
     // Validate file size limits
     this.validateFileSize(file.size, mediaType);
 
-    // Store the file
+    // Store the original file untouched
     const storageResult = await this.storageService.store(file, coupleId, mediaType);
+
+    // For images, generate downscaled variants (thumb ~256px, medium ~1080px).
+    // Non-image uploads (video/audio/file) are stored as-is, exactly as before.
+    let imageMeta: { width?: number; height?: number } = {};
+    let thumbnails: { small?: string; medium?: string } | null = null;
+    let variants: Record<string, string> | null = null;
+
+    if (file.mimetype.startsWith('image/')) {
+      const generated = await this.generateImageVariants(
+        file.buffer,
+        coupleId,
+        file.mimetype,
+      );
+      imageMeta = generated.dimensions;
+      if (generated.thumbUrl || generated.mediumUrl) {
+        // thumbnails.{small,medium} mirror the spec's existing column shape.
+        thumbnails = {
+          ...(generated.thumbUrl ? { small: generated.thumbUrl } : {}),
+          ...(generated.mediumUrl ? { medium: generated.mediumUrl } : {}),
+        };
+        // variants keyed by name for clients that read media.variants.
+        variants = {
+          original: storageResult.cdnUrl,
+          ...(generated.thumbUrl ? { thumb: generated.thumbUrl } : {}),
+          ...(generated.mediumUrl ? { medium: generated.mediumUrl } : {}),
+        };
+      }
+    }
 
     // Insert media record
     const [mediaRecord] = await this.db
@@ -58,6 +94,10 @@ export class MediaService {
         cdnUrl: storageResult.cdnUrl,
         mimeType: file.mimetype,
         fileSize: file.size,
+        width: imageMeta.width ?? null,
+        height: imageMeta.height ?? null,
+        thumbnails,
+        variants,
         albumId: data.albumId || null,
         tags: data.tags || [],
         caption: data.caption || null,
@@ -434,6 +474,86 @@ export class MediaService {
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────────
+
+  /**
+   * Generate downscaled JPEG variants for an image upload and store them.
+   * Returns the variant URLs plus the original image dimensions.
+   * Failures are non-fatal: the original upload still succeeds (we just skip
+   * variants and log), so the existing upload contract is never broken.
+   */
+  private async generateImageVariants(
+    buffer: Buffer,
+    coupleId: string,
+    mimeType: string,
+  ): Promise<{
+    thumbUrl: string | null;
+    mediumUrl: string | null;
+    dimensions: { width?: number; height?: number };
+  }> {
+    try {
+      // `failOn: 'none'` keeps sharp tolerant of slightly malformed inputs.
+      const pipeline = sharp(buffer, { failOn: 'none' });
+      const metadata = await pipeline.metadata();
+      const dimensions = {
+        width: metadata.width,
+        height: metadata.height,
+      };
+
+      // Animated formats (e.g. GIF, animated WebP) are left as the original
+      // only — flattening them to JPEG would drop the animation. We still
+      // record dimensions.
+      if (metadata.pages && metadata.pages > 1) {
+        return { thumbUrl: null, mediumUrl: null, dimensions };
+      }
+
+      const longestEdge = Math.max(metadata.width ?? 0, metadata.height ?? 0);
+
+      const thumbUrl = await this.renderVariant(
+        buffer,
+        coupleId,
+        MediaService.THUMB_EDGE,
+      );
+
+      // Only produce a separate medium when the source is larger than the
+      // medium edge; otherwise the medium would just duplicate the original.
+      const mediumUrl =
+        longestEdge > MediaService.MEDIUM_EDGE
+          ? await this.renderVariant(buffer, coupleId, MediaService.MEDIUM_EDGE)
+          : null;
+
+      return { thumbUrl, mediumUrl, dimensions };
+    } catch (err) {
+      this.logger.warn(
+        `Failed to generate image variants (${mimeType}); serving original only`,
+        err instanceof Error ? err.stack : String(err),
+      );
+      return { thumbUrl: null, mediumUrl: null, dimensions: {} };
+    }
+  }
+
+  /**
+   * Resize an image buffer so its longest edge is `edge` px (never upscaling)
+   * and re-encode as JPEG, then store it via the storage service.
+   */
+  private async renderVariant(
+    buffer: Buffer,
+    coupleId: string,
+    edge: number,
+  ): Promise<string> {
+    const out = await sharp(buffer, { failOn: 'none' })
+      .rotate() // respect EXIF orientation before resizing
+      .resize(edge, edge, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+
+    const stored = await this.storageService.storeBuffer(
+      out,
+      coupleId,
+      'photo',
+      '.jpg',
+    );
+    return stored.cdnUrl;
+  }
 
   private inferMediaType(mimetype: string): string {
     if (mimetype.startsWith('image/')) return 'photo';
