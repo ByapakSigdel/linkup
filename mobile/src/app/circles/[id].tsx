@@ -6,7 +6,7 @@
 // the grid and follow-state fresh.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TextInput, useWindowDimensions } from 'react-native';
+import { View, ScrollView, TextInput, useWindowDimensions, RefreshControl } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Heart, ImagePlus, Lock, Plus, X } from 'lucide-react-native';
 import { Screen, AppText, Button, Card, EmptyState, Input, Row, Skeleton } from '@/components/ui';
@@ -57,6 +57,7 @@ export default function CircleProfileScreen() {
   const [postsLoading, setPostsLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [showComposer, setShowComposer] = useState(false);
   const [addStoryOpen, setAddStoryOpen] = useState(false);
@@ -250,6 +251,15 @@ export default function CircleProfileScreen() {
     setEditOpen(false);
   }, []);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadProfile();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadProfile]);
+
   // ─── Not paired ──────────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
     return (
@@ -318,6 +328,9 @@ export default function CircleProfileScreen() {
           alignSelf: 'center',
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
       >
         <ProfileHeader
           profile={profile}

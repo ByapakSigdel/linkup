@@ -5,7 +5,7 @@
 // follow:accepted / follow:removed keep follow states in sync.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, FlatList, TextInput } from 'react-native';
+import { View, FlatList, TextInput, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Compass, Search, Heart, Sparkles, UserPlus } from 'lucide-react-native';
 import { Screen, AppText, Button, Card, EmptyState, Spinner, Row, Skeleton } from '@/components/ui';
@@ -32,6 +32,7 @@ export default function DiscoverScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasOwnCircle, setHasOwnCircle] = useState<boolean | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const requestIdRef = useRef(0);
 
@@ -106,6 +107,15 @@ export default function DiscoverScreen() {
   const handleFollowChange = useCallback((id: string, state: FollowState) => {
     setCircles((prev) => prev.map((c) => (c.id === id ? { ...c, followState: state } : c)));
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchResults(debouncedQuery);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchResults, debouncedQuery]);
 
   useEffect(() => {
     if (!couple?.isPaired) return;
@@ -266,6 +276,9 @@ export default function DiscoverScreen() {
         onEndReachedThreshold={0.6}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListFooterComponent={
           loadingMore ? (
             <View style={{ alignItems: 'center', paddingVertical: 16 }}>

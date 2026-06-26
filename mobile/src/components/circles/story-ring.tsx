@@ -5,9 +5,13 @@
 //   (all seen). Tapping opens the StoryViewer at that tray.
 // Self-contained: fetches the tray + listens for circle:story:new /
 // circle:self:updated to stay fresh.
+//
+// Avatar images use expo-image (memory-disk cache + recyclingKey) for the
+// thumb (~256px) variant so small ring images are cheaply recycled.
 
 import { useCallback, useEffect, useState } from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, Text } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus } from 'lucide-react-native';
 import { Avatar, AppText, Spinner } from '@/components/ui';
@@ -19,6 +23,56 @@ import * as circlesApi from '@/lib/circles-api';
 import { AddStorySheet } from './add-story-sheet';
 import { StoryViewer } from './story-viewer';
 import type { StoryTray, Story } from './types';
+
+// ─── CircleAvatar ─────────────────────────────────────────────────────────────
+// Inline avatar that uses expo-image for caching. Falls back to initials when no
+// URL is available (mirrors the shared Avatar component's behaviour).
+function CircleAvatar({
+  uri,
+  name,
+  size,
+  recyclingKey,
+}: {
+  uri?: string | null;
+  name: string;
+  size: number;
+  recyclingKey: string;
+}) {
+  const { colors, fonts } = useTheme();
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        recyclingKey={recyclingKey}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceHover }}
+      />
+    );
+  }
+  const initials = name
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: colors.primaryLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text style={{ color: colors.primary, fontFamily: fonts.bodyBold, fontSize: size * 0.36 }}>
+        {initials}
+      </Text>
+    </View>
+  );
+}
 
 export function StoryRing() {
   const { colors } = useTheme();
@@ -81,7 +135,7 @@ export function StoryRing() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 16, paddingVertical: 12, paddingHorizontal: 4 }}
       >
-        {/* Leading "Your story" add tile */}
+        {/* Leading "Your story" add tile — use Avatar (initials fallback) */}
         <Pressable onPress={() => setAddOpen(true)} style={{ width: 68, alignItems: 'center', gap: 6 }} accessibilityLabel="Add to your story">
           <View
             style={{
@@ -127,6 +181,11 @@ export function StoryRing() {
           trays.map((tray, i) => {
             const isOwn = couple?.id ? isOwnTray(tray, couple.id) : false;
             const label = isOwn ? 'Your story' : tray.circle.handle ? `@${tray.circle.handle}` : tray.circle.name;
+            // Resolve the thumb-variant URL for this circle's avatar.
+            // CircleSummary carries avatarUrl (original); variants arrive via
+            // future pipeline enrichment. For now resolveMediaUrl gives the CDN
+            // URL we use as both the thumb fallback and the recyclingKey.
+            const avatarUri = resolveMediaUrl(tray.circle.avatarUrl) ?? undefined;
             return (
               <Pressable
                 key={tray.circle.id}
@@ -141,14 +200,24 @@ export function StoryRing() {
                     end={{ x: 1, y: 0 }}
                     style={{ width: 64, height: 64, borderRadius: 32, padding: 2.5, alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <View style={{ width: '100%', height: '100%', borderRadius: 30, borderWidth: 2, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-                      <Avatar uri={resolveMediaUrl(tray.circle.avatarUrl)} name={tray.circle.name} size={52} />
+                    <View style={{ width: '100%', height: '100%', borderRadius: 30, borderWidth: 2, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      <CircleAvatar
+                        uri={avatarUri}
+                        name={tray.circle.name}
+                        size={52}
+                        recyclingKey={`story-ring-${tray.circle.id}`}
+                      />
                     </View>
                   </LinearGradient>
                 ) : (
                   <View style={{ width: 64, height: 64, borderRadius: 32, padding: 2.5, backgroundColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
-                    <View style={{ width: '100%', height: '100%', borderRadius: 30, borderWidth: 2, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-                      <Avatar uri={resolveMediaUrl(tray.circle.avatarUrl)} name={tray.circle.name} size={52} />
+                    <View style={{ width: '100%', height: '100%', borderRadius: 30, borderWidth: 2, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      <CircleAvatar
+                        uri={avatarUri}
+                        name={tray.circle.name}
+                        size={52}
+                        recyclingKey={`story-ring-${tray.circle.id}`}
+                      />
                     </View>
                   </View>
                 )}

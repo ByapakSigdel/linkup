@@ -4,7 +4,7 @@
 // requests arrive in real time via `follow:request` and are prepended.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, FlatList, Pressable } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Check, Heart, Lock, UserCheck, X } from 'lucide-react-native';
 import { Screen, Avatar, AppText, Button, Card, EmptyState, Spinner, Row, Skeleton, Badge } from '@/components/ui';
@@ -34,6 +34,7 @@ export default function CircleRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, 'accept' | 'decline'>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const seenRef = useRef<Set<string>>(new Set());
 
@@ -50,6 +51,15 @@ export default function CircleRequestsScreen() {
       setLoading(false);
     }
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchRequests();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchRequests]);
 
   useEffect(() => {
     if (!couple?.isPaired) {
@@ -203,6 +213,9 @@ export default function CircleRequestsScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         renderItem={({ item: req }) => {
           const { circle } = req;
           const displayHandle = circle.handle ? `@${circle.handle}` : null;

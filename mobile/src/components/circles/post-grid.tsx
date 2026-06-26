@@ -1,6 +1,9 @@
 // PostGrid — Instagram-style 3-column thumbnail grid of a circle's posts.
 // Ported from apps/web/src/components/circles/post-grid.tsx. Tapping a thumbnail
 // opens a full-screen lightbox modal with carousel paging, caption, and counts.
+//
+// Uses expo-image (memory-disk cache + recyclingKey) via PostMedia for cells.
+// Grid cells request the 'thumb' variant (~256px); the lightbox requests 'full'.
 
 import { useState } from 'react';
 import {
@@ -87,6 +90,7 @@ export function PostGrid({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
         {posts.map((post) => {
           const cover = post.mediaUrls[0];
+          const coverVariants = post.mediaObjects?.[0];
           const isMulti = post.mediaUrls.length > 1;
           return (
             <Pressable
@@ -97,7 +101,13 @@ export function PostGrid({
               style={{ width: cell, height: cell, backgroundColor: colors.surfaceActive, overflow: 'hidden' }}
             >
               {cover ? (
-                <PostMedia url={cover} resizeMode="cover" />
+                // Use thumb (~256px) for the compact grid cell.
+                <PostMedia
+                  url={cover}
+                  variants={coverVariants}
+                  size="thumb"
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <ImageOff size={22} color={colors.textMuted} />
@@ -165,14 +175,27 @@ function Lightbox({ post, onClose }: { post: CirclePost; onClose: () => void }) 
               keyExtractor={(_, i) => `${post.id}-lb-${i}`}
               onScroll={onScroll}
               scrollEventThrottle={16}
-              renderItem={({ item }) => (
+              renderItem={({ item, index: i }) => (
                 <View style={{ width: stage, height: stage }}>
-                  <PostMedia url={item} resizeMode="contain" controls />
+                  {/* Lightbox always requests the full/original resolution. */}
+                  <PostMedia
+                    url={item}
+                    variants={post.mediaObjects?.[i]}
+                    size="full"
+                    resizeMode="contain"
+                    controls
+                  />
                 </View>
               )}
             />
           ) : (
-            <PostMedia url={post.mediaUrls[0]!} resizeMode="contain" controls />
+            <PostMedia
+              url={post.mediaUrls[0]!}
+              variants={post.mediaObjects?.[0]}
+              size="full"
+              resizeMode="contain"
+              controls
+            />
           )}
           {count > 1 ? (
             <Row gap={5} style={{ position: 'absolute', bottom: 12, alignSelf: 'center' }}>

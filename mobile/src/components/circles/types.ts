@@ -12,6 +12,19 @@ export type PostType = 'photo' | 'video' | 'carousel';
 /** Story media kind. */
 export type StoryMediaType = 'image' | 'video';
 
+/**
+ * Per-item image variant map returned by the be-image-pipeline.
+ * `variants.original` is always the full-resolution CDN URL.
+ * `thumb` (~256px longest edge) and `medium` (~1080px) are populated for new
+ * uploads; absent on older posts (clients must fall back to the plain URL).
+ */
+export interface MediaVariants {
+  original?: string;
+  thumb?: string;
+  medium?: string;
+  [key: string]: string | undefined;
+}
+
 export interface CircleProfile {
   id: string;
   handle: string | null;
@@ -80,6 +93,12 @@ export interface CirclePost {
   caption?: string;
   type: PostType | string;
   mediaUrls: string[];
+  /**
+   * Optional per-item variant maps from the image pipeline (§1.1).
+   * Index-aligned with `mediaUrls`. Absent on old posts — always fall back
+   * to `mediaUrls[i]` when the desired variant is missing.
+   */
+  mediaObjects?: MediaVariants[];
   metadata?: Record<string, unknown>;
   likeCount: number;
   commentCount: number;

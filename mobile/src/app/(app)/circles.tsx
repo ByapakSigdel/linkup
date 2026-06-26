@@ -9,7 +9,7 @@
 // follow:accepted (refetch feed).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, FlatList } from 'react-native';
+import { View, FlatList, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Compass, Heart, Inbox, Sparkles, UserCircle } from 'lucide-react-native';
 import { Screen, AppText, Button, Card, Spinner, EmptyState, Touchable, Row, Badge, Skeleton } from '@/components/ui';
@@ -45,6 +45,7 @@ export default function CirclesScreen() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadMyCircle = useCallback(async () => {
     setMeLoading(true);
@@ -104,6 +105,15 @@ export default function CirclesScreen() {
   useEffect(() => {
     if (myCircle) void loadFeed();
   }, [myCircle, loadFeed]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadMyCircle(), loadFeed()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadMyCircle, loadFeed]);
 
   // Realtime.
   useEffect(() => {
@@ -278,6 +288,9 @@ export default function CirclesScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListFooterComponent={
           posts.length > 0 ? (
             loadingMore ? (

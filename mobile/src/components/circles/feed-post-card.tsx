@@ -161,9 +161,16 @@ export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
                 keyExtractor={(_, i) => `${post.id}-m-${i}`}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                renderItem={({ item }) => (
+                renderItem={({ item, index: i }) => (
                   <View style={{ width: mediaSize, height: mediaSize }}>
-                    <PostMedia url={item} resizeMode="cover" controls={false} />
+                    {/* Use medium (~1080px) variant in the feed for bandwidth. */}
+                    <PostMedia
+                      url={item}
+                      variants={post.mediaObjects?.[i]}
+                      size="medium"
+                      resizeMode="cover"
+                      controls={false}
+                    />
                   </View>
                 )}
               />
@@ -187,7 +194,13 @@ export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
               </Row>
             </>
           ) : (
-            <PostMedia url={media[0]!} resizeMode="cover" controls={isVideoSingle(media[0]!)} />
+            <PostMedia
+              url={media[0]!}
+              variants={post.mediaObjects?.[0]}
+              size="medium"
+              resizeMode="cover"
+              controls={isVideoSingle(media[0]!)}
+            />
           )}
         </View>
       ) : null}
