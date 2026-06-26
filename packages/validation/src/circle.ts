@@ -13,6 +13,7 @@ export const RESERVED_HANDLES = [
   'discover',
   'requests',
   'stories',
+  'conversations',
 ] as const;
 
 export const handleSchema = z
@@ -62,6 +63,20 @@ export const createStorySchema = z.object({
   caption: z.string().max(500).optional(),
   durationMs: z.number().int().min(1000).max(60000).optional(),
 });
+
+// ─── Circle DM (couple-to-couple, mutuals-only) ──────────────────────────────
+// A message needs either text content or at least one media item.
+export const sendCircleDmSchema = z
+  .object({
+    content: z.string().max(4000).optional(),
+    mediaUrls: z.array(z.string().url()).max(10).optional(),
+  })
+  .refine(
+    (v) => (v.content?.trim().length ?? 0) > 0 || (v.mediaUrls?.length ?? 0) > 0,
+    'Message must have text or media',
+  );
+
+export type SendCircleDmInput = z.infer<typeof sendCircleDmSchema>;
 
 export type CreateCircleInput = z.infer<typeof createCircleSchema>;
 export type UpdateCircleInput = z.infer<typeof updateCircleSchema>;

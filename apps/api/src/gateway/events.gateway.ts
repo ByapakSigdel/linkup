@@ -356,6 +356,82 @@ export class EventsGateway
     return { event: 'message:deleted', data: { messageId } };
   }
 
+  // ─── Circle DM typing relay (couple-to-couple) ───────────────────────────────
+
+  /**
+   * Relay a Circle-DM typing indicator to the OTHER participants of a
+   * conversation. Self-contained in the gateway (own DB access) to avoid a
+   * circular dependency with CircleDmService. Participant-checked so a
+   * non-member can't spoof typing into a thread.
+   */
+  @SubscribeMessage('circle:dm:typing')
+  async handleCircleDmTyping(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: { conversationId: string; isTyping?: boolean },
+  ) {
+    const { userId } = client;
+    const conversationId = payload?.conversationId;
+    if (!conversationId) return;
+
+    // Resolve the sender's circle (their couple's circle).
+    const [me] = await this.db
+      .select({ coupleId: schema.users.coupleId })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    if (!me?.coupleId) return;
+    const [myCircle] = await this.db
+      .select({ id: schema.circles.id })
+      .from(schema.circles)
+      .where(eq(schema.circles.createdByCoupleId, me.coupleId))
+      .limit(1);
+    if (!myCircle) return;
+
+    // Load the conversation and verify the sender is a participant.
+    const [conv] = await this.db
+      .select()
+      .from(schema.circleConversations)
+      .where(eq(schema.circleConversations.id, conversationId))
+      .limit(1);
+    if (!conv) return;
+    if (conv.circleLoId !== myCircle.id && conv.circleHiId !== myCircle.id) return;
+
+    const otherCircleId =
+      conv.circleLoId === myCircle.id ? conv.circleHiId : conv.circleLoId;
+    const recipientIds = await this.circleCoupleUserIds(otherCircleId);
+
+    const data = {
+      conversationId,
+      circleId: myCircle.id,
+      userId,
+      isTyping: payload.isTyping ?? true,
+    };
+    for (const recipientId of recipientIds) {
+      if (recipientId === userId) continue;
+      this.emitToUser(recipientId, 'circle:dm:typing', data);
+    }
+  }
+
+  /** Both partner user ids for a circle's owner couple. */
+  private async circleCoupleUserIds(circleId: string): Promise<string[]> {
+    const [circle] = await this.db
+      .select({ coupleId: schema.circles.createdByCoupleId })
+      .from(schema.circles)
+      .where(eq(schema.circles.id, circleId))
+      .limit(1);
+    if (!circle?.coupleId) return [];
+    const [couple] = await this.db
+      .select({
+        partner1Id: schema.couples.partner1Id,
+        partner2Id: schema.couples.partner2Id,
+      })
+      .from(schema.couples)
+      .where(eq(schema.couples.id, circle.coupleId))
+      .limit(1);
+    if (!couple) return [];
+    return [couple.partner1Id, couple.partner2Id].filter((id): id is string => !!id);
+  }
+
   @SubscribeMessage('typing:start')
   async handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,

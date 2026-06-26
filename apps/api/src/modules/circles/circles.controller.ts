@@ -15,13 +15,16 @@ import {
   createCirclePostSchema,
   addCommentSchema,
   createStorySchema,
+  sendCircleDmSchema,
   type CreateCircleInput,
   type UpdateCircleInput,
   type CreateCirclePostInput,
   type AddCommentInput,
   type CreateStoryInput,
+  type SendCircleDmInput,
 } from '@linkup/validation';
 import { CirclesService } from './circles.service';
+import { CircleDmService } from './circle-dm.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -31,7 +34,10 @@ const toLimit = (v?: string): number | undefined =>
 @Controller('circles')
 @UseGuards(JwtAuthGuard)
 export class CirclesController {
-  constructor(private readonly circlesService: CirclesService) {}
+  constructor(
+    private readonly circlesService: CirclesService,
+    private readonly circleDmService: CircleDmService,
+  ) {}
 
   // ─── Profile (opt-in) ──────────────────────────────────────────────────────────
 
@@ -240,6 +246,55 @@ export class CirclesController {
     return { success: true, data };
   }
 
+  // ─── Direct messages (mutuals-only, couple-to-couple) ────────────────────────
+  // Static `conversations` segments MUST precede the `:idOrHandle` catch-all.
+
+  // GET /circles/conversations — caller's circle's inbox.
+  @Get('conversations')
+  async listConversations(
+    @CurrentUser('coupleId') coupleId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.circleDmService.listConversations(coupleId, cursor, toLimit(limit));
+    return { success: true, data };
+  }
+
+  // GET /circles/conversations/:id/messages — keyset, participant-only.
+  @Get('conversations/:id/messages')
+  async listMessages(
+    @Param('id') id: string,
+    @CurrentUser('coupleId') coupleId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.circleDmService.listMessages(id, coupleId, cursor, toLimit(limit));
+    return { success: true, data };
+  }
+
+  // POST /circles/conversations/:id/messages — send (re-checks mutual).
+  @Post('conversations/:id/messages')
+  async sendMessage(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('coupleId') coupleId: string,
+    @Body() body: SendCircleDmInput,
+  ) {
+    const input = sendCircleDmSchema.parse(body);
+    const data = await this.circleDmService.sendMessage(id, userId, coupleId, input);
+    return { success: true, data };
+  }
+
+  // POST /circles/conversations/:id/read — mark read for the caller's circle.
+  @Post('conversations/:id/read')
+  async markRead(
+    @Param('id') id: string,
+    @CurrentUser('coupleId') coupleId: string,
+  ) {
+    const data = await this.circleDmService.markRead(id, coupleId);
+    return { success: true, data };
+  }
+
   // ─── Public profile by id OR handle + nested reads (catch-all LAST) ───────────
 
   // GET /circles/:idOrHandle — view a profile.
@@ -249,6 +304,16 @@ export class CirclesController {
     @CurrentUser('coupleId') coupleId: string,
   ) {
     const data = await this.circlesService.getProfile(idOrHandle, coupleId);
+    return { success: true, data };
+  }
+
+  // POST /circles/:idOrHandle/conversations — find-or-create a DM (403 unless mutual).
+  @Post(':idOrHandle/conversations')
+  async openConversation(
+    @Param('idOrHandle') idOrHandle: string,
+    @CurrentUser('coupleId') coupleId: string,
+  ) {
+    const data = await this.circleDmService.openConversation(idOrHandle, coupleId);
     return { success: true, data };
   }
 

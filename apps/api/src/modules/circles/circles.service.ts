@@ -17,6 +17,7 @@ import * as schema from '../../database/schema';
 import { EventsGateway } from '../../gateway/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../media/storage.service';
+import { isMutualFromRows } from './circle-dm.service';
 
 // ─── Input shapes (validated upstream by zod schemas in @linkup/validation) ──────
 
@@ -181,6 +182,75 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Create your circle first');
     }
     return circle;
+  }
+
+  // ─── Public accessors (reused by CircleDmService) ──────────────────────────────
+  // Thin pass-throughs so the DM submodule can reuse the same circle/couple
+  // resolution without re-implementing it.
+
+  /** The circle owned by a couple, or null. */
+  async getMyCirclePublic(coupleId: string): Promise<CircleRow | null> {
+    return this.getMyCircle(coupleId);
+  }
+
+  /** The circle owned by a couple, or throw "create your circle first". */
+  async requireMyCirclePublic(coupleId: string): Promise<CircleRow> {
+    return this.requireMyCircle(coupleId);
+  }
+
+  /** Resolve a circle by uuid or @handle (throws NotFound if missing). */
+  async resolveCirclePublic(idOrHandle: string): Promise<CircleRow> {
+    return this.resolveCircle(idOrHandle);
+  }
+
+  /** Both partner user ids of a couple. */
+  async coupleUserIdsPublic(coupleId: string | null): Promise<string[]> {
+    return this.coupleUserIds(coupleId);
+  }
+
+  /** The owner couple's two partner user ids for a circle id. */
+  async circleUserIdsPublic(circleId: string): Promise<string[]> {
+    return this.coupleUserIdsForCircle(circleId);
+  }
+
+  /**
+   * Mutual-follow check between two circles: an ACCEPTED follow edge exists in
+   * BOTH directions (a->b AND b->a). Enforced server-side for DM open + send.
+   */
+  async isMutualFollow(circleAId: string, circleBId: string): Promise<boolean> {
+    if (circleAId === circleBId) return false;
+    const rows = await this.db
+      .select({
+        followerCircleId: schema.circleFollows.followerCircleId,
+        followingCircleId: schema.circleFollows.followingCircleId,
+      })
+      .from(schema.circleFollows)
+      .where(
+        and(
+          eq(schema.circleFollows.status, 'accepted'),
+          or(
+            and(
+              eq(schema.circleFollows.followerCircleId, circleAId),
+              eq(schema.circleFollows.followingCircleId, circleBId),
+            ),
+            and(
+              eq(schema.circleFollows.followerCircleId, circleBId),
+              eq(schema.circleFollows.followingCircleId, circleAId),
+            ),
+          ),
+        ),
+      );
+    return isMutualFromRows(circleAId, circleBId, rows);
+  }
+
+  /** Public circle summary {id, handle, name, avatarUrl} for DM list payloads. */
+  circleSummaryPublic(c: {
+    id: string;
+    handle: string | null;
+    name: string;
+    avatarUrl: string | null;
+  }) {
+    return this.circleSummary(c);
   }
 
   /** Resolve a circle by uuid (if param looks like a uuid) else by handle. */
@@ -654,10 +724,23 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
     const followState = await this.resolveFollowState(viewerCircle?.id ?? null, target);
     const canView = await this.canViewPosts(target, coupleId, viewerCircle?.id ?? null);
 
+    // §Phase2: expose mutual status so the client shows the Message button only
+    // for mutuals. `followsYou` = the TARGET has an accepted follow toward the
+    // viewer; `isMutual` = accepted follow in BOTH directions.
+    let followsYou = false;
+    let isMutual = false;
+    if (viewerCircle && !isOwner) {
+      const reverseState = await this.resolveFollowState(target.id, viewerCircle);
+      followsYou = reverseState === 'accepted';
+      isMutual = followsYou && followState === 'accepted';
+    }
+
     return {
       circle: this.serializeCircle(target),
       isOwner,
       followState,
+      followsYou,
+      isMutual,
       canViewPosts: canView,
     };
   }
