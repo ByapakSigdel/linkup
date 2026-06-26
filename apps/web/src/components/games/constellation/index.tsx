@@ -107,31 +107,58 @@ export function ConstellationOfUs() {
     );
   }
 
+  const hasStars = stars.length > 0;
+
   return (
     <div className="flex h-[70vh] min-h-[28rem] flex-col">
-      {/* Progress header */}
-      <div className="border-b border-border px-4 py-2.5">
-        <p className="text-xs text-primary">
-          {`✦ ${litCount} star${litCount === 1 ? '' : 's'} lit · ${completeCount} constellation${completeCount === 1 ? '' : 's'}`}
-          {pct > 0 ? ` · you know each other ${pct}%` : ''}
-        </p>
-      </div>
+      {/* Progress header — only once the sky has begun. */}
+      {hasStars && (
+        <div className="border-b border-border px-4 py-2.5">
+          <p className="text-xs text-text-muted">
+            <span className="text-primary">✦ </span>
+            <span className="font-display text-sm font-semibold text-text">{litCount}</span>
+            {` ${litCount === 1 ? 'star' : 'stars'} lit · `}
+            <span className="font-display text-sm font-semibold text-text">{completeCount}</span>
+            {` ${completeCount === 1 ? 'constellation' : 'constellations'}`}
+            {pct > 0 ? ` · you know each other ${pct}%` : ''}
+          </p>
+        </div>
+      )}
 
-      {/* Sky */}
+      {/* Sky (always present so the empty state floats over the dust + pending field) */}
       <div className="relative flex-1">
         <SkyView
           stars={stars}
           onPressStar={setSelected}
           onPressEmpty={() => setSheetOpen(true)}
         />
+
+        {/* Empty-state invitation, centered over the faint pending field. */}
+        {!hasStars && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-8">
+            <div className="pointer-events-auto flex max-w-xs flex-col items-center text-center">
+              <p className="font-display text-2xl leading-snug text-text">
+                Your sky is dark — for now.
+              </p>
+              <p className="mt-2 mb-6 text-sm text-text-muted">
+                Answer a prompt to light your first star.
+              </p>
+              <Button variant="primary" shape="pill" onClick={() => setSheetOpen(true)}>
+                ✦ Light your first star
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Floating CTA */}
-      <div className="p-4 pb-6">
-        <Button variant="primary" shape="pill" onClick={() => setSheetOpen(true)}>
-          ✦ Light a new star
-        </Button>
-      </div>
+      {/* Floating CTA — hidden in the empty state (the invitation carries the CTA). */}
+      {hasStars && (
+        <div className="p-4 pb-6">
+          <Button variant="primary" shape="pill" onClick={() => setSheetOpen(true)}>
+            ✦ Light a new star
+          </Button>
+        </div>
+      )}
 
       {/* Prompt sheet */}
       <PromptSheet

@@ -110,32 +110,60 @@ export function ConstellationOfUs(): JSX.Element {
     );
   }
 
+  const hasStars = stars.length > 0;
+
   return (
     <View style={styles.root}>
-      {/* Progress header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <AppText variant="caption" color={colors.primary}>
-          {`✦ ${litCount} star${litCount === 1 ? '' : 's'} lit · ${completeCount} constellation${completeCount === 1 ? '' : 's'}`}
-          {pct > 0 ? ` · you know each other ${pct}%` : ''}
-        </AppText>
-      </View>
+      {/* Progress header — only once the sky has begun. */}
+      {hasStars && (
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <AppText variant="caption" color={colors.textMuted}>
+            <AppText variant="caption" color={colors.primary}>
+              {'✦ '}
+            </AppText>
+            <AppText variant="title" color={colors.text} style={styles.headerCount}>
+              {litCount}
+            </AppText>
+            {` ${litCount === 1 ? 'star' : 'stars'} lit · `}
+            <AppText variant="title" color={colors.text} style={styles.headerCount}>
+              {completeCount}
+            </AppText>
+            {` ${completeCount === 1 ? 'constellation' : 'constellations'}`}
+            {pct > 0 ? ` · you know each other ${pct}%` : ''}
+          </AppText>
+        </View>
+      )}
 
-      {/* Sky */}
+      {/* Sky (always present so the empty state floats over the dust + pending field) */}
       <View style={styles.sky}>
         <SkyView
           stars={stars}
           onPressStar={setSelected}
           onPressEmpty={() => setSheetOpen(true)}
         />
+
+        {/* Empty-state invitation, centered over the faint pending field. */}
+        {!hasStars && (
+          <View pointerEvents="box-none" style={styles.emptyOverlay}>
+            <View pointerEvents="box-none" style={styles.emptyCard}>
+              <AppText variant="title" center color={colors.text} style={styles.emptyTitle}>
+                Your sky is dark — for now.
+              </AppText>
+              <AppText variant="body" center color={colors.textMuted} style={styles.emptySub}>
+                Answer a prompt to light your first star.
+              </AppText>
+              <Button label="✦ Light your first star" onPress={() => setSheetOpen(true)} />
+            </View>
+          </View>
+        )}
       </View>
 
-      {/* Floating CTA */}
-      <View style={styles.cta}>
-        <Button
-          label="✦ Light a new star"
-          onPress={() => setSheetOpen(true)}
-        />
-      </View>
+      {/* Floating CTA — hidden in the empty state (the invitation carries the CTA). */}
+      {hasStars && (
+        <View style={styles.cta}>
+          <Button label="✦ Light a new star" onPress={() => setSheetOpen(true)} />
+        </View>
+      )}
 
       {/* Prompt sheet */}
       <PromptSheet
@@ -166,11 +194,34 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  headerCount: {
+    fontSize: 15,
+  },
   sky: {
     flex: 1,
   },
   cta: {
     padding: 16,
     paddingBottom: 24,
+  },
+  emptyOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    maxWidth: 320,
+  },
+  emptyTitle: {
+    marginBottom: 8,
+  },
+  emptySub: {
+    marginBottom: 24,
   },
 });

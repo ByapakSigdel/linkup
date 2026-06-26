@@ -49,41 +49,48 @@ function usePrefersReducedMotion(): boolean {
 }
 
 /**
- * A single lit star: a steady bright core with a softly twinkling halo behind
- * it. The halo opacity breathes via a CSS animation unless reduce-motion is on.
- * A larger transparent circle on top captures clicks/taps.
+ * A single lit star rendered as three stacked layers — a soft outer glow, a
+ * bright core, and a tiny offset highlight glint. The glow opacity breathes via
+ * a CSS animation (staggered by `index` so the field doesn't pulse in unison)
+ * unless reduce-motion is on. The core + a larger transparent click target stay
+ * static so taps stay reliable.
  */
 function LitStar({
   star,
+  index,
   reduceMotion,
   onPress,
 }: {
   star: Star;
+  index: number;
   reduceMotion: boolean;
   onPress: (star: Star) => void;
 }) {
-  // Stagger by position so the field doesn't pulse in unison.
-  const dur = 2200 + ((Math.round(star.posX + star.posY) % 1800) | 0);
+  // Period 2.6–3.4s, phase offset by index so they don't pulse together.
+  const dur = 2600 + ((index * 137) % 800);
+  const delay = (index * 211) % 1400;
 
   return (
     <g>
-      {/* Twinkling glow halo */}
+      {/* Twinkling outer glow */}
       <circle
         cx={star.posX}
         cy={star.posY}
-        r={14}
+        r={16}
         fill="var(--color-primary)"
-        opacity={0.35}
+        opacity={0.18}
         style={
           reduceMotion
             ? undefined
             : {
-                animation: `lk-twinkle ${dur}ms ease-in-out infinite alternate`,
+                animation: `lk-twinkle ${dur}ms ease-in-out ${delay}ms infinite alternate`,
               }
         }
       />
       {/* Bright core */}
-      <circle cx={star.posX} cy={star.posY} r={6} fill="var(--color-primary)" />
+      <circle cx={star.posX} cy={star.posY} r={5} fill="var(--color-primary)" />
+      {/* Glint highlight, offset up-left */}
+      <circle cx={star.posX - 1.5} cy={star.posY - 1.5} r={1.3} fill="#ffffff" opacity={0.9} />
       {/* Transparent click/tap target */}
       <circle
         cx={star.posX}
@@ -219,7 +226,10 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps) {
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <style>{`@keyframes lk-twinkle { from { opacity: 0.2; } to { opacity: 0.6; } }`}</style>
+      <style>{`
+        @keyframes lk-twinkle { from { opacity: 0.12; } to { opacity: 0.24; } }
+        @keyframes lk-draw { from { stroke-dashoffset: var(--lk-len); } to { stroke-dashoffset: 0; } }
+      `}</style>
       <svg
         ref={svgRef}
         width="100%"
@@ -261,6 +271,7 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps) {
             <g key={`line-${c.key}`}>
               {c.points.slice(1).map((s, i) => {
                 const prev = c.points[i]!;
+                const len = Math.hypot(s.posX - prev.posX, s.posY - prev.posY);
                 return (
                   <line
                     key={`${c.key}-seg-${i}`}
@@ -269,18 +280,28 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps) {
                     x2={s.posX}
                     y2={s.posY}
                     stroke="var(--color-primary)"
-                    strokeWidth={1.5}
-                    strokeOpacity={0.5}
+                    strokeWidth={1.2}
+                    strokeOpacity={0.4}
+                    strokeDasharray={len}
+                    style={
+                      reduceMotion
+                        ? undefined
+                        : ({
+                            ['--lk-len' as string]: String(len),
+                            animation: `lk-draw 700ms ease-out ${i * 90}ms both`,
+                          } as React.CSSProperties)
+                    }
                   />
                 );
               })}
               <text
                 x={c.labelX}
-                y={c.labelY - 26}
+                y={c.labelY - 28}
                 fill="var(--color-text)"
-                fontSize={20}
+                fontSize={19}
                 textAnchor="middle"
-                opacity={0.85}
+                opacity={0.7}
+                style={{ fontFamily: 'var(--font-display)' }}
               >
                 {c.name}
               </text>
@@ -293,16 +314,17 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps) {
               key={`pending-${m.key}`}
               cx={m.x}
               cy={m.y}
-              r={3}
+              r={2.5}
               fill="var(--color-text-muted)"
-              opacity={0.3}
+              opacity={0.28}
             />
           ))}
 
-          {/* Non-lit stars (e.g. a half-answered guess). */}
+          {/* In-progress stars (e.g. a half-answered guess) — "kindling". */}
           {otherStars.map((s) => (
             <g key={`star-${s.id}`}>
-              <circle cx={s.posX} cy={s.posY} r={4} fill="var(--color-secondary)" opacity={0.6} />
+              <circle cx={s.posX} cy={s.posY} r={10} fill="var(--color-secondary)" opacity={0.12} />
+              <circle cx={s.posX} cy={s.posY} r={4} fill="var(--color-secondary)" opacity={0.7} />
               <circle
                 cx={s.posX}
                 cy={s.posY}
@@ -316,9 +338,15 @@ export function SkyView({ stars, onPressStar, onPressEmpty }: SkyViewProps) {
             </g>
           ))}
 
-          {/* Lit stars (bright core + twinkling halo). */}
-          {litStars.map((s) => (
-            <LitStar key={`lit-${s.id}`} star={s} reduceMotion={reduceMotion} onPress={onPressStar} />
+          {/* Lit stars (3-layer luminous: glow + core + glint). */}
+          {litStars.map((s, i) => (
+            <LitStar
+              key={`lit-${s.id}`}
+              star={s}
+              index={i}
+              reduceMotion={reduceMotion}
+              onPress={onPressStar}
+            />
           ))}
         </g>
       </svg>
