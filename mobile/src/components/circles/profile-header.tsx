@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { View, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Globe, Lock, Pencil } from 'lucide-react-native';
 import { Avatar, AppText, Row } from '@/components/ui';
@@ -23,10 +24,22 @@ interface ProfileHeaderProps {
   onOpenStories?: () => void;
   onEdit?: () => void;
   onFollowChange?: (state: FollowState) => void;
+  /** Owner-only: tap the followers stat to open the followers list. */
+  onOpenFollowers?: () => void;
+  /** Owner-only: tap the following stat to open the following list. */
+  onOpenFollowing?: () => void;
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
+function Stat({
+  value,
+  label,
+  onPress,
+}: {
+  value: number;
+  label: string;
+  onPress?: () => void;
+}) {
+  const body = (
     <View style={{ alignItems: 'center' }}>
       <AppText variant="subtitle" weight="700">
         {formatCount(value)}
@@ -35,6 +48,18 @@ function Stat({ value, label }: { value: number; label: string }) {
         {label}
       </AppText>
     </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${label}`}
+      hitSlop={8}
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+    >
+      {body}
+    </Pressable>
   );
 }
 
@@ -45,10 +70,13 @@ export function ProfileHeader({
   onOpenStories,
   onEdit,
   onFollowChange,
+  onOpenFollowers,
+  onOpenFollowing,
 }: ProfileHeaderProps) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const { circle, isOwner, followState } = profile;
   const pushToast = useToastStore((s) => s.push);
+  const coverUrl = resolveMediaUrl(circle.coverImageUrl);
 
   const [isPrivate, setIsPrivate] = useState(circle.isPrivate);
   const [followerCount, setFollowerCount] = useState(circle.followerCount);
@@ -94,6 +122,22 @@ export function ProfileHeader({
 
   return (
     <View style={{ gap: 16 }}>
+      {/* Cover banner (§1.7) — rendered only when set. */}
+      {coverUrl ? (
+        <Image
+          source={{ uri: coverUrl }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={coverUrl}
+          style={{
+            width: '100%',
+            height: 140,
+            borderRadius: radius.card,
+            backgroundColor: colors.surfaceHover,
+          }}
+        />
+      ) : null}
+
       <Row gap={20} style={{ alignItems: 'flex-start' }}>
         {/* Avatar + story ring slot */}
         <Pressable onPress={hasRing ? onOpenStories : undefined} disabled={!hasRing} accessibilityLabel={circle.name}>
@@ -168,8 +212,8 @@ export function ProfileHeader({
 
           <Row gap={28}>
             <Stat value={circle.postCount} label="posts" />
-            <Stat value={followerCount} label="followers" />
-            <Stat value={circle.followingCount} label="following" />
+            <Stat value={followerCount} label="followers" onPress={onOpenFollowers} />
+            <Stat value={circle.followingCount} label="following" onPress={onOpenFollowing} />
           </Row>
         </View>
       </Row>

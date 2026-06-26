@@ -5,16 +5,18 @@
 // Private circles you don't follow render a locked state. Realtime keeps counts,
 // the grid and follow-state fresh.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TextInput, useWindowDimensions, RefreshControl } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Heart, ImagePlus, Lock, Plus, X } from 'lucide-react-native';
-import { Screen, AppText, Button, Card, EmptyState, Input, Row, Skeleton } from '@/components/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, ScrollView, Image, Pressable, TextInput, useWindowDimensions, RefreshControl } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Heart, ImagePlus, Lock, Plus, X, Trash2 } from 'lucide-react-native';
+import { Screen, AppText, Button, Card, EmptyState, Input, Row, Skeleton, Spinner } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
+import { resolveMediaUrl } from '@/lib/env';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
 import {
@@ -29,7 +31,7 @@ import {
   type Story,
   type StoryTray,
 } from '@/components/circles';
-import { isHandleValid, sanitizeHandle, errMessage } from '@/components/circles/helpers';
+import { isHandleValid, sanitizeHandle, errMessage, assetToUploadFile } from '@/components/circles/helpers';
 
 export default function CircleProfileScreen() {
   const { colors } = useTheme();
@@ -56,6 +58,7 @@ export default function CircleProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -67,6 +70,7 @@ export default function CircleProfileScreen() {
   const circleId = profile?.circle.id ?? null;
   const isOwner = profile?.isOwner ?? false;
   const canViewPosts = profile?.canViewPosts ?? false;
+  const routeKey = profile ? profile.circle.handle ?? profile.circle.id : idOrHandle;
 
   const loadProfile = useCallback(async () => {
     if (!idOrHandle) return;
@@ -230,7 +234,8 @@ export default function CircleProfileScreen() {
   );
 
   const loadMore = useCallback(async () => {
-    if (!idOrHandle || !nextCursor || loadingMore) return;
+    if (!idOrHandle || !nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const { posts: more, nextCursor: cur } = await circlesApi.getCirclePosts(idOrHandle, { cursor: nextCursor });
@@ -242,9 +247,33 @@ export default function CircleProfileScreen() {
     } catch {
       pushToast({ title: 'Could not load more posts', body: 'Please try again.' });
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [idOrHandle, nextCursor, loadingMore, pushToast]);
+  }, [idOrHandle, nextCursor, pushToast]);
+
+  const handleDeletePost = useCallback(
+    async (post: CirclePost) => {
+      const snapshot = posts;
+      // Optimistically remove the post + decrement the profile count.
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setProfile((prev) =>
+        prev ? { ...prev, circle: { ...prev.circle, postCount: Math.max(prev.circle.postCount - 1, 0) } } : prev,
+      );
+      try {
+        await circlesApi.deletePost(post.id);
+        pushToast({ title: 'Post deleted', body: 'Your post has been removed.', variant: 'success' });
+      } catch (err) {
+        // Roll back on failure.
+        setPosts(snapshot);
+        setProfile((prev) =>
+          prev ? { ...prev, circle: { ...prev.circle, postCount: prev.circle.postCount + 1 } } : prev,
+        );
+        pushToast({ title: 'Could not delete post', body: errMessage(err, 'Please try again.') });
+      }
+    },
+    [posts, pushToast],
+  );
 
   const handleEdited = useCallback((circle: CircleProfileResponse['circle']) => {
     setProfile((prev) => (prev ? { ...prev, circle } : prev));
@@ -314,84 +343,96 @@ export default function CircleProfileScreen() {
     );
   }
 
+  // Shared header content for the post grid / locked state. Rendered as the
+  // FlatList ListHeaderComponent (§1.4) so it scrolls with the virtualized grid.
+  const headerContent = (
+    <View style={{ gap: 20, paddingBottom: 16 }}>
+      <ProfileHeader
+        profile={profile}
+        hasStories={hasUnseenStories}
+        storiesSeen={hasSeenStories}
+        onOpenStories={tray ? () => setStoryViewerOpen(true) : undefined}
+        onEdit={isOwner ? () => setEditOpen(true) : undefined}
+        onFollowChange={handleFollowChange}
+        onOpenFollowers={isOwner ? () => router.push(`/circles/${encodeURIComponent(routeKey)}/followers`) : undefined}
+        onOpenFollowing={isOwner ? () => router.push(`/circles/${encodeURIComponent(routeKey)}/following`) : undefined}
+      />
+
+      {/* Owner action bar */}
+      {isOwner ? (
+        <Row gap={8} style={{ flexWrap: 'wrap' }}>
+          <Button
+            size="sm"
+            variant={showComposer ? 'outline' : 'primary'}
+            onPress={() => setShowComposer((v) => !v)}
+            leftIcon={
+              showComposer ? <X size={16} color={colors.text} /> : <Plus size={16} color={colors.textOnPrimary} />
+            }
+            label={showComposer ? 'Close' : 'New post'}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onPress={() => setAddStoryOpen(true)}
+            leftIcon={<ImagePlus size={16} color={colors.text} />}
+            label="Add to story"
+          />
+        </Row>
+      ) : null}
+
+      {isOwner && showComposer ? (
+        <PostComposer onPosted={handlePosted} onCancel={() => setShowComposer(false)} />
+      ) : null}
+
+      {isOwner && editOpen ? (
+        <EditCircleForm circle={profile.circle} onSaved={handleEdited} onCancel={() => setEditOpen(false)} />
+      ) : null}
+
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border }} />
+    </View>
+  );
+
+  const refreshCtl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+  );
+
   return (
     <Screen padded={false}>
       <View style={{ paddingHorizontal: 16, width: '100%', maxWidth: isTablet ? PROFILE_WIDTH : undefined, alignSelf: 'center' }}>
         <ScreenHeader title={profile.circle.handle ? `@${profile.circle.handle}` : profile.circle.name} />
       </View>
-      <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          gap: 20,
-          width: '100%',
-          maxWidth: isTablet ? PROFILE_WIDTH : undefined,
-          alignSelf: 'center',
-        }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        <ProfileHeader
-          profile={profile}
-          hasStories={hasUnseenStories}
-          storiesSeen={hasSeenStories}
-          onOpenStories={tray ? () => setStoryViewerOpen(true) : undefined}
-          onEdit={isOwner ? () => setEditOpen(true) : undefined}
-          onFollowChange={handleFollowChange}
+
+      {canViewPosts ? (
+        <PostGrid
+          posts={posts}
+          loading={postsLoading}
+          columns={gridColumnCount}
+          containerWidth={gridWidth}
+          emptyLabel={isOwner ? 'Share your first photo with your followers.' : 'No posts yet.'}
+          onDeletePost={isOwner ? handleDeletePost : undefined}
+          ListHeaderComponent={headerContent}
+          refreshControl={refreshCtl}
+          onEndReached={() => void loadMore()}
+          loadingMore={loadingMore}
+          hasMore={!!nextCursor}
+          maxWidth={isTablet ? PROFILE_WIDTH : undefined}
         />
-
-        {/* Owner action bar */}
-        {isOwner ? (
-          <Row gap={8} style={{ flexWrap: 'wrap' }}>
-            <Button
-              size="sm"
-              variant={showComposer ? 'outline' : 'primary'}
-              onPress={() => setShowComposer((v) => !v)}
-              leftIcon={
-                showComposer ? <X size={16} color={colors.text} /> : <Plus size={16} color={colors.textOnPrimary} />
-              }
-              label={showComposer ? 'Close' : 'New post'}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onPress={() => setAddStoryOpen(true)}
-              leftIcon={<ImagePlus size={16} color={colors.text} />}
-              label="Add to story"
-            />
-          </Row>
-        ) : null}
-
-        {isOwner && showComposer ? (
-          <PostComposer onPosted={handlePosted} onCancel={() => setShowComposer(false)} />
-        ) : null}
-
-        {isOwner && editOpen ? (
-          <EditCircleForm circle={profile.circle} onSaved={handleEdited} onCancel={() => setEditOpen(false)} />
-        ) : null}
-
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
-          {canViewPosts ? (
-            <>
-              <PostGrid
-                posts={posts}
-                loading={postsLoading}
-                columns={gridColumnCount}
-                containerWidth={gridWidth}
-                emptyLabel={isOwner ? 'Share your first photo with your followers.' : 'No posts yet.'}
-              />
-              {nextCursor ? (
-                <View style={{ alignItems: 'center', paddingTop: 20 }}>
-                  <Button variant="outline" size="sm" onPress={() => void loadMore()} loading={loadingMore} label="Load more" />
-                </View>
-              ) : null}
-            </>
-          ) : (
-            <LockedState isPending={profile.followState === 'pending'} name={profile.circle.name} />
-          )}
-        </View>
-      </ScrollView>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            padding: 16,
+            gap: 20,
+            width: '100%',
+            maxWidth: isTablet ? PROFILE_WIDTH : undefined,
+            alignSelf: 'center',
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshCtl}
+        >
+          {headerContent}
+          <LockedState isPending={profile.followState === 'pending'} name={profile.circle.name} />
+        </ScrollView>
+      )}
 
       <AddStorySheet open={addStoryOpen} onClose={() => setAddStoryOpen(false)} onAdded={handleStoryAdded} />
 
@@ -433,15 +474,51 @@ function EditCircleForm({
 }) {
   const { colors, radius } = useTheme();
   const pushToast = useToastStore((s) => s.push);
+  const coupleId = useAuthStore((s) => s.couple?.id ?? null);
   const [handle, setHandle] = useState(circle.handle ?? '');
   const [name, setName] = useState(circle.name);
   const [bio, setBio] = useState(circle.bio ?? '');
+  const [cover, setCover] = useState<string | null>(circle.coverImageUrl ?? null);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const handleValid = isHandleValid(handle);
+  const coverChanged = (cover ?? '') !== (circle.coverImageUrl ?? '');
   const dirty =
-    handle !== (circle.handle ?? '') || name.trim() !== circle.name || bio.trim() !== (circle.bio ?? '');
+    handle !== (circle.handle ?? '') ||
+    name.trim() !== circle.name ||
+    bio.trim() !== (circle.bio ?? '') ||
+    coverChanged;
+
+  const pickCover = useCallback(async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      pushToast({ title: 'Permission needed', body: 'Allow photo access to set a cover image.' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [3, 1],
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    if (!coupleId) {
+      setErr('We could not find your couple. Please reload and try again.');
+      return;
+    }
+    setUploadingCover(true);
+    setErr(null);
+    try {
+      const uploaded = await circlesApi.uploadMedia(assetToUploadFile(result.assets[0]), coupleId);
+      setCover(uploaded.media.cdnUrl);
+    } catch (error) {
+      setErr(errMessage(error, 'Could not upload the cover image. Please try again.'));
+    } finally {
+      setUploadingCover(false);
+    }
+  }, [coupleId, pushToast]);
 
   const submit = useCallback(async () => {
     if (!handleValid) {
@@ -455,6 +532,7 @@ function EditCircleForm({
         handle: handle !== (circle.handle ?? '') ? handle : undefined,
         name: name.trim() || undefined,
         bio: bio.trim(),
+        coverImageUrl: coverChanged ? cover : undefined,
       });
       pushToast({ title: 'Profile updated', body: 'Your circle changes are live.', variant: 'success' });
       onSaved(updated);
@@ -463,11 +541,72 @@ function EditCircleForm({
     } finally {
       setSaving(false);
     }
-  }, [handle, handleValid, name, bio, circle.handle, onSaved, pushToast]);
+  }, [handle, handleValid, name, bio, cover, coverChanged, circle.handle, onSaved, pushToast]);
+
+  const coverPreview = cover ? resolveMediaUrl(cover) : null;
 
   return (
     <Card variant="bordered" style={{ gap: 16 }}>
       <AppText variant="subtitle">Edit profile</AppText>
+
+      {/* Cover image (§1.7) */}
+      <View style={{ gap: 6 }}>
+        <AppText variant="label">
+          Cover image <AppText variant="label" muted>(optional)</AppText>
+        </AppText>
+        {coverPreview ? (
+          <View style={{ borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.surfaceHover }}>
+            <Image source={{ uri: coverPreview }} style={{ width: '100%', height: 120 }} resizeMode="cover" />
+            <Row gap={8} style={{ position: 'absolute', top: 8, right: 8 }}>
+              <Pressable
+                onPress={pickCover}
+                disabled={uploadingCover || saving}
+                accessibilityLabel="Change cover image"
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ImagePlus size={16} color="#fff" />
+              </Pressable>
+              <Pressable
+                onPress={() => setCover(null)}
+                disabled={uploadingCover || saving}
+                accessibilityLabel="Remove cover image"
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Trash2 size={16} color="#fff" />
+              </Pressable>
+            </Row>
+            {uploadingCover ? (
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+                <Spinner size="small" color="#fff" />
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <Pressable
+            onPress={pickCover}
+            disabled={uploadingCover || saving}
+            style={{
+              height: 120,
+              borderRadius: radius.card,
+              borderWidth: 2,
+              borderStyle: 'dashed',
+              borderColor: colors.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            {uploadingCover ? (
+              <Spinner size="small" />
+            ) : (
+              <>
+                <ImagePlus size={22} color={colors.textMuted} />
+                <AppText variant="caption" muted>Add a cover banner</AppText>
+              </>
+            )}
+          </Pressable>
+        )}
+      </View>
 
       <View style={{ gap: 6 }}>
         <AppText variant="label">Handle</AppText>
@@ -530,7 +669,7 @@ function EditCircleForm({
 
       <Row gap={8} style={{ justifyContent: 'flex-end' }}>
         <Button variant="ghost" size="sm" onPress={onCancel} disabled={saving} label="Cancel" />
-        <Button size="sm" onPress={submit} loading={saving} disabled={!handleValid || !dirty} label="Save changes" />
+        <Button size="sm" onPress={submit} loading={saving} disabled={!handleValid || !dirty || uploadingCover} label="Save changes" />
       </Row>
     </Card>
   );

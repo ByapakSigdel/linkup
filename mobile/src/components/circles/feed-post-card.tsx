@@ -9,14 +9,15 @@ import {
   View,
   Pressable,
   FlatList,
+  Alert,
   useWindowDimensions,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Heart, MessageCircle } from 'lucide-react-native';
+import { Heart, MessageCircle, Trash2 } from 'lucide-react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
-import { Avatar, AppText, Row } from '@/components/ui';
+import { Avatar, AppText, Row, Spinner } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { resolveMediaUrl } from '@/lib/env';
 import { getSocket } from '@/lib/socket';
@@ -29,9 +30,11 @@ import type { CirclePost } from './types';
 interface FeedPostCardProps {
   post: CirclePost;
   onUpdate?: (postId: string, patch: Partial<CirclePost>) => void;
+  /** Owner-only: when set, the card shows a delete affordance in its header. */
+  onDelete?: (post: CirclePost) => void | Promise<void>;
 }
 
-export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
+export function FeedPostCard({ post, onUpdate, onDelete }: FeedPostCardProps) {
   const { colors, radius } = useTheme();
   const { width } = useWindowDimensions();
   // Card spans the screen minus the 16px screen padding on each side.
@@ -48,6 +51,7 @@ export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
   const [liking, setLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [slide, setSlide] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
@@ -117,6 +121,29 @@ export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
 
   const goToProfile = () => router.push(`/circles/${encodeURIComponent(routeKey)}`);
 
+  const confirmDelete = () => {
+    if (!onDelete || deleting) return;
+    Alert.alert(
+      'Delete post?',
+      'This will permanently remove this post from your circle. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await onDelete(post);
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View
       style={{
@@ -146,6 +173,18 @@ export function FeedPostCard({ post, onUpdate }: FeedPostCardProps) {
             {timeAgo(post.createdAt)}
           </AppText>
         </View>
+        {onDelete ? (
+          <Pressable
+            onPress={confirmDelete}
+            disabled={deleting}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Delete post"
+            style={{ padding: 4, opacity: deleting ? 0.5 : 1 }}
+          >
+            {deleting ? <Spinner size="small" /> : <Trash2 size={20} color={colors.textMuted} />}
+          </Pressable>
+        ) : null}
       </Row>
 
       {/* Media */}

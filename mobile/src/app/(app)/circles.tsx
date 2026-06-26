@@ -17,6 +17,7 @@ import { AppBar } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useAuthStore } from '@/stores/auth-store';
+import { useToastStore } from '@/stores/toast-store';
 import { getSocket } from '@/lib/socket';
 import * as circlesApi from '@/lib/circles-api';
 import {
@@ -33,6 +34,7 @@ export default function CirclesScreen() {
   const { isTablet } = useResponsive();
   const FEED_WIDTH = 680;
   const couple = useAuthStore((s) => s.couple);
+  const pushToast = useToastStore((s) => s.push);
 
   const [myCircle, setMyCircle] = useState<CircleProfileResponse['circle'] | null>(null);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
@@ -144,6 +146,22 @@ export default function CirclesScreen() {
   const handlePostUpdate = useCallback((postId: string, patch: Partial<FeedPost>) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...patch } : p)));
   }, []);
+
+  const handleDeletePost = useCallback(
+    async (post: FeedPost) => {
+      const snapshot = posts;
+      // Optimistically remove from the feed.
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      try {
+        await circlesApi.deletePost(post.id);
+        pushToast({ title: 'Post deleted', body: 'Your post has been removed.', variant: 'success' });
+      } catch (err) {
+        setPosts(snapshot);
+        pushToast({ title: 'Could not delete post', body: errMessage(err, 'Please try again.') });
+      }
+    },
+    [posts, pushToast],
+  );
 
   // ─── Not paired ────────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
@@ -284,7 +302,13 @@ export default function CirclesScreen() {
         }}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={emptyFeed}
-        renderItem={({ item }) => <FeedPostCard post={item} onUpdate={handlePostUpdate} />}
+        renderItem={({ item }) => (
+          <FeedPostCard
+            post={item}
+            onUpdate={handlePostUpdate}
+            onDelete={item.circleId === myCircle.id ? handleDeletePost : undefined}
+          />
+        )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
         showsVerticalScrollIndicator={false}
