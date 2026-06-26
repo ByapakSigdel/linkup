@@ -567,6 +567,78 @@ export const circleStoryViews = pgTable(
   }),
 );
 
+// ─── Circle Conversations (couple-to-couple DMs) ────────────────────────────────
+
+// Ordered pair (circleLoId < circleHiId lexicographically) ensures find-or-create is race-safe.
+export const circleConversations = pgTable(
+  'circle_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // lo < hi (string compare) — enforced by the service before insert
+    circleLoId: uuid('circle_lo_id')
+      .notNull()
+      .references(() => circles.id),
+    circleHiId: uuid('circle_hi_id')
+      .notNull()
+      .references(() => circles.id),
+    lastMessageAt: timestamp('last_message_at'),
+    lastMessagePreview: varchar('last_message_preview', { length: 280 }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    pairUnique: uniqueIndex('circle_conversations_pair_unique').on(
+      table.circleLoId,
+      table.circleHiId,
+    ),
+  }),
+);
+
+export const circleConversationMessages = pgTable(
+  'circle_conversation_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => circleConversations.id),
+    senderUserId: uuid('sender_user_id')
+      .notNull()
+      .references(() => users.id),
+    senderCircleId: uuid('sender_circle_id')
+      .notNull()
+      .references(() => circles.id),
+    content: text('content'),
+    mediaUrls: jsonb('media_urls').$type<string[]>(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    conversationCreatedIdx: index('circle_conv_messages_conv_created_idx').on(
+      table.conversationId,
+      table.createdAt,
+    ),
+  }),
+);
+
+export const circleConversationReads = pgTable(
+  'circle_conversation_reads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => circleConversations.id),
+    circleId: uuid('circle_id')
+      .notNull()
+      .references(() => circles.id),
+    lastReadAt: timestamp('last_read_at').defaultNow(),
+  },
+  (table) => ({
+    convCircleUnique: uniqueIndex('circle_conversation_reads_conv_circle_unique').on(
+      table.conversationId,
+      table.circleId,
+    ),
+  }),
+);
+
 // ─── Custom Emojis ──────────────────────────────────────────────────────────────
 
 export const customEmojis = pgTable('custom_emojis', {
@@ -990,6 +1062,8 @@ export const circlesRelations = relations(circles, ({ one, many }) => ({
   following: many(circleFollows, { relationName: 'follower' }),
   posts: many(circlePosts),
   stories: many(circleStories),
+  conversationsAsLo: many(circleConversations, { relationName: 'circleLoConversations' }),
+  conversationsAsHi: many(circleConversations, { relationName: 'circleHiConversations' }),
 }));
 
 export const circleFollowsRelations = relations(circleFollows, ({ one }) => ({
@@ -1135,3 +1209,50 @@ export const devicesRelations = relations(devices, ({ one }) => ({
 export const verificationCodesRelations = relations(verificationCodes, ({ one }) => ({
   user: one(users, { fields: [verificationCodes.userId], references: [users.id] }),
 }));
+
+export const circleConversationsRelations = relations(circleConversations, ({ one, many }) => ({
+  circleLo: one(circles, {
+    fields: [circleConversations.circleLoId],
+    references: [circles.id],
+    relationName: 'circleLoConversations',
+  }),
+  circleHi: one(circles, {
+    fields: [circleConversations.circleHiId],
+    references: [circles.id],
+    relationName: 'circleHiConversations',
+  }),
+  messages: many(circleConversationMessages),
+  reads: many(circleConversationReads),
+}));
+
+export const circleConversationMessagesRelations = relations(
+  circleConversationMessages,
+  ({ one }) => ({
+    conversation: one(circleConversations, {
+      fields: [circleConversationMessages.conversationId],
+      references: [circleConversations.id],
+    }),
+    senderUser: one(users, {
+      fields: [circleConversationMessages.senderUserId],
+      references: [users.id],
+    }),
+    senderCircle: one(circles, {
+      fields: [circleConversationMessages.senderCircleId],
+      references: [circles.id],
+    }),
+  }),
+);
+
+export const circleConversationReadsRelations = relations(
+  circleConversationReads,
+  ({ one }) => ({
+    conversation: one(circleConversations, {
+      fields: [circleConversationReads.conversationId],
+      references: [circleConversations.id],
+    }),
+    circle: one(circles, {
+      fields: [circleConversationReads.circleId],
+      references: [circles.id],
+    }),
+  }),
+);

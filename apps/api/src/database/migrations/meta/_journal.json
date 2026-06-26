@@ -57,6 +57,13 @@
       "when": 1782300426938,
       "tag": "0007_melted_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782471030733,
+      "tag": "0008_lively_lilandra",
+      "breakpoints": true
     }
   ]
 }
