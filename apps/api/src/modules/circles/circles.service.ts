@@ -753,28 +753,32 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('At least one media item is required');
     }
 
-    const [post] = await this.db
-      .insert(schema.circlePosts)
-      .values({
-        circleId: circle.id, // server-forced: never trust a body circleId
-        coupleId,
-        authorId: userId,
-        content: input.caption ?? null,
-        type: input.type ?? 'photo',
-        mediaUrls: input.mediaUrls,
-        metadata: input.metadata,
-        likeCount: 0,
-        commentCount: 0,
-      })
-      .returning();
+    const post = await this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(schema.circlePosts)
+        .values({
+          circleId: circle.id, // server-forced: never trust a body circleId
+          coupleId,
+          authorId: userId,
+          content: input.caption ?? null,
+          type: input.type ?? 'photo',
+          mediaUrls: input.mediaUrls,
+          metadata: input.metadata,
+          likeCount: 0,
+          commentCount: 0,
+        })
+        .returning();
 
-    await this.db
-      .update(schema.circles)
-      .set({ postCount: sql`${schema.circles.postCount} + 1`, updatedAt: new Date() })
-      .where(eq(schema.circles.id, circle.id));
+      await tx
+        .update(schema.circles)
+        .set({ postCount: sql`${schema.circles.postCount} + 1`, updatedAt: new Date() })
+        .where(eq(schema.circles.id, circle.id));
+
+      return inserted!;
+    });
 
     const serialized = {
-      ...this.serializePost(post!),
+      ...this.serializePost(post),
       circle: this.circleSummary(circle),
     };
 
@@ -784,7 +788,7 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       circleId: circle.id,
       post: serialized,
     });
-    await this.afterOwnerMutation(userId, 'post:new', { circleId: circle.id, postId: post!.id });
+    await this.afterOwnerMutation(userId, 'post:new', { circleId: circle.id, postId: post.id });
 
     return { post: serialized };
   }
@@ -804,14 +808,16 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException('You can only delete posts on your own circle');
     }
 
-    await this.db.delete(schema.circlePosts).where(eq(schema.circlePosts.id, postId));
-    await this.db
-      .update(schema.circles)
-      .set({
-        postCount: sql`GREATEST(${schema.circles.postCount} - 1, 0)`,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.circles.id, circle.id));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.circlePosts).where(eq(schema.circlePosts.id, postId));
+      await tx
+        .update(schema.circles)
+        .set({
+          postCount: sql`GREATEST(${schema.circles.postCount} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.circles.id, circle.id));
+    });
 
     const followerUserIds = await this.resolveFollowerUserIds(circle.id);
     this.fanOut(followerUserIds, 'circle:post:deleted', { circleId: circle.id, postId });
@@ -841,32 +847,40 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       .limit(1);
 
     let liked: boolean;
+    let likeCount: number;
     if (existing) {
-      await this.db.delete(schema.postLikes).where(eq(schema.postLikes.id, existing.id));
-      await this.db
-        .update(schema.circlePosts)
-        .set({ likeCount: sql`GREATEST(${schema.circlePosts.likeCount} - 1, 0)` })
-        .where(eq(schema.circlePosts.id, postId));
+      likeCount = await this.db.transaction(async (tx) => {
+        await tx.delete(schema.postLikes).where(eq(schema.postLikes.id, existing.id));
+        const [after] = await tx
+          .update(schema.circlePosts)
+          .set({ likeCount: sql`GREATEST(${schema.circlePosts.likeCount} - 1, 0)` })
+          .where(eq(schema.circlePosts.id, postId))
+          .returning({ likeCount: schema.circlePosts.likeCount });
+        return after?.likeCount ?? 0;
+      });
       liked = false;
     } else {
       try {
-        await this.db.insert(schema.postLikes).values({ postId, userId });
-        await this.db
-          .update(schema.circlePosts)
-          .set({ likeCount: sql`${schema.circlePosts.likeCount} + 1` })
-          .where(eq(schema.circlePosts.id, postId));
+        likeCount = await this.db.transaction(async (tx) => {
+          await tx.insert(schema.postLikes).values({ postId, userId });
+          const [after] = await tx
+            .update(schema.circlePosts)
+            .set({ likeCount: sql`${schema.circlePosts.likeCount} + 1` })
+            .where(eq(schema.circlePosts.id, postId))
+            .returning({ likeCount: schema.circlePosts.likeCount });
+          return after?.likeCount ?? 0;
+        });
       } catch (err) {
         if (!this.isUniqueViolation(err)) throw err; // concurrent like, ignore
+        const [cur] = await this.db
+          .select({ likeCount: schema.circlePosts.likeCount })
+          .from(schema.circlePosts)
+          .where(eq(schema.circlePosts.id, postId))
+          .limit(1);
+        likeCount = cur?.likeCount ?? 0;
       }
       liked = true;
     }
-
-    const [updated] = await this.db
-      .select({ likeCount: schema.circlePosts.likeCount })
-      .from(schema.circlePosts)
-      .where(eq(schema.circlePosts.id, postId))
-      .limit(1);
-    const likeCount = updated?.likeCount ?? 0;
 
     // Emit to post-owner couple users.
     const ownerUserIds = await this.ownerCoupleUserIds(target);
@@ -1083,18 +1097,37 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
     const status = isPublic ? 'accepted' : 'pending';
     const now = new Date();
 
+    // Insert the follow edge + atomically bump counters (public only).
     let follow: typeof schema.circleFollows.$inferSelect | undefined;
+    let newFollowerCount = 0;
     try {
-      [follow] = await this.db
-        .insert(schema.circleFollows)
-        .values({
-          followerCircleId: myCircle.id,
-          followingCircleId: target.id,
-          status,
-          requestedByUserId: userId,
-          acceptedAt: isPublic ? now : null,
-        })
-        .returning();
+      ({ follow, newFollowerCount } = await this.db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(schema.circleFollows)
+          .values({
+            followerCircleId: myCircle.id,
+            followingCircleId: target.id,
+            status,
+            requestedByUserId: userId,
+            acceptedAt: isPublic ? now : null,
+          })
+          .returning();
+
+        if (isPublic) {
+          const [updatedTarget] = await tx
+            .update(schema.circles)
+            .set({ followerCount: sql`${schema.circles.followerCount} + 1` })
+            .where(eq(schema.circles.id, target.id))
+            .returning({ followerCount: schema.circles.followerCount });
+          await tx
+            .update(schema.circles)
+            .set({ followingCount: sql`${schema.circles.followingCount} + 1` })
+            .where(eq(schema.circles.id, myCircle.id));
+          return { follow: inserted!, newFollowerCount: updatedTarget?.followerCount ?? 0 };
+        }
+
+        return { follow: inserted!, newFollowerCount: 0 };
+      }));
     } catch (err) {
       if (this.isUniqueViolation(err)) {
         const [again] = await this.db
@@ -1117,25 +1150,10 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
     const actor = await this.displayName(userId);
 
     if (isPublic) {
-      await this.db
-        .update(schema.circles)
-        .set({ followerCount: sql`${schema.circles.followerCount} + 1` })
-        .where(eq(schema.circles.id, target.id));
-      await this.db
-        .update(schema.circles)
-        .set({ followingCount: sql`${schema.circles.followingCount} + 1` })
-        .where(eq(schema.circles.id, myCircle.id));
-
-      const [updatedTarget] = await this.db
-        .select({ followerCount: schema.circles.followerCount })
-        .from(schema.circles)
-        .where(eq(schema.circles.id, target.id))
-        .limit(1);
-
       this.fanOut(ownerUserIds, 'follow:new', {
         circleId: target.id,
         followerCircle: followerSummary,
-        followerCount: updatedTarget?.followerCount ?? 0,
+        followerCount: newFollowerCount,
       });
       for (const ownerUserId of ownerUserIds) {
         await this.notifications.create({
@@ -1197,28 +1215,31 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       .limit(1);
     if (!existing) return { success: true };
 
-    await this.db.delete(schema.circleFollows).where(eq(schema.circleFollows.id, existing.id));
+    let newFollowerCount = 0;
+    const wasAccepted = existing.status === 'accepted';
 
-    if (existing.status === 'accepted') {
-      await this.db
-        .update(schema.circles)
-        .set({ followerCount: sql`GREATEST(${schema.circles.followerCount} - 1, 0)` })
-        .where(eq(schema.circles.id, target.id));
-      await this.db
-        .update(schema.circles)
-        .set({ followingCount: sql`GREATEST(${schema.circles.followingCount} - 1, 0)` })
-        .where(eq(schema.circles.id, myCircle.id));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.circleFollows).where(eq(schema.circleFollows.id, existing.id));
 
-      const [updatedTarget] = await this.db
-        .select({ followerCount: schema.circles.followerCount })
-        .from(schema.circles)
-        .where(eq(schema.circles.id, target.id))
-        .limit(1);
+      if (wasAccepted) {
+        const [updatedTarget] = await tx
+          .update(schema.circles)
+          .set({ followerCount: sql`GREATEST(${schema.circles.followerCount} - 1, 0)` })
+          .where(eq(schema.circles.id, target.id))
+          .returning({ followerCount: schema.circles.followerCount });
+        await tx
+          .update(schema.circles)
+          .set({ followingCount: sql`GREATEST(${schema.circles.followingCount} - 1, 0)` })
+          .where(eq(schema.circles.id, myCircle.id));
+        newFollowerCount = updatedTarget?.followerCount ?? 0;
+      }
+    });
 
+    if (wasAccepted) {
       const ownerUserIds = await this.ownerCoupleUserIds(target);
       this.fanOut(ownerUserIds, 'follow:removed', {
         circleId: target.id,
-        followerCount: updatedTarget?.followerCount ?? 0,
+        followerCount: newFollowerCount,
       });
     }
 
@@ -1369,20 +1390,22 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
     }
 
     const now = new Date();
-    const [updated] = await this.db
-      .update(schema.circleFollows)
-      .set({ status: 'accepted', acceptedAt: now })
-      .where(eq(schema.circleFollows.id, followId))
-      .returning();
-
-    await this.db
-      .update(schema.circles)
-      .set({ followerCount: sql`${schema.circles.followerCount} + 1` })
-      .where(eq(schema.circles.id, myCircle.id));
-    await this.db
-      .update(schema.circles)
-      .set({ followingCount: sql`${schema.circles.followingCount} + 1` })
-      .where(eq(schema.circles.id, follow.followerCircleId));
+    const updated = await this.db.transaction(async (tx) => {
+      const [updatedFollow] = await tx
+        .update(schema.circleFollows)
+        .set({ status: 'accepted', acceptedAt: now })
+        .where(eq(schema.circleFollows.id, followId))
+        .returning();
+      await tx
+        .update(schema.circles)
+        .set({ followerCount: sql`${schema.circles.followerCount} + 1` })
+        .where(eq(schema.circles.id, myCircle.id));
+      await tx
+        .update(schema.circles)
+        .set({ followingCount: sql`${schema.circles.followingCount} + 1` })
+        .where(eq(schema.circles.id, follow.followerCircleId));
+      return updatedFollow;
+    });
 
     const followerUserIds = await this.coupleUserIdsForCircle(follow.followerCircleId);
     this.fanOut(followerUserIds, 'follow:accepted', { circleId: myCircle.id });
@@ -1538,9 +1561,41 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    // Single query: leftJoin circleFollows so follow state is computed without N+1.
+    // The join is conditional on myCircle — when null no row will match and
+    // followStatus will be null (≡ 'none') for every result.
+    const myCircleId = myCircle?.id ?? null;
+
     const rows = await this.db
-      .select()
+      .select({
+        // Full circle row.
+        id: schema.circles.id,
+        handle: schema.circles.handle,
+        name: schema.circles.name,
+        description: schema.circles.description,
+        avatarUrl: schema.circles.avatarUrl,
+        coverImageUrl: schema.circles.coverImageUrl,
+        isPrivate: schema.circles.isPrivate,
+        followerCount: schema.circles.followerCount,
+        followingCount: schema.circles.followingCount,
+        postCount: schema.circles.postCount,
+        createdByCoupleId: schema.circles.createdByCoupleId,
+        createdByUserId: schema.circles.createdByUserId,
+        createdAt: schema.circles.createdAt,
+        updatedAt: schema.circles.updatedAt,
+        // Follow edge (null when no edge or no viewer circle).
+        followStatus: schema.circleFollows.status,
+      })
       .from(schema.circles)
+      .leftJoin(
+        schema.circleFollows,
+        myCircleId
+          ? and(
+              eq(schema.circleFollows.followerCircleId, myCircleId),
+              eq(schema.circleFollows.followingCircleId, schema.circles.id),
+            )
+          : sql`false`,
+      )
       .where(and(...conditions))
       .orderBy(desc(schema.circles.followerCount), desc(schema.circles.id))
       .limit(take + 1);
@@ -1548,12 +1603,15 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
     const hasMore = rows.length > take;
     const sliced = hasMore ? rows.slice(0, take) : rows;
 
-    const circles = await Promise.all(
-      sliced.map(async (c) => {
-        const followState = await this.resolveFollowState(myCircle?.id ?? null, c);
-        return { ...this.serializeCircle(c), followState };
-      }),
-    );
+    const circles = sliced.map((c) => {
+      const followState: FollowState =
+        c.followStatus === 'accepted'
+          ? 'accepted'
+          : c.followStatus === 'pending'
+            ? 'pending'
+            : 'none';
+      return { ...this.serializeCircle(c), followState };
+    });
 
     const last = sliced[sliced.length - 1];
     const nextCursor =
