@@ -50,7 +50,7 @@ export const GOOGLE_WEB_CLIENT_ID =
  * url, notes }) and, if the server's build is higher, offers to download the new
  * APK. Lets sideloaded users update from within the app instead of re-installing.
  */
-export const APP_BUILD = 16;
+export const APP_BUILD = 17;
 export const UPDATE_MANIFEST_URL = `${API_ORIGIN}/downloads/latest.json`;
 
 /**
