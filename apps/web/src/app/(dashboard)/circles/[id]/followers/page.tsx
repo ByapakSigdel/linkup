@@ -1,40 +1,18 @@
 'use client';
 
-// Circles › Followers — owner-only list of couples that follow this circle
-// (§1.6). Reached by tapping the "followers" stat on the profile header. Uses
-// the shared ConnectionsList, which consumes GET /circles/me/followers.
+// Circles › Followers — followers of THIS circle (the [id] in the route), not
+// the viewer's own (§1.6). Reached by tapping the "followers" stat on the
+// profile header. Uses the shared ConnectionsList scoped to the circle via the
+// public GET /circles/:id/followers (visibility enforced server-side).
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Heart } from 'lucide-react';
-import { Card } from '@/components/ui';
+import { ArrowLeft } from 'lucide-react';
 import { ConnectionsList } from '@/components/circles';
-import { useAuthStore } from '@/stores/auth-store';
 
 export default function CircleFollowersPage() {
   const params = useParams<{ id: string }>();
   const idOrHandle = params?.id;
-  const couple = useAuthStore((s) => s.couple);
-
-  if (!couple?.isPaired) {
-    return (
-      <div className="mx-auto max-w-3xl p-4 md:p-6">
-        <Card cardStyle="bordered" padding="lg">
-          <div className="flex flex-col items-center gap-4 py-12 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-light">
-              <Heart className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-text">
-              Link up with your partner first
-            </h2>
-            <p className="max-w-sm text-sm text-text-muted">
-              Pair with your partner to manage your circle&apos;s followers.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
@@ -53,7 +31,7 @@ export default function CircleFollowersPage() {
         <h1 className="font-display text-2xl font-bold text-text">Followers</h1>
       </div>
 
-      <ConnectionsList kind="followers" />
+      <ConnectionsList kind="followers" circleIdOrHandle={idOrHandle} />
     </div>
   );
 }

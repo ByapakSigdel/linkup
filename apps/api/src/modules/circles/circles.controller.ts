@@ -271,6 +271,40 @@ export class CirclesController {
     return { success: true, data };
   }
 
+  // GET /circles/:id/followers — followers of a specific circle (visibility-scoped).
+  @Get(':idOrHandle/followers')
+  async listCircleFollowers(
+    @Param('idOrHandle') idOrHandle: string,
+    @CurrentUser('coupleId') coupleId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.circlesService.listCircleFollowers(
+      idOrHandle,
+      coupleId,
+      cursor,
+      toLimit(limit),
+    );
+    return { success: true, data };
+  }
+
+  // GET /circles/:id/following — circles a specific circle follows (visibility-scoped).
+  @Get(':idOrHandle/following')
+  async listCircleFollowing(
+    @Param('idOrHandle') idOrHandle: string,
+    @CurrentUser('coupleId') coupleId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.circlesService.listCircleFollowing(
+      idOrHandle,
+      coupleId,
+      cursor,
+      toLimit(limit),
+    );
+    return { success: true, data };
+  }
+
   // POST /circles/:id/posts/:postId/like — toggle like.
   @Post(':idOrHandle/posts/:postId/like')
   async toggleLike(

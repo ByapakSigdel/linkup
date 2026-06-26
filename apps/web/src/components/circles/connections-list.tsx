@@ -19,9 +19,15 @@ export type ConnectionsKind = 'followers' | 'following';
 
 interface ConnectionsListProps {
   kind: ConnectionsKind;
+  /**
+   * When set, list THIS circle's followers/following (public, visibility-scoped)
+   * instead of the caller's own (me-scoped). Required when viewing another
+   * couple's profile so the lists reflect that circle, not the viewer.
+   */
+  circleIdOrHandle?: string;
 }
 
-export function ConnectionsList({ kind }: ConnectionsListProps) {
+export function ConnectionsList({ kind, circleIdOrHandle }: ConnectionsListProps) {
   const [items, setItems] = useState<CircleSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,14 +44,19 @@ export function ConnectionsList({ kind }: ConnectionsListProps) {
     async (
       cursor?: string,
     ): Promise<{ list: CircleSummary[]; nextCursor: string | null }> => {
+      const page = cursor ? { cursor } : undefined;
       if (kind === 'followers') {
-        const res = await circlesApi.getFollowers(cursor ? { cursor } : undefined);
+        const res = circleIdOrHandle
+          ? await circlesApi.getCircleFollowers(circleIdOrHandle, page)
+          : await circlesApi.getFollowers(page);
         return { list: res.followers, nextCursor: res.nextCursor };
       }
-      const res = await circlesApi.getFollowing(cursor ? { cursor } : undefined);
+      const res = circleIdOrHandle
+        ? await circlesApi.getCircleFollowing(circleIdOrHandle, page)
+        : await circlesApi.getFollowing(page);
       return { list: res.following, nextCursor: res.nextCursor };
     },
-    [kind],
+    [kind, circleIdOrHandle],
   );
 
   const load = useCallback(async () => {

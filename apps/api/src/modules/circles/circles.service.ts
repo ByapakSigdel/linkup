@@ -54,6 +54,12 @@ interface CreateStoryInput {
 
 type FollowState = 'none' | 'pending' | 'accepted';
 
+/** §1.1: resolved image-pipeline variant urls for a single media item. */
+interface MediaVariantEntry {
+  thumb?: string;
+  medium?: string;
+}
+
 type CircleRow = typeof schema.circles.$inferSelect;
 
 const UUID_RE =
@@ -705,28 +711,36 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
 
     const hasMore = rows.length > take;
     const sliced = hasMore ? rows.slice(0, take) : rows;
-    const posts = await this.attachLikedByMe(sliced.map((p) => this.serializePost(p)), userId);
+    const variantMap = await this.resolveMediaVariants(sliced);
+    const posts = await this.attachLikedByMe(
+      sliced.map((p) => this.serializePost(p, variantMap)),
+      userId,
+    );
     const last = sliced[sliced.length - 1];
     const nextCursor = hasMore && last ? this.encodeCursor(last.createdAt, last.id) : null;
 
     return { posts, nextCursor };
   }
 
-  private serializePost(p: {
-    id: string;
-    circleId: string;
-    coupleId: string;
-    authorId: string;
-    content: string | null;
-    type: string | null;
-    mediaUrls: string[] | null;
-    metadata: Record<string, unknown> | null;
-    likeCount: number | null;
-    commentCount: number | null;
-    createdAt: Date | null;
-    authorName?: string | null;
-    authorAvatarUrl?: string | null;
-  }) {
+  private serializePost(
+    p: {
+      id: string;
+      circleId: string;
+      coupleId: string;
+      authorId: string;
+      content: string | null;
+      type: string | null;
+      mediaUrls: string[] | null;
+      metadata: Record<string, unknown> | null;
+      likeCount: number | null;
+      commentCount: number | null;
+      createdAt: Date | null;
+      authorName?: string | null;
+      authorAvatarUrl?: string | null;
+    },
+    variantMap?: Map<string, MediaVariantEntry>,
+  ) {
+    const mediaUrls = p.mediaUrls ?? [];
     return {
       id: p.id,
       circleId: p.circleId,
@@ -734,7 +748,18 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       authorId: p.authorId,
       caption: p.content ?? undefined,
       type: p.type ?? 'photo',
-      mediaUrls: p.mediaUrls ?? [],
+      mediaUrls,
+      // §1.1: index-aligned variant objects so clients' pickVariantUrl gets real
+      // thumb/medium data instead of always falling back to the original.
+      mediaObjects: mediaUrls.map((url) => {
+        const v = variantMap?.get(url);
+        return {
+          url,
+          original: url,
+          ...(v?.thumb ? { thumb: v.thumb } : {}),
+          ...(v?.medium ? { medium: v.medium } : {}),
+        };
+      }),
       metadata: p.metadata ?? undefined,
       likeCount: p.likeCount ?? 0,
       commentCount: p.commentCount ?? 0,
@@ -742,6 +767,45 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       authorName: p.authorName ?? null,
       authorAvatarUrl: p.authorAvatarUrl ?? null,
     };
+  }
+
+  /**
+   * §1.1: Resolve image-pipeline variants for a batch of posts in ONE query.
+   * Given posts with `mediaUrls`, look up the `media` rows by cdnUrl and build a
+   * Map<cdnUrl, {thumb?, medium?}> from media.variants / media.thumbnails. Urls
+   * with no media row (or no variants) are simply omitted — callers fall back to
+   * the original url. Avoids N+1: one media query per page of posts.
+   */
+  private async resolveMediaVariants(
+    posts: { mediaUrls: string[] | null }[],
+  ): Promise<Map<string, MediaVariantEntry>> {
+    const urls = Array.from(
+      new Set(posts.flatMap((p) => p.mediaUrls ?? []).filter((u): u is string => !!u)),
+    );
+    const map = new Map<string, MediaVariantEntry>();
+    if (urls.length === 0) return map;
+
+    const rows = await this.db
+      .select({
+        cdnUrl: schema.media.cdnUrl,
+        thumbnails: schema.media.thumbnails,
+        variants: schema.media.variants,
+      })
+      .from(schema.media)
+      .where(inArray(schema.media.cdnUrl, urls));
+
+    for (const r of rows) {
+      if (!r.cdnUrl) continue;
+      const thumb = r.variants?.thumb ?? r.thumbnails?.small;
+      const medium = r.variants?.medium ?? r.thumbnails?.medium;
+      if (thumb || medium) {
+        map.set(r.cdnUrl, {
+          ...(thumb ? { thumb } : {}),
+          ...(medium ? { medium } : {}),
+        });
+      }
+    }
+    return map;
   }
 
   // ─── 7. POST /circles/me/posts ─────────────────────────────────────────────────
@@ -777,8 +841,9 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       return inserted!;
     });
 
+    const variantMap = await this.resolveMediaVariants([post]);
     const serialized = {
-      ...this.serializePost(post),
+      ...this.serializePost(post, variantMap),
       circle: this.circleSummary(circle),
     };
 
@@ -991,17 +1056,22 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       .limit(1);
     if (!post) throw new NotFoundException('Post not found');
 
-    const [comment] = await this.db
-      .insert(schema.postComments)
-      .values({ postId, userId, content: content.trim() })
-      .returning();
+    // §1.8: insert + counter increment in one tx so the count never drifts.
+    const comment = await this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(schema.postComments)
+        .values({ postId, userId, content: content.trim() })
+        .returning();
 
-    await this.db
-      .update(schema.circlePosts)
-      .set({ commentCount: sql`${schema.circlePosts.commentCount} + 1` })
-      .where(eq(schema.circlePosts.id, postId));
+      await tx
+        .update(schema.circlePosts)
+        .set({ commentCount: sql`${schema.circlePosts.commentCount} + 1` })
+        .where(eq(schema.circlePosts.id, postId));
 
-    // Emit to post-owner couple users.
+      return inserted!;
+    });
+
+    // Emit to post-owner couple users (after the tx commits).
     const ownerUserIds = await this.ownerCoupleUserIds(target);
     this.fanOut(ownerUserIds, 'circle:comment:new', {
       circleId: target.id,
@@ -1060,11 +1130,14 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException('You cannot delete this comment');
     }
 
-    await this.db.delete(schema.postComments).where(eq(schema.postComments.id, commentId));
-    await this.db
-      .update(schema.circlePosts)
-      .set({ commentCount: sql`GREATEST(${schema.circlePosts.commentCount} - 1, 0)` })
-      .where(eq(schema.circlePosts.id, postId));
+    // §1.8: delete + counter decrement in one tx so the count never drifts.
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.postComments).where(eq(schema.postComments.id, commentId));
+      await tx
+        .update(schema.circlePosts)
+        .set({ commentCount: sql`GREATEST(${schema.circlePosts.commentCount} - 1, 0)` })
+        .where(eq(schema.circlePosts.id, postId));
+    });
 
     return { success: true };
   }
@@ -1258,6 +1331,38 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
   async listFollowing(coupleId: string, cursor?: string, limit?: number) {
     const myCircle = await this.requireMyCircle(coupleId);
     return this.listFollowEdges('following', myCircle.id, cursor, limit);
+  }
+
+  // ─── Public per-circle followers / following (respect profile visibility) ──────
+
+  /**
+   * Followers/following of ANY circle by id-or-handle. Used by the web/mobile
+   * profile pages so viewing another circle's lists shows THAT circle's edges,
+   * not the viewer's. Honors the same visibility rule as the profile's posts
+   * (owner OR public OR accepted follower); private circles throw 403.
+   */
+  async listCircleFollowers(
+    idOrHandle: string,
+    coupleId: string,
+    cursor?: string,
+    limit?: number,
+  ) {
+    const target = await this.resolveCircle(idOrHandle);
+    const viewerCircle = await this.getMyCircle(coupleId);
+    await this.requireCanView(target, coupleId, viewerCircle?.id ?? null);
+    return this.listFollowEdges('followers', target.id, cursor, limit);
+  }
+
+  async listCircleFollowing(
+    idOrHandle: string,
+    coupleId: string,
+    cursor?: string,
+    limit?: number,
+  ) {
+    const target = await this.resolveCircle(idOrHandle);
+    const viewerCircle = await this.getMyCircle(coupleId);
+    await this.requireCanView(target, coupleId, viewerCircle?.id ?? null);
+    return this.listFollowEdges('following', target.id, cursor, limit);
   }
 
   private async listFollowEdges(
@@ -1498,8 +1603,9 @@ export class CirclesService implements OnModuleInit, OnModuleDestroy {
 
     const hasMore = rows.length > take;
     const sliced = hasMore ? rows.slice(0, take) : rows;
+    const variantMap = await this.resolveMediaVariants(sliced);
     const base = sliced.map((r) => ({
-      ...this.serializePost(r),
+      ...this.serializePost(r, variantMap),
       circle: this.circleSummary({
         id: r.circleId,
         handle: r.circleHandle,

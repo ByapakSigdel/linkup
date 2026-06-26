@@ -218,6 +218,30 @@ export function getFollowing(
   return unwrap(api.get('/circles/me/following', { params: pageQuery(params) }));
 }
 
+/** GET /circles/:id/followers — accepted followers of a specific circle. */
+export function getCircleFollowers(
+  idOrHandle: string,
+  params?: PageParams,
+): Promise<{ followers: CircleSummary[]; nextCursor: string | null }> {
+  return unwrap(
+    api.get(`/circles/${encodeURIComponent(idOrHandle)}/followers`, {
+      params: pageQuery(params),
+    }),
+  );
+}
+
+/** GET /circles/:id/following — circles a specific circle follows (accepted). */
+export function getCircleFollowing(
+  idOrHandle: string,
+  params?: PageParams,
+): Promise<{ following: CircleSummary[]; nextCursor: string | null }> {
+  return unwrap(
+    api.get(`/circles/${encodeURIComponent(idOrHandle)}/following`, {
+      params: pageQuery(params),
+    }),
+  );
+}
+
 /** GET /circles/me/requests — pending incoming follow requests (owner). */
 export function getRequests(
   params?: PageParams,
