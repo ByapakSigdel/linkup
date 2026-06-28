@@ -139,11 +139,30 @@ export default function ChatScreen({ readOnly: readOnlyProp }: { readOnly?: bool
     }
   }, [readOnly]);
 
-  const handleReply = useCallback((message: Message) => setReplyingTo(message), [setReplyingTo]);
-  const handleEdit = useCallback((message: Message) => setEditingMessage(message), [setEditingMessage]);
+  // Guard the UI-state writers too (not just the network mutations): in read-only
+  // memorial mode a long-press → Reply/Edit/Highlight must be inert, otherwise it
+  // writes spurious entries to the chat store and the highlight picker pops up
+  // only to silently dismiss when a color is tapped.
+  const handleReply = useCallback(
+    (message: Message) => {
+      if (readOnly) return;
+      setReplyingTo(message);
+    },
+    [setReplyingTo, readOnly],
+  );
+  const handleEdit = useCallback(
+    (message: Message) => {
+      if (readOnly) return;
+      setEditingMessage(message);
+    },
+    [setEditingMessage, readOnly],
+  );
   const handleHighlight = useCallback(
-    (message: Message) => setHighlightingMessage(message),
-    [setHighlightingMessage],
+    (message: Message) => {
+      if (readOnly) return;
+      setHighlightingMessage(message);
+    },
+    [setHighlightingMessage, readOnly],
   );
 
   const handleHighlightSelect = useCallback(

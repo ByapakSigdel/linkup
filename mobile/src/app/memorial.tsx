@@ -309,15 +309,23 @@ function LeaveDialog({
     }
   }, [password, deleteAccount]);
 
+  // Always reset local state (password, error, busy) on any dismissal — back
+  // button, backdrop tap, or Cancel — so a re-opened dialog never shows a stale
+  // typed password or error. Mirrors DeleteAccountDialog in settings.tsx.
+  const close = useCallback(() => {
+    reset();
+    onClose();
+  }, [reset, onClose]);
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={close}
     >
       <View style={styles.dialogBackdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : close} />
         <Card variant="elevated" style={styles.dialogCard}>
           <View style={{ gap: 12 }}>
             <AppText variant="subtitle">Wind down &amp; leave</AppText>
@@ -342,10 +350,7 @@ function LeaveDialog({
                   variant="ghost"
                   fullWidth
                   disabled={busy}
-                  onPress={() => {
-                    reset();
-                    onClose();
-                  }}
+                  onPress={close}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -378,8 +383,11 @@ function MemorialDates({ coupleId }: { coupleId?: string }) {
 
   useEffect(() => {
     let mounted = true;
+    // Forward the couple id explicitly: an already-solo survivor revisiting
+    // Memories has a null live coupleId on the server, so without this the
+    // archived couple's dates resolve to a 404 and the empty state hides them.
     api
-      .get('/dates')
+      .get('/dates', coupleId ? { params: { coupleId } } : undefined)
       .then(({ data }) => {
         if (mounted) setDates(data.data?.dates ?? []);
       })

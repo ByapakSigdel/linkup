@@ -5,6 +5,7 @@ import {
   Patch,
   Delete,
   Param,
+  Query,
   Body,
   UseGuards,
 } from '@nestjs/common';
@@ -41,8 +42,16 @@ export class DatesController {
   async getDates(
     @CurrentUser('id') userId: string,
     @CurrentUser('coupleId') coupleId: string,
+    // A solo survivor revisiting the read-only Memorial has no live `coupleId`
+    // (it was nulled when she went solo), so she passes her `archivedCoupleId`
+    // explicitly. Membership is still verified via partner1Id/partner2Id in the
+    // service, so this can only read couples the caller belonged to.
+    @Query('coupleId') queryCoupleId?: string,
   ) {
-    const dates = await this.datesService.getDates(coupleId, userId);
+    const dates = await this.datesService.getDates(
+      queryCoupleId ?? coupleId,
+      userId,
+    );
     return { success: true, data: { dates } };
   }
 
