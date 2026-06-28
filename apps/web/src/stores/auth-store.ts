@@ -22,7 +22,17 @@ interface AuthState {
     dateOfBirth?: string;
   }) => Promise<{ verificationCode?: string }>;
   loginWithGoogle: (credential: string) => Promise<void>;
+  /** Re-fetch the couple so the shell re-gates (e.g. on a `couple:ended` event). */
+  refreshCouple: () => Promise<void>;
+  /** Permanently delete this account (anonymized into a tombstone server-side),
+   *  then clear the local session. Re-verifies the password server-side. */
+  deleteAccount: (password: string) => Promise<void>;
+  /** Survivor of an ended couple keeps going solo: archive the relationship
+   *  read-only (unpair) and re-hydrate so the shell re-gates. */
+  archiveAndGoSolo: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Clear the session locally (no network) — used after account deletion. */
+  forceLogout: () => void;
   refreshToken: () => Promise<void>;
   hydrate: () => Promise<void>;
   setUser: (user: User) => void;
@@ -107,10 +117,12 @@ export const useAuthStore = create<AuthState>()(
           const { data: meBody } = await api.post('/auth/me');
           const fullUser: User = meBody.data.user;
           set({ user: fullUser });
-          if (fullUser.coupleId) {
-            const { data: cBody } = await api.get(
-              `/couples/${fullUser.coupleId}`,
-            );
+          // The active couple wins; otherwise fall back to the survivor's archived
+          // couple so the read-only memorial / "Memories" entry loads after she has
+          // gone solo (coupleId=null, archivedCoupleId set).
+          const coupleId = fullUser.coupleId ?? fullUser.archivedCoupleId ?? null;
+          if (coupleId) {
+            const { data: cBody } = await api.get(`/couples/${coupleId}`);
             const couple = cBody.data.couple ?? null;
             set({ couple });
             // The couple's shared theme is authoritative for both partners.
@@ -123,6 +135,38 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Non-fatal: keep whatever we have
         }
+      },
+
+      /** Re-fetch the couple (e.g. on a `couple:ended` realtime event). */
+      refreshCouple: async () => {
+        const c = get().couple;
+        if (!c?.id) {
+          await get().hydrate();
+          return;
+        }
+        try {
+          const { data: body } = await api.get(`/couples/${c.id}`);
+          if (body?.data?.couple) set({ couple: body.data.couple });
+        } catch {
+          // keep current couple
+        }
+      },
+
+      deleteAccount: async (password) => {
+        // axios DELETE carries a body under `data`. The server anonymizes the
+        // account + revokes refresh tokens; locally we just drop the session.
+        await api.delete('/users/me', { data: { confirm: true, password } });
+        get().forceLogout();
+      },
+
+      archiveAndGoSolo: async () => {
+        await api.post('/couples/me/survivor-decision', {
+          decision: 'archived_solo',
+        });
+        // The backend sets users.coupleId=null and users.archivedCoupleId=<id>.
+        // Re-hydrate so the user row (coupleId=null, archivedCoupleId set) and the
+        // archived couple reload, and the shell re-gates out of the memorial.
+        await get().hydrate();
       },
 
       logout: async () => {
@@ -139,6 +183,13 @@ export const useAuthStore = create<AuthState>()(
           disconnectSocket();
           set(initialState);
         }
+      },
+
+      forceLogout: () => {
+        // Drop the session locally (no network) — used after account deletion,
+        // where the refresh token is already revoked server-side.
+        disconnectSocket();
+        set(initialState);
       },
 
       refreshToken: async () => {
@@ -173,3 +224,23 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// ─── Lifecycle selectors (pure; no new data) ─────────────────────────────────
+// Derived from the couple/user already on the auth store. Kept as standalone
+// functions so the app shell + screens can gate consistently. Mirrors mobile's
+// mobile/src/stores/auth-store.ts selectors.
+
+type LifecycleSlice = Pick<AuthState, 'user' | 'couple'>;
+
+/** "Actively paired" ⇔ has a couple that has NOT ended. */
+export const isActivelyPaired = (s: LifecycleSlice): boolean =>
+  !!s.couple && s.couple.relationshipStatus !== 'ended';
+
+/** The survivor still needs to choose (memorial takeover gate). */
+export const isMemorialPending = (s: LifecycleSlice): boolean =>
+  !!s.couple &&
+  s.couple.relationshipStatus === 'ended' &&
+  s.couple.survivorDecision === 'pending';
+
+/** A past relationship is kept read-only for the now-solo survivor to revisit. */
+export const hasArchive = (s: LifecycleSlice): boolean => !!s.user?.archivedCoupleId;

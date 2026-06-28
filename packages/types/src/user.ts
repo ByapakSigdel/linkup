@@ -15,6 +15,10 @@ export interface User {
 
   // Couple reference
   coupleId?: string;
+  /** Pointer to a past couple kept read-only after the survivor chose to go solo. */
+  archivedCoupleId?: string | null;
+  /** Non-null once the account is tombstoned (anonymized after deletion). */
+  deletedAt?: string | null;
 
   // Settings
   themeId: string;

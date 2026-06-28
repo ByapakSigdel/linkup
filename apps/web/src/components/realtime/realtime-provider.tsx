@@ -195,6 +195,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
+    // The partner deleted their account → the couple is now `ended`. Re-fetch the
+    // couple so the dashboard shell re-gates the survivor into the memorial on the
+    // next safe navigation (never interrupting an in-progress action mid-tap).
+    const onCoupleEnded = () => {
+      void useAuthStore.getState().refreshCouple();
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('message:new', onMessageNew);
@@ -213,6 +220,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('watch:invite', onWatchInvite);
     socket.on('theme:changed', onThemeChanged);
     socket.on('game:event', onGameEvent);
+    socket.on('couple:ended', onCoupleEnded);
 
     if (socket.connected) onConnect();
 
@@ -235,6 +243,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('watch:invite', onWatchInvite);
       socket.off('theme:changed', onThemeChanged);
       socket.off('game:event', onGameEvent);
+      socket.off('couple:ended', onCoupleEnded);
     };
   }, [token]);
 

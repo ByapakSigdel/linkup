@@ -19,6 +19,7 @@ export type NotificationType =
   | 'circle_comment'
   | 'highlight'
   | 'media_shared'
+  | 'relationship_ended'
   | 'system';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';

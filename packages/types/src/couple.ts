@@ -2,6 +2,9 @@
 // Couple Types
 // ============================================
 
+/** Survivor's choice on an ended couple (the relationship-memorial fork). */
+export type SurvivorDecision = 'pending' | 'archived_solo' | 'left';
+
 export interface Couple {
   id: string;
 
@@ -13,7 +16,13 @@ export interface Couple {
   coupleName?: string;
   coupleAvatarUrl?: string;
   anniversaryDate?: string;
-  relationshipStatus: 'dating' | 'engaged' | 'married' | 'other';
+  relationshipStatus: 'dating' | 'engaged' | 'married' | 'other' | 'ended';
+
+  // Relationship lifecycle (set once a partner deletes their account)
+  endedAt?: string | null;
+  endedByUserId?: string | null;
+  survivorDecision?: SurvivorDecision | null;
+  survivorDecidedAt?: string | null;
 
   // Pairing
   pairingCode?: string;

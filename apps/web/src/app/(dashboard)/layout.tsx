@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isMemorialPending } from '@/stores/auth-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { TopBar } from '@/components/layout/top-bar';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
@@ -17,6 +17,9 @@ export default function DashboardLayout({
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const hydrate = useAuthStore((s) => s.hydrate);
+  // Subscribe reactively so a `couple:ended` refresh re-gates on the next render.
+  const user = useAuthStore((s) => s.user);
+  const couple = useAuthStore((s) => s.couple);
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -44,6 +47,17 @@ export default function DashboardLayout({
       router.replace('/login');
     }
   }, [mounted, isAuthenticated, isLoading, router]);
+
+  // Survivor of an ended relationship who hasn't yet chosen → memorial takeover.
+  // Guard against redirecting away from the memorial page itself (it lives inside
+  // this dashboard group), which would otherwise loop.
+  useEffect(() => {
+    if (!mounted || !isAuthenticated) return;
+    if (pathname === '/memorial' || pathname.startsWith('/memorial/')) return;
+    if (isMemorialPending({ user, couple })) {
+      router.replace('/memorial');
+    }
+  }, [mounted, isAuthenticated, user, couple, pathname, router]);
 
   // Show loading state while hydrating or checking auth
   if (!mounted || (!isAuthenticated && isLoading)) {
