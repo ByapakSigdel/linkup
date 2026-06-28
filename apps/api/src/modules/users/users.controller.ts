@@ -32,9 +32,11 @@ export class UsersController {
 
   /**
    * Delete (tombstone) the caller's own account — the "Relationship Graveyard"
-   * offboarding. Destructive, so the body must carry `confirm: true` AND the
-   * account password, which the service re-verifies before anonymizing. Returns
-   * 204 with no body; the client clears auth and routes to a goodbye screen.
+   * offboarding. Destructive, so the body must carry `confirm: true` AND a
+   * re-authentication credential: either the account `password` (re-verified) or,
+   * for OAuth-only accounts (e.g. Google sign-in, whose stored password is a
+   * random value the user can never know), a fresh `googleIdToken`. Returns 204
+   * with no body; the client clears auth and routes to a goodbye screen.
    */
   @Delete('me')
   @HttpCode(204)
@@ -42,8 +44,8 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() body: unknown,
   ): Promise<void> {
-    const { password } = deleteAccountSchema.parse(body);
-    await this.usersService.deleteAccount(userId, password);
+    const { password, googleIdToken } = deleteAccountSchema.parse(body);
+    await this.usersService.deleteAccount(userId, password, googleIdToken);
   }
 
   @Get('me/profile')

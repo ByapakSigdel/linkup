@@ -43,12 +43,24 @@ export const updateSettingsSchema = z.object({
 });
 
 // Account deletion (the "Relationship Graveyard" offboarding). Destructive, so
-// the client must explicitly confirm AND re-enter the password — the API
-// re-verifies the password before anonymizing the account into a tombstone.
-export const deleteAccountSchema = z.object({
-  confirm: z.literal(true),
-  password: z.string().min(1, 'Password is required'),
-});
+// the client must explicitly confirm AND re-authenticate before the account is
+// anonymized into a tombstone. Two re-auth paths:
+//  - password accounts → re-enter the password (the API re-verifies it), OR
+//  - OAuth-only accounts (e.g. Google sign-in, whose stored password is a random
+//    value the user can never know) → supply a fresh `googleIdToken`, which the
+//    API verifies and matches to the account's email.
+// Exactly one credential is required; `password` defaults to '' so OAuth clients
+// can omit it. The service enforces that at least one valid credential is given.
+export const deleteAccountSchema = z
+  .object({
+    confirm: z.literal(true),
+    password: z.string().default(''),
+    googleIdToken: z.string().min(1).optional(),
+  })
+  .refine((v) => v.password.length > 0 || !!v.googleIdToken, {
+    message: 'A password or Google sign-in is required to delete your account',
+    path: ['password'],
+  });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

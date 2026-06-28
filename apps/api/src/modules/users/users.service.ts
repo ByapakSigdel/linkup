@@ -3,7 +3,9 @@ import {
   Inject,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, count, ilike, or, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
@@ -17,6 +19,10 @@ import {
   buildAnonymizedUserFields,
   shouldPurgeCoupleData,
 } from './account-deletion.helpers';
+import {
+  collectAllowedGoogleClientIds,
+  verifyGoogleIdToken,
+} from '../auth/google-token.helpers';
 
 /**
  * The transaction client passed to db.transaction's callback. Drizzle does not
@@ -38,6 +44,9 @@ export class UsersService {
     private readonly gateway: EventsGateway,
     private readonly notifications: NotificationsService,
     private readonly fcm: FcmService,
+    // ConfigModule is @Global — used to read the allowed Google OAuth client IDs
+    // when re-authenticating an OAuth-only account for deletion.
+    private readonly config: ConfigService,
   ) {}
 
   async findById(id: string) {
@@ -345,8 +354,11 @@ export class UsersService {
   // ─── Account deletion (Relationship Graveyard offboarding) ──────────────────
 
   /**
-   * Delete (tombstone) the caller's account. Destructive, so the password is
-   * re-verified before anything is mutated.
+   * Delete (tombstone) the caller's account. Destructive, so the caller is
+   * re-authenticated before anything is mutated — either with their `password`
+   * (re-verified with bcrypt) or, for OAuth-only accounts (e.g. Google sign-in,
+   * whose stored password is a random value the user can never reproduce), with a
+   * fresh `googleIdToken` verified against Google and matched to the account email.
    *
    * Everything that mutates state runs inside a SINGLE db.transaction, so the
    * operation is all-or-nothing: the user is never anonymized without also having
@@ -359,12 +371,19 @@ export class UsersService {
    * Behaviour:
    * - already deleted → idempotent no-op.
    * - solo user (no couple) → anonymize + revoke tokens only.
+   * - survivor who already chose "keep going solo" (coupleId null but
+   *   archivedCoupleId set) → anonymize, then purge the archived couple once BOTH
+   *   partners are tombstoned (the "wind down & leave" path after going solo).
    * - first partner leaving an active couple → couple becomes 'ended'
    *   (endedByUserId/survivorDecision='pending'), survivor is notified.
    * - survivor leaving an already-ended couple → survivorDecision='left'; once
    *   BOTH partners are tombstoned the couple's shared content is purged.
    */
-  async deleteAccount(userId: string, password: string): Promise<void> {
+  async deleteAccount(
+    userId: string,
+    password: string,
+    googleIdToken?: string,
+  ): Promise<void> {
     const [user] = await this.db
       .select()
       .from(schema.users)
@@ -374,15 +393,15 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    // Idempotent: a second delete on an already-tombstoned account is a no-op.
+    // Defensive idempotency for INTERNAL callers only: a tombstoned account is
+    // already rejected at the JWT strategy layer (validateUser → isUsableAccount),
+    // so an HTTP DELETE on an already-deleted account 401s before reaching here.
+    // This guard exists so any future internal service call is a safe no-op.
     if (user.deletedAt) {
       return;
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      throw new UnauthorizedException('Password is incorrect');
-    }
+    await this.reauthenticateForDeletion(user, password, googleIdToken);
 
     const now = new Date();
 
@@ -406,8 +425,50 @@ export class UsersService {
         .set({ isRevoked: true })
         .where(eq(schema.refreshTokens.userId, userId));
 
-      // 3. Solo account → nothing shared to transition.
+      // 3. No live couple. Two sub-cases:
       if (!user.coupleId) {
+        // (a) A survivor who already chose "keep going solo" still points at the
+        //     archived couple via archivedCoupleId. The departing partner is
+        //     already a tombstone, so deleting her now means BOTH are gone →
+        //     purge the archived couple's shared content. Without this, the
+        //     "wind down & leave after going solo" path would orphan the couple's
+        //     data forever (no one left to ever purge it).
+        if (user.archivedCoupleId) {
+          const [archived] = await tx
+            .select()
+            .from(schema.couples)
+            .where(eq(schema.couples.id, user.archivedCoupleId))
+            .limit(1);
+          if (archived) {
+            const otherId =
+              archived.partner1Id === userId
+                ? archived.partner2Id
+                : archived.partner1Id;
+            let otherDeletedAt: Date | null = null;
+            if (otherId) {
+              const [other] = await tx
+                .select({ deletedAt: schema.users.deletedAt })
+                .from(schema.users)
+                .where(eq(schema.users.id, otherId))
+                .limit(1);
+              otherDeletedAt = other?.deletedAt ?? null;
+            }
+            // We just tombstoned this user (deletedAt=now); purge iff the other
+            // partner is also tombstoned (or already absent).
+            if (!otherId || shouldPurgeCoupleData(now, otherDeletedAt)) {
+              await tx
+                .update(schema.couples)
+                .set({
+                  survivorDecision: 'left',
+                  survivorDecidedAt: now,
+                  updatedAt: now,
+                })
+                .where(eq(schema.couples.id, archived.id));
+              await this.purgeCoupleData(tx, archived.id);
+            }
+          }
+        }
+        // (b) Genuine solo account (or archive partner still live) → nothing more.
         return;
       }
 
@@ -481,6 +542,63 @@ export class UsersService {
   }
 
   /**
+   * Re-authenticate the caller before the destructive account deletion. Two
+   * mutually-exclusive credentials are accepted:
+   *
+   *  - `password` → compared with bcrypt against the stored hash.
+   *  - `googleIdToken` → verified against Google and matched to the account's
+   *    email. This is the ONLY way an OAuth-only account can delete itself: Google
+   *    sign-in accounts are created with a random `passwordHash` derived from
+   *    `google:<sub>:<username>`, a secret the user can never reproduce, so
+   *    `bcrypt.compare(anyInput, hash)` always fails — without this path
+   *    DELETE /users/me would 401 forever for every Google user (e.g. the
+   *    dean/ayusha test accounts).
+   *
+   * A Google token always wins when present (its `aud` and matching verified
+   * email are a strictly stronger proof than a possibly-stale password). If only a
+   * password is supplied it must verify. Throws Unauthorized when neither
+   * credential proves identity. The DB row is never mutated here.
+   */
+  private async reauthenticateForDeletion(
+    user: { id: string; email: string; passwordHash: string },
+    password: string,
+    googleIdToken?: string,
+  ): Promise<void> {
+    if (googleIdToken) {
+      let info;
+      try {
+        info = await verifyGoogleIdToken(
+          googleIdToken,
+          collectAllowedGoogleClientIds((k) => this.config.get<string>(k)),
+          (url) => fetch(url),
+        );
+      } catch {
+        throw new UnauthorizedException('Could not verify Google sign-in');
+      }
+      // The re-auth token must belong to THIS account.
+      if (info.email !== (user.email || '').toLowerCase()) {
+        throw new UnauthorizedException(
+          'That Google account does not match this account',
+        );
+      }
+      return;
+    }
+
+    if (!password) {
+      // Neither credential supplied — the validation schema normally catches this,
+      // but guard defensively for any internal caller.
+      throw new BadRequestException(
+        'A password or Google sign-in is required to delete your account',
+      );
+    }
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException('Password is incorrect');
+    }
+  }
+
+  /**
    * Permanently delete all of a couple's shared content + the couple row, used
    * only when BOTH partners are tombstoned. Runs inside the caller's transaction.
    *
@@ -533,6 +651,13 @@ export class UsersService {
       // Conversations this circle is a participant in (with any other circle),
       // plus their messages/reads. circle_lo_id / circle_hi_id reference
       // circles.id with no ON DELETE action.
+      //
+      // NOTE: the three deletes just above remove rows by THIS circle's column
+      // (sender/viewer/circle id); the conversation-scoped deletes below remove
+      // rows by conversation_id (covering the OTHER circle's messages/reads in
+      // shared conversations). The two passes overlap (a row already removed
+      // above simply won't match below) but are complementary and idempotent —
+      // together they leave no dangling row, and neither can raise an FK error.
       const convIds = (
         await tx
           .select({ id: schema.circleConversations.id })

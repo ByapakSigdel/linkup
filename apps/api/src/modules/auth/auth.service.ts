@@ -16,6 +16,11 @@ import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
 import { EmailService } from '../email/email.service';
 import { isUsableAccount } from './auth.account-guard';
+import {
+  collectAllowedGoogleClientIds,
+  verifyGoogleIdToken,
+  GoogleTokenError,
+} from './google-token.helpers';
 
 @Injectable()
 export class AuthService {
@@ -246,47 +251,32 @@ export class AuthService {
    * resolve to the same user.
    */
   async loginWithGoogle(idToken?: string) {
-    if (!idToken) {
-      throw new UnauthorizedException('Missing Google credential');
-    }
-
-    let payload: any;
+    // Shared, dependency-free verifier (also used by the account-deletion
+    // re-authentication path) — keeps the two flows from drifting apart.
+    let info;
     try {
-      const res = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      info = await verifyGoogleIdToken(
+        idToken,
+        collectAllowedGoogleClientIds((k) => this.configService.get<string>(k)),
+        (url) => fetch(url),
       );
-      if (!res.ok) {
-        throw new Error(`tokeninfo HTTP ${res.status}`);
-      }
-      payload = await res.json();
     } catch (err) {
-      this.logger.warn(`Google token verification failed: ${(err as Error).message}`);
-      throw new UnauthorizedException('Could not verify Google sign-in');
+      if (err instanceof GoogleTokenError) {
+        this.logger.warn(err.message);
+        if (err.message.startsWith('Google sign-in is not configured')) {
+          throw new UnauthorizedException(err.message);
+        }
+        if (err.message.startsWith('Your Google account has no verified email')) {
+          throw new UnauthorizedException(err.message);
+        }
+        if (err.message === 'Missing Google credential') {
+          throw new UnauthorizedException(err.message);
+        }
+        throw new UnauthorizedException('Could not verify Google sign-in');
+      }
+      throw err;
     }
-
-    // Audience check: token must be minted for one of our configured client IDs.
-    // Both web and mobile sign-in send an ID token whose `aud` is the WEB client
-    // ID, so accept that source too (GOOGLE_WEB_CLIENT_ID / the public web var).
-    const allowed = [
-      ...(this.configService.get<string>('GOOGLE_CLIENT_ID', '') || '').split(','),
-      ...(this.configService.get<string>('GOOGLE_CLIENT_IDS', '') || '').split(','),
-      ...(this.configService.get<string>('GOOGLE_WEB_CLIENT_ID', '') || '').split(','),
-      ...(this.configService.get<string>('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '') || '').split(','),
-    ]
-      .map((s) => s.trim())
-      .filter(Boolean);
-    // Fail CLOSED: if no client IDs are configured, reject — otherwise a token
-    // minted for *any* Google client would pass the audience check, letting an
-    // attacker sign in as any verified email.
-    if (allowed.length === 0 || !allowed.includes(payload.aud)) {
-      throw new UnauthorizedException('Google sign-in is not configured for this app');
-    }
-
-    const email = String(payload.email || '').toLowerCase();
-    const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
-    if (!email || !emailVerified) {
-      throw new UnauthorizedException('Your Google account has no verified email');
-    }
+    const { email, picture, sub, name } = info;
 
     let [user] = await this.db
       .select()
@@ -303,11 +293,13 @@ export class AuthService {
     }
 
     if (!user) {
-      const displayName = String(payload.name || email.split('@')[0]).slice(0, 50);
+      const displayName = String(name || email.split('@')[0]).slice(0, 50);
       const username = await this.uniqueUsername(email.split('@')[0]);
       // Random unusable password — the account signs in via Google (or via a
-      // future password reset).
-      const passwordHash = await bcrypt.hash(`google:${payload.sub}:${username}`, 12);
+      // future password reset). Because the user can never know this value, the
+      // account-deletion endpoint re-authenticates such accounts via a fresh
+      // Google ID token instead of a password (see UsersService.deleteAccount).
+      const passwordHash = await bcrypt.hash(`google:${sub}:${username}`, 12);
       const [created] = await this.db
         .insert(schema.users)
         .values({
@@ -316,7 +308,7 @@ export class AuthService {
           displayName,
           passwordHash,
           isVerified: true,
-          avatarUrl: payload.picture || null,
+          avatarUrl: picture || null,
         })
         .returning();
       user = created;
