@@ -27,10 +27,12 @@ function SharedAnswers({
   star,
   userId,
   partnerName,
+  readOnly,
 }: {
   star: Star;
   userId: string;
   partnerName: string;
+  readOnly?: boolean;
 }) {
   const patchStar = useConstellationStore((s) => s.patchStar);
   const toast = useToastStore.getState();
@@ -80,7 +82,7 @@ function SharedAnswers({
               <span className={cn('text-sm font-medium', isMe ? 'text-primary' : 'text-text-muted')}>
                 {label}
               </span>
-              {isMe && !isEditing && (
+              {isMe && !isEditing && !readOnly && (
                 <button
                   type="button"
                   onClick={() => {
@@ -134,10 +136,12 @@ function GuessAnswers({
   star,
   userId,
   partnerName,
+  readOnly,
 }: {
   star: Star;
   userId: string;
   partnerName: string;
+  readOnly?: boolean;
 }) {
   const patchStar = useConstellationStore((s) => s.patchStar);
   const toast = useToastStore.getState();
@@ -203,8 +207,9 @@ function GuessAnswers({
           );
         })()}
 
-      {/* Self-judge: show only if I am the subject AND a guess exists AND not yet judged */}
-      {iAmSubject && ans.guess && ans.matched == null && (
+      {/* Self-judge: show only if I am the subject AND a guess exists AND not
+          yet judged AND we're not in read-only memorial mode. */}
+      {iAmSubject && ans.guess && ans.matched == null && !readOnly && (
         <Card cardStyle="bordered">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-text">Did they nail it?</span>
@@ -236,7 +241,7 @@ function GuessAnswers({
 
 /* ─── Photo section ──────────────────────────────────────────────────────── */
 
-function PhotoSection({ star }: { star: Star }) {
+function PhotoSection({ star, readOnly }: { star: Star; readOnly?: boolean }) {
   const couple = useAuthStore((s) => s.couple);
   const uploadFile = useMediaStore((s) => s.uploadFile);
   const patchStar = useConstellationStore((s) => s.patchStar);
@@ -244,6 +249,20 @@ function PhotoSection({ star }: { star: Star }) {
 
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Read-only memorial: show the photo if one exists, but never the add/change
+  // affordance. A starless star simply renders nothing here.
+  if (readOnly) {
+    if (!star.photoUrl) return null;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={star.photoUrl}
+        alt={star.title}
+        className="h-56 w-full rounded-xl bg-surface-hover object-cover"
+      />
+    );
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -295,9 +314,11 @@ function PhotoSection({ star }: { star: Star }) {
 export function StarDetail({
   star,
   onClose,
+  readOnly,
 }: {
   star: Star;
   onClose: () => void;
+  readOnly?: boolean;
 }) {
   const userId = useAuthStore((s) => s.user?.id ?? '');
   const partnerName = usePartnerName();
@@ -347,13 +368,13 @@ export function StarDetail({
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-10 pt-2">
           {/* Answers section */}
           {live.kind === 'guess' ? (
-            <GuessAnswers star={live} userId={userId} partnerName={partnerName} />
+            <GuessAnswers star={live} userId={userId} partnerName={partnerName} readOnly={readOnly} />
           ) : (
-            <SharedAnswers star={live} userId={userId} partnerName={partnerName} />
+            <SharedAnswers star={live} userId={userId} partnerName={partnerName} readOnly={readOnly} />
           )}
 
           {/* Photo section */}
-          <PhotoSection star={live} />
+          <PhotoSection star={live} readOnly={readOnly} />
         </div>
       </div>
     </div>

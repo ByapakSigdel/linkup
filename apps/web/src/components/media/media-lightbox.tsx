@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/cn';
 import { useMediaStore, type MediaItem } from '@/stores/media-store';
 
-export function MediaLightbox() {
+export function MediaLightbox({ readOnly }: { readOnly?: boolean } = {}) {
   const lightboxIndex = useMediaStore((s) => s.lightboxIndex);
   const items = useMediaStore((s) => s.items);
   const closeLightbox = useMediaStore((s) => s.closeLightbox);
@@ -153,21 +153,24 @@ export function MediaLightbox() {
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => toggleFavorite(currentItem.id)}
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
-              currentItem.isFavorite
-                ? 'text-primary hover:text-primary/80'
-                : 'text-white/70 hover:text-white',
-            )}
-            title="Favorite"
-          >
-            <Heart
-              className="h-5 w-5"
-              fill={currentItem.isFavorite ? 'currentColor' : 'none'}
-            />
-          </button>
+          {/* Favorite — a mutation; hidden in read-only memorial mode. */}
+          {!readOnly && (
+            <button
+              onClick={() => toggleFavorite(currentItem.id)}
+              className={cn(
+                'flex h-9 w-9 items-center justify-center rounded-full transition-colors',
+                currentItem.isFavorite
+                  ? 'text-primary hover:text-primary/80'
+                  : 'text-white/70 hover:text-white',
+              )}
+              title="Favorite"
+            >
+              <Heart
+                className="h-5 w-5"
+                fill={currentItem.isFavorite ? 'currentColor' : 'none'}
+              />
+            </button>
+          )}
 
           <button
             onClick={handleDownload}
@@ -177,13 +180,16 @@ export function MediaLightbox() {
             <Download className="h-5 w-5" />
           </button>
 
-          <button
-            onClick={handleDelete}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:text-error transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="h-5 w-5" />
-          </button>
+          {/* Delete — a mutation; hidden in read-only memorial mode. */}
+          {!readOnly && (
+            <button
+              onClick={handleDelete}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:text-error transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
 
           <button
             onClick={closeLightbox}

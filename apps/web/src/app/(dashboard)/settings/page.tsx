@@ -20,9 +20,12 @@ import {
   Calendar,
   ChevronRight,
   Users,
+  Trash2,
+  Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasArchive, isActivelyPaired } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { selectTheme } from '@/lib/sync-theme';
 import { themes, themeIds } from '@/styles/themes/index';
@@ -32,10 +35,19 @@ import {
   CardTitle,
   CardContent,
   Button,
+  Input,
   Spinner,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import api from '@/lib/api';
+
+/** Local error-message extractor — matches the web watch/music page pattern. */
+function errMsg(e: unknown, fallback: string): string {
+  return (
+    (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+      ?.error?.message || fallback
+  );
+}
 
 interface UserSettings {
   id: string;
@@ -115,6 +127,11 @@ export default function SettingsPage() {
   const couple = useAuthStore((s) => s.couple);
   const setCouple = useAuthStore((s) => s.setCouple);
   const user = useAuthStore((s) => s.user);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
+  const showMemories = useAuthStore((s) => hasArchive({ user: s.user, couple: s.couple }));
+  // A paired delete offboards the partner compassionately; a survivor/solo
+  // delete simply closes the account. We tailor the dialog copy accordingly.
+  const paired = useAuthStore((s) => isActivelyPaired({ user: s.user, couple: s.couple }));
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +139,7 @@ export default function SettingsPage() {
   const [coupleName, setCoupleName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -495,6 +513,27 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Memories — shown once the survivor has gone solo (archived couple). */}
+      {showMemories && (
+        <Card cardStyle="bordered" padding="none">
+          <Link
+            href="/memorial"
+            className="flex items-center gap-3 p-4 transition-colors hover:bg-surface-hover"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-light">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-text">Memories</p>
+              <p className="text-xs text-text-muted">
+                Revisit your shared space — kept read-only, just as it was.
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-text-muted" />
+          </Link>
+        </Card>
+      )}
+
       {/* Account */}
       <Card cardStyle="bordered" padding="md">
         <CardHeader>
@@ -504,16 +543,140 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Button
-            onClick={handleLogout}
-            variant="destructive"
-            size="md"
-            className="w-full"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Log Out
-          </Button>
+          <div className="space-y-3">
+            <Button
+              onClick={handleLogout}
+              variant="destructive"
+              size="md"
+              className="w-full"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Log Out
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowDelete(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-[var(--lk-btn-radius)] border border-error py-2.5 text-sm font-medium text-error transition-colors hover:bg-error/10"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete account
+            </button>
+            <p className="text-xs text-text-muted">
+              Permanently closes your account. This can&apos;t be undone.
+            </p>
+          </div>
         </CardContent>
+      </Card>
+
+      <DeleteAccountDialog
+        open={showDelete}
+        paired={paired}
+        onClose={() => setShowDelete(false)}
+        deleteAccount={deleteAccount}
+      />
+    </div>
+  );
+}
+
+/* ─── Delete-account confirm dialog (password) ─────────────────────────────── */
+function DeleteAccountDialog({
+  open,
+  paired,
+  onClose,
+  deleteAccount,
+}: {
+  open: boolean;
+  paired: boolean;
+  onClose: () => void;
+  deleteAccount: (password: string) => Promise<void>;
+}) {
+  const router = useRouter();
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const close = useCallback(() => {
+    if (busy) return;
+    setPassword('');
+    setError('');
+    onClose();
+  }, [busy, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, close]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!password) {
+      setError('Enter your password to confirm.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await deleteAccount(password);
+      router.replace('/goodbye');
+    } catch (e) {
+      setBusy(false);
+      setError(errMsg(e, 'That password is incorrect.'));
+    }
+  }, [password, deleteAccount, router]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={close}
+        aria-hidden
+      />
+      <Card cardStyle="elevated" padding="md" className="relative w-full max-w-md">
+        <div className="flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-error">
+            <Trash2 className="h-5 w-5" />
+            Delete account
+          </h2>
+          <p className="text-sm text-text-muted">
+            {paired
+              ? 'This permanently closes your account. Your partner will be met gently — your shared space becomes a read-only memorial for them. Enter your password to confirm.'
+              : "This permanently closes your account and can't be undone. Enter your password to confirm."}
+          </p>
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+            autoComplete="current-password"
+            disabled={busy}
+            error={error || undefined}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleConfirm();
+            }}
+          />
+          <div className="mt-1 flex gap-2">
+            <Button variant="ghost" className="flex-1" disabled={busy} onClick={close}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              loading={busy}
+              onClick={handleConfirm}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

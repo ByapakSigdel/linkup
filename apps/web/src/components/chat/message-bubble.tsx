@@ -156,6 +156,8 @@ export interface MessageBubbleProps {
   onDelete?: (messageId: string) => void;
   onHighlight?: (message: Message) => void;
   onReact?: (messageId: string, emoji: string) => void;
+  /** Read-only memorial mode: suppresses the hover action + reaction menus. */
+  readOnly?: boolean;
 }
 
 export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
@@ -169,6 +171,7 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
       onDelete,
       onHighlight,
       onReact,
+      readOnly,
     },
     ref,
   ) => {
@@ -213,11 +216,11 @@ export const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(
           isSent ? 'justify-end' : 'justify-start',
           !isGroupedWithPrevious && 'mt-2',
         )}
-        onMouseEnter={() => setShowActions(true)}
+        onMouseEnter={() => !readOnly && setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        {/* Action menu (hover) */}
-        {showActions && (
+        {/* Action menu (hover) — never shown in read-only memorial mode. */}
+        {showActions && !readOnly && (
           <div
             className={cn(
               'absolute top-0 flex items-center gap-0.5 z-10',

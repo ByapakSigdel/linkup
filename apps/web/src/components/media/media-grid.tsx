@@ -9,6 +9,8 @@ interface MediaGridProps {
   onItemClick?: (item: MediaItem, index: number) => void;
   className?: string;
   columns?: 3 | 4;
+  /** Read-only memorial mode: hides favorite/delete hover actions. */
+  readOnly?: boolean;
 }
 
 export function MediaGrid({
@@ -16,6 +18,7 @@ export function MediaGrid({
   onItemClick,
   className,
   columns = 4,
+  readOnly,
 }: MediaGridProps) {
   const toggleFavorite = useMediaStore((s) => s.toggleFavorite);
   const deleteMedia = useMediaStore((s) => s.deleteMedia);
@@ -26,9 +29,13 @@ export function MediaGrid({
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-active mb-4">
           <Heart className="h-7 w-7 text-text-muted" />
         </div>
-        <p className="text-sm font-medium text-text">No photos yet</p>
+        <p className="text-sm font-medium text-text">
+          {readOnly ? 'No photos' : 'No photos yet'}
+        </p>
         <p className="mt-1 text-xs text-text-muted">
-          Upload your first photo to start building your gallery
+          {readOnly
+            ? 'There are no shared photos between you.'
+            : 'Upload your first photo to start building your gallery'}
         </p>
       </div>
     );
@@ -49,6 +56,7 @@ export function MediaGrid({
           onClick={() => onItemClick?.(item, index)}
           onToggleFavorite={() => toggleFavorite(item.id)}
           onDelete={() => deleteMedia(item.id)}
+          readOnly={readOnly}
         />
       ))}
     </div>
@@ -60,9 +68,10 @@ interface MediaGridItemProps {
   onClick?: () => void;
   onToggleFavorite?: () => void;
   onDelete?: () => void;
+  readOnly?: boolean;
 }
 
-function MediaGridItem({ item, onClick, onToggleFavorite, onDelete }: MediaGridItemProps) {
+function MediaGridItem({ item, onClick, onToggleFavorite, onDelete, readOnly }: MediaGridItemProps) {
   const isVideo = item.type === 'video';
   const isFavorite = item.isFavorite;
   const imageUrl = item.cdnUrl;
@@ -113,40 +122,43 @@ function MediaGridItem({ item, onClick, onToggleFavorite, onDelete }: MediaGridI
       {/* Hover overlay with actions */}
       <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/20" />
 
-      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite?.();
-          }}
-          className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors',
-            isFavorite
-              ? 'bg-primary/90 text-white'
-              : 'bg-black/40 text-white hover:bg-black/60',
-          )}
-          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        >
-          <Heart
-            className="h-3.5 w-3.5"
-            fill={isFavorite ? 'currentColor' : 'none'}
-          />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete?.();
-          }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-error/80"
-          title="Delete"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {/* Favorite / delete actions — hidden in read-only memorial mode. */}
+      {!readOnly && (
+        <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite?.();
+            }}
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors',
+              isFavorite
+                ? 'bg-primary/90 text-white'
+                : 'bg-black/40 text-white hover:bg-black/60',
+            )}
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart
+              className="h-3.5 w-3.5"
+              fill={isFavorite ? 'currentColor' : 'none'}
+            />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.();
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-error/80"
+            title="Delete"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Favorite indicator (always visible) */}
       {isFavorite && (
-        <div className="absolute top-1.5 left-1.5 group-hover:hidden">
+        <div className={cn('absolute top-1.5 left-1.5', !readOnly && 'group-hover:hidden')}>
           <Heart className="h-4 w-4 text-primary drop-shadow-md" fill="currentColor" />
         </div>
       )}

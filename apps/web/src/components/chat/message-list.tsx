@@ -14,6 +14,8 @@ interface MessageListProps {
   onDelete?: (messageId: string) => void;
   onHighlight?: (message: Message) => void;
   onReact?: (messageId: string, emoji: string) => void;
+  /** Read-only memorial mode: disables the hover action / reaction menus. */
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -23,6 +25,7 @@ export function MessageList({
   onDelete,
   onHighlight,
   onReact,
+  readOnly,
   className,
 }: MessageListProps) {
   const messages = useChatStore((s) => s.messages);
@@ -166,6 +169,7 @@ export function MessageList({
               onDelete={onDelete}
               onHighlight={onHighlight}
               onReact={onReact}
+              readOnly={readOnly}
             />
           </div>
         );
