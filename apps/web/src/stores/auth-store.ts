@@ -155,6 +155,11 @@ export const useAuthStore = create<AuthState>()(
       deleteAccount: async (password) => {
         // axios DELETE carries a body under `data`. The server anonymizes the
         // account + revokes refresh tokens; locally we just drop the session.
+        // This action is navigation-agnostic (mirrors mobile): forceLogout()
+        // clears isAuthenticated, which the layout's auth effect routes to
+        // /login. Caller MUST router.replace('/goodbye') immediately after this
+        // resolves to land on the farewell screen instead — same contract as
+        // mobile/src/app/memorial.tsx:305 and (app)/settings.tsx.
         await api.delete('/users/me', { data: { confirm: true, password } });
         get().forceLogout();
       },

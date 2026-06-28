@@ -27,7 +27,14 @@ export interface User {
   updatedAt: string;
 }
 
-/** Survivor's choice on an ended couple (the relationship-memorial fork). */
+/**
+ * Survivor's choice on an ended couple (the relationship-memorial fork).
+ *
+ * NOTE: this duplicates `SurvivorDecision` from `@linkup/types`
+ * (packages/types/src/couple.ts). Mobile is outside the pnpm workspace so it
+ * keeps a local copy; if the set of decisions ever changes, update BOTH. A
+ * future cleanup could have mobile import from @linkup/types instead.
+ */
 export type SurvivorDecision = 'pending' | 'archived_solo' | 'left';
 
 // ─── Couple ─────────────────────────────────────────────────────────────────

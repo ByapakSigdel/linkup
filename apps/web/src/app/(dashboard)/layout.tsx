@@ -24,6 +24,10 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // hydrate() does not set isLoading, so we track its in-flight window locally
+  // to gate the memorial redirect on fresh server data (avoids redirecting off a
+  // stale-persisted couple before the first hydrate confirms it).
+  const [isHydrating, setIsHydrating] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -38,7 +42,8 @@ export default function DashboardLayout({
   // made elsewhere (or by the partner) are reflected.
   useEffect(() => {
     if (isAuthenticated) {
-      hydrate();
+      setIsHydrating(true);
+      hydrate().finally(() => setIsHydrating(false));
     }
   }, [isAuthenticated, hydrate]);
 
@@ -52,12 +57,15 @@ export default function DashboardLayout({
   // Guard against redirecting away from the memorial page itself (it lives inside
   // this dashboard group), which would otherwise loop.
   useEffect(() => {
-    if (!mounted || !isAuthenticated) return;
+    // Guard on isHydrating (mirrors the auth redirect's isLoading guard) so we
+    // never redirect off a stale-persisted couple before the first hydrate
+    // confirms fresh server data.
+    if (!mounted || !isAuthenticated || isHydrating) return;
     if (pathname === '/memorial' || pathname.startsWith('/memorial/')) return;
     if (isMemorialPending({ user, couple })) {
       router.replace('/memorial');
     }
-  }, [mounted, isAuthenticated, user, couple, pathname, router]);
+  }, [mounted, isAuthenticated, isHydrating, user, couple, pathname, router]);
 
   // Show loading state while hydrating or checking auth
   if (!mounted || (!isAuthenticated && isLoading)) {
