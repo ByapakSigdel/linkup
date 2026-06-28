@@ -157,7 +157,12 @@ export const useAuthStore = create<AuthState>()(
 
       archiveAndGoSolo: async () => {
         await api.post('/couples/me/survivor-decision', { decision: 'archived_solo' });
-        await get().refreshCouple();
+        // The backend sets users.coupleId=null and users.archivedCoupleId=<id>.
+        // refreshCouple() alone would leave store.user stale (hasArchive would
+        // read false, and the next hydrate would refetch via a stale coupleId).
+        // hydrate() reloads the user row (coupleId=null, archivedCoupleId set)
+        // and loads the couple via getMe's archivedCoupleId fallback.
+        await get().hydrate();
       },
 
       hydrate: async () => {
@@ -165,8 +170,14 @@ export const useAuthStore = create<AuthState>()(
           const { data: meBody } = await api.post('/auth/me');
           const fullUser: User = meBody.data.user;
           set({ user: fullUser });
-          if (fullUser.coupleId) {
-            const { data: cBody } = await api.get(`/couples/${fullUser.coupleId}`);
+          // The active couple wins; otherwise fall back to the survivor's archived
+          // couple so the read-only memorial / "Memories" entry loads after she has
+          // gone solo (coupleId=null, archivedCoupleId set). getMe's `data.couple`
+          // already applies this precedence, but it only carries lifecycle fields,
+          // so we re-fetch the full couple by its id via GET /couples/:id.
+          const coupleId = fullUser.coupleId ?? fullUser.archivedCoupleId ?? null;
+          if (coupleId) {
+            const { data: cBody } = await api.get(`/couples/${coupleId}`);
             const couple = cBody.data.couple ?? null;
             set({ couple });
             if (couple?.sharedThemeId) {

@@ -319,7 +319,8 @@ export type NotificationType =
   | 'message' | 'call_missed' | 'call_incoming' | 'streak_reminder'
   | 'streak_broken' | 'anniversary' | 'date_reminder' | 'achievement'
   | 'circle_follow' | 'circle_follow_request' | 'circle_follow_accepted'
-  | 'circle_post_like' | 'circle_comment' | 'highlight' | 'media_shared' | 'system';
+  | 'circle_post_like' | 'circle_comment' | 'highlight' | 'media_shared'
+  | 'relationship_ended' | 'system';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
