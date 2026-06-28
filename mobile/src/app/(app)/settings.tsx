@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, Modal, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import Animated, {
   useAnimatedStyle,
@@ -20,6 +20,9 @@ import {
   Calendar,
   Users,
   Check,
+  Trash2,
+  Sparkles,
+  ChevronRight,
 } from 'lucide-react-native';
 
 import {
@@ -37,10 +40,10 @@ import { ScreenHeader } from '@/components/top-bar';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { themes, themeIds, type ThemeMeta } from '@/theme/themes';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, hasArchive, isActivelyPaired } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { getSocket } from '@/lib/socket';
-import api from '@/lib/api';
+import api, { apiErrorMessage } from '@/lib/api';
 import { useToastStore } from '@/stores/toast-store';
 
 interface UserSettings {
@@ -95,12 +98,18 @@ export default function SettingsScreen() {
   const couple = useAuthStore((s) => s.couple);
   const setCouple = useAuthStore((s) => s.setCouple);
   const user = useAuthStore((s) => s.user);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
+  const showMemories = useAuthStore((s) => hasArchive({ user: s.user, couple: s.couple }));
+  // A paired delete offboards the partner compassionately; a survivor/solo
+  // delete simply closes the account. We tailor the dialog copy accordingly.
+  const paired = useAuthStore((s) => isActivelyPaired({ user: s.user, couple: s.couple }));
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [coupleName, setCoupleName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -384,6 +393,32 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        {/* Memories — shown once the survivor has gone solo (archived couple). */}
+        {showMemories && (
+          <Card padded={false}>
+            <Pressable
+              onPress={() => router.push('/memorial')}
+              style={({ pressed }) => [styles.memoriesRow, { opacity: pressed ? 0.85 : 1 }]}
+            >
+              <View
+                style={[
+                  styles.memoriesIcon,
+                  { backgroundColor: colors.primaryLight, borderRadius: radius.button },
+                ]}
+              >
+                <Sparkles color={colors.primary} size={20} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AppText variant="label">Memories</AppText>
+                <Muted variant="caption">
+                  Revisit your shared space — kept read-only, just as it was.
+                </Muted>
+              </View>
+              <ChevronRight color={colors.textMuted} size={20} />
+            </Pressable>
+          </Card>
+        )}
+
         {/* Account */}
         <Card>
           <View style={{ gap: 12 }}>
@@ -400,12 +435,121 @@ export default function SettingsScreen() {
               leftIcon={<LogOut color={colors.textOnPrimary} size={16} />}
               onPress={handleLogout}
             />
+            <Pressable
+              onPress={() => setShowDelete(true)}
+              style={({ pressed }) => [
+                styles.deleteRow,
+                { borderColor: colors.error, opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Trash2 color={colors.error} size={16} />
+              <AppText variant="label" color={colors.error}>
+                Delete account
+              </AppText>
+            </Pressable>
+            <Muted variant="caption">
+              Permanently closes your account. This can&apos;t be undone.
+            </Muted>
           </View>
         </Card>
 
         <View style={{ height: 8 }} />
       </ScrollView>
+
+      <DeleteAccountDialog
+        visible={showDelete}
+        paired={paired}
+        onClose={() => setShowDelete(false)}
+        deleteAccount={deleteAccount}
+      />
     </Screen>
+  );
+}
+
+/* ─── Delete-account confirm dialog (password) ─────────────────────────────── */
+function DeleteAccountDialog({
+  visible,
+  paired,
+  onClose,
+  deleteAccount,
+}: {
+  visible: boolean;
+  paired: boolean;
+  onClose: () => void;
+  deleteAccount: (password: string) => Promise<void>;
+}) {
+  const { colors } = useTheme();
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const close = useCallback(() => {
+    setPassword('');
+    setError('');
+    setBusy(false);
+    onClose();
+  }, [onClose]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!password) {
+      setError('Enter your password to confirm.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await deleteAccount(password);
+      router.replace('/goodbye');
+    } catch (e) {
+      setBusy(false);
+      setError(apiErrorMessage(e, 'That password is incorrect.'));
+    }
+  }, [password, deleteAccount]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <View style={styles.dialogBackdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : close} />
+        <Card variant="elevated" style={styles.dialogCard}>
+          <View style={{ gap: 12 }}>
+            <Row gap={8}>
+              <Trash2 color={colors.error} size={18} />
+              <AppText variant="subtitle" color={colors.error}>
+                Delete account
+              </AppText>
+            </Row>
+            <Muted variant="caption">
+              {paired
+                ? 'This permanently closes your account. Your partner will be met gently — your shared space becomes a read-only memorial for them. Enter your password to confirm.'
+                : "This permanently closes your account and can't be undone. Enter your password to confirm."}
+            </Muted>
+            <Input
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Your password"
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!busy}
+              error={error || undefined}
+            />
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Cancel" variant="ghost" fullWidth disabled={busy} onPress={close} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Delete"
+                  variant="destructive"
+                  fullWidth
+                  loading={busy}
+                  onPress={handleConfirm}
+                />
+              </View>
+            </View>
+          </View>
+        </Card>
+      </View>
+    </Modal>
   );
 }
 
@@ -678,3 +822,35 @@ function ThemeSwatch({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  memoriesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+  },
+  memoriesIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  dialogCard: { width: '100%', maxWidth: 400 },
+});
