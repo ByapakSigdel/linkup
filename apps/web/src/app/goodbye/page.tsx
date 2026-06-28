@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui';
 import { LinkupMark } from '@/components/brand/logo';
 import { cn } from '@/lib/cn';
@@ -14,6 +15,12 @@ import { cn } from '@/lib/cn';
  */
 export default function GoodbyePage() {
   const router = useRouter();
+
+  // We've landed on the farewell screen: the deletion + redirect race is over,
+  // so clear the transient winding-down flag the dashboard layout was guarding on.
+  useEffect(() => {
+    useAuthStore.getState().clearWindingDown();
+  }, []);
 
   // Honor prefers-reduced-motion: skip the staggered entrance when set.
   const [reduceMotion, setReduceMotion] = useState(false);

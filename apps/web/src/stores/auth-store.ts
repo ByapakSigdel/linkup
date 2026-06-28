@@ -11,6 +11,11 @@ interface AuthState {
   couple: Couple | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** Transient flag set while an account deletion is in flight + navigating to
+   *  /goodbye. The dashboard layout's /login redirect guards on this so the
+   *  goodbye redirect always wins the race against the layout's auth effect.
+   *  Cleared on the goodbye page mount (or any reset()). */
+  isWindingDown: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -33,6 +38,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Clear the session locally (no network) — used after account deletion. */
   forceLogout: () => void;
+  /** Reset the transient winding-down flag (called once /goodbye mounts). */
+  clearWindingDown: () => void;
   refreshToken: () => Promise<void>;
   hydrate: () => Promise<void>;
   setUser: (user: User) => void;
@@ -46,6 +53,7 @@ const initialState = {
   couple: null,
   isAuthenticated: false,
   isLoading: false,
+  isWindingDown: false,
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -161,7 +169,16 @@ export const useAuthStore = create<AuthState>()(
         // resolves to land on the farewell screen instead — same contract as
         // mobile/src/app/memorial.tsx:305 and (app)/settings.tsx.
         await api.delete('/users/me', { data: { confirm: true, password } });
+        // Clear the session, then mark winding-down. forceLogout() resets to
+        // initialState (isWindingDown:false), so we set the flag AFTER it. Both
+        // set() calls batch synchronously before any re-render, so the layout's
+        // /login redirect effect — which guards on isWindingDown — sees `true`
+        // and stands down, letting the caller's router.replace('/goodbye') win
+        // the race (Next.js App Router gives no ordering guarantee between the
+        // two router.replace calls). The goodbye page calls clearWindingDown()
+        // on mount. Mirrors mobile's deleteAccount → forceLogout → /goodbye.
         get().forceLogout();
+        set({ isWindingDown: true });
       },
 
       archiveAndGoSolo: async () => {
@@ -196,6 +213,8 @@ export const useAuthStore = create<AuthState>()(
         disconnectSocket();
         set(initialState);
       },
+
+      clearWindingDown: () => set({ isWindingDown: false }),
 
       refreshToken: async () => {
         const { tokens } = get();

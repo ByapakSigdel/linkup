@@ -16,6 +16,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  // While an account deletion is winding down, the caller routes to /goodbye;
+  // this flag tells the auth effect to stand down so it doesn't race a /login
+  // redirect against the goodbye redirect.
+  const isWindingDown = useAuthStore((s) => s.isWindingDown);
   const hydrate = useAuthStore((s) => s.hydrate);
   // Subscribe reactively so a `couple:ended` refresh re-gates on the next render.
   const user = useAuthStore((s) => s.user);
@@ -48,10 +52,10 @@ export default function DashboardLayout({
   }, [isAuthenticated, hydrate]);
 
   useEffect(() => {
-    if (mounted && !isAuthenticated && !isLoading) {
+    if (mounted && !isAuthenticated && !isLoading && !isWindingDown) {
       router.replace('/login');
     }
-  }, [mounted, isAuthenticated, isLoading, router]);
+  }, [mounted, isAuthenticated, isLoading, isWindingDown, router]);
 
   // Survivor of an ended relationship who hasn't yet chosen → memorial takeover.
   // Guard against redirecting away from the memorial page itself (it lives inside

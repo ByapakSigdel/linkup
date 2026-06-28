@@ -82,7 +82,11 @@ interface MediaState {
   lightboxIndex: number | null;
 
   // Actions — data fetching
-  fetchMedia: (coupleId: string, offset?: number) => Promise<void>;
+  // fetchMedia returns a status so callers (e.g. the Memorial) can distinguish a
+  // genuinely empty gallery from a `forbidden` (archived-couple membership not
+  // honored by the API) or other fetch error and render the right state.
+  // Existing callers ignore the return — backward compatible with `Promise<void>`.
+  fetchMedia: (coupleId: string, offset?: number) => Promise<'ok' | 'forbidden' | 'error'>;
   fetchAlbums: (coupleId: string) => Promise<void>;
 
   // Actions — media operations
@@ -167,8 +171,11 @@ export const useMediaStore = create<MediaState>()((set, get) => ({
           hasMore: fetched.length >= 50,
         }));
       }
+      return 'ok';
     } catch (error) {
       console.error('Failed to fetch media:', error);
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      return status === 403 ? 'forbidden' : 'error';
     } finally {
       set({ isLoading: false });
     }

@@ -34,6 +34,12 @@ export function ConstellationOfUs({ readOnly: readOnlyProp }: { readOnly?: boole
   const [selected, setSelected] = useState<Star | null>(null);
 
   // Fetch on mount.
+  // NOTE: when readOnly=true (the memorial), `couple` on the auth store is
+  // expected to be the ARCHIVED couple (the auth hydrate loads it via the
+  // survivor's archivedCoupleId). fetchStars() resolves the couple id from that
+  // same store, so the backend /constellation read must authorize archived-couple
+  // membership (user.archivedCoupleId === coupleId) in addition to active
+  // membership, or a now-solo survivor's star-fetch will silently fail.
   useEffect(() => {
     void fetchStars();
   }, [fetchStars]);

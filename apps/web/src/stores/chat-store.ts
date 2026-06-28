@@ -66,7 +66,11 @@ interface ChatState {
   setHighlightingMessage: (message: Message | null) => void;
 
   // Actions — API
-  fetchMessages: (coupleId: string, offset?: number) => Promise<void>;
+  // Returns a status so callers (e.g. the Memorial) can distinguish a genuine
+  // empty thread from a `forbidden` (archived-couple membership not honored by
+  // the API) or other fetch error and show the right state. Existing callers
+  // ignore the return — backward compatible with the previous `Promise<void>`.
+  fetchMessages: (coupleId: string, offset?: number) => Promise<'ok' | 'forbidden' | 'error'>;
 
   // Actions — reset
   reset: () => void;
@@ -229,8 +233,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         // Pagination: prepend older messages
         get().appendOlderMessages([...fetchedMessages].reverse());
       }
+      return 'ok';
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      return status === 403 ? 'forbidden' : 'error';
     } finally {
       set({ isLoadingMessages: false });
     }

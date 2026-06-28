@@ -75,6 +75,13 @@ export default function MemorialPage() {
   const [view, setView] = useState<'intro' | 'memorial'>(archived ? 'memorial' : 'intro');
   const [tab, setTab] = useState<Tab>('chat');
 
+  // If `archived` flips true after mount (e.g. Zustand persisted state hydrates
+  // asynchronously, or archiveAndGoSolo completes), make sure a returning solo
+  // survivor lands straight in the read-only archive rather than the takeover.
+  useEffect(() => {
+    if (archived && view === 'intro') setView('memorial');
+  }, [archived, view]);
+
   // Fork state.
   const [archiving, setArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState('');
@@ -346,18 +353,50 @@ function LeaveDialog({
   );
 }
 
+/* ─── Shared "can't reach these memories" state ────────────────────────────── */
+// Shown when the archive fetch is rejected (e.g. a 403 because the API doesn't
+// yet authorize a now-solo survivor's archived-couple membership) or otherwise
+// fails. Distinct from the genuinely-empty states below so we never silently
+// pretend an unreachable archive is empty. Backend follow-up tracked in the
+// StructuredOutput concerns: /messages, /media, /dates, and /constellation
+// should authorize reads by `user.archivedCoupleId === coupleId`.
+function MemorialUnavailable({ Icon }: { Icon: typeof MessageCircle }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+      <Icon className="h-10 w-10 text-text-muted" />
+      <p className="mt-2 text-base font-semibold text-text">
+        These memories aren&apos;t loading
+      </p>
+      <p className="mt-1 max-w-xs text-sm text-text-muted">
+        We couldn&apos;t reach this part of your archive right now. Please try
+        again in a little while.
+      </p>
+    </div>
+  );
+}
+
 /* ─── Read-only chat ───────────────────────────────────────────────────────── */
 function MemorialChat({ coupleId }: { coupleId?: string }) {
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const reset = useChatStore((s) => s.reset);
+  // Surface a fetch failure (e.g. a 403 on the archived couple) explicitly
+  // rather than letting the silently-swallowed error read as an empty thread.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!coupleId) return;
-    fetchMessages(coupleId);
+    let mounted = true;
+    setFailed(false);
+    fetchMessages(coupleId).then((status) => {
+      if (mounted && status !== 'ok') setFailed(true);
+    });
     return () => {
+      mounted = false;
       reset();
     };
   }, [coupleId, fetchMessages, reset]);
+
+  if (failed) return <MemorialUnavailable Icon={MessageCircle} />;
 
   return (
     <div className="flex h-full flex-col">
@@ -372,11 +411,23 @@ function MemorialPhotos({ coupleId }: { coupleId?: string }) {
   const isLoading = useMediaStore((s) => s.isLoading);
   const fetchMedia = useMediaStore((s) => s.fetchMedia);
   const openLightbox = useMediaStore((s) => s.openLightbox);
+  // Surface a fetch failure (e.g. a 403 on the archived couple) explicitly
+  // rather than letting the silently-swallowed error read as an empty gallery.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!coupleId) return;
-    fetchMedia(coupleId);
+    let mounted = true;
+    setFailed(false);
+    fetchMedia(coupleId).then((status) => {
+      if (mounted && status !== 'ok') setFailed(true);
+    });
+    return () => {
+      mounted = false;
+    };
   }, [coupleId, fetchMedia]);
+
+  if (failed) return <MemorialUnavailable Icon={ImageIcon} />;
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -401,9 +452,14 @@ interface MemorialDate {
 
 function MemorialDates({ coupleId }: { coupleId?: string }) {
   const [dates, setDates] = useState<MemorialDate[] | null>(null);
+  // Distinguish a genuine "no dates" from a fetch failure (e.g. a 403 because
+  // the API doesn't yet authorize the now-solo survivor's archived couple) so we
+  // don't render an empty state over an unreachable archive.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    setFailed(false);
     // Forward the couple id explicitly: an already-solo survivor revisiting
     // Memories has a null live coupleId on the server, so without this the
     // archived couple's dates resolve to a 404 and the empty state hides them.
@@ -413,12 +469,14 @@ function MemorialDates({ coupleId }: { coupleId?: string }) {
         if (mounted) setDates(data.data?.dates ?? []);
       })
       .catch(() => {
-        if (mounted) setDates([]);
+        if (mounted) setFailed(true);
       });
     return () => {
       mounted = false;
     };
   }, [coupleId]);
+
+  if (failed) return <MemorialUnavailable Icon={Calendar} />;
 
   if (dates === null) {
     return (
