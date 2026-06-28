@@ -64,14 +64,22 @@ export function shouldPurgeCoupleData(
  *     watch_parties, call_sessions, constellation_stars, circle_posts,
  *     circle_stories, circles (via created_by_couple_id).
  *   - chained child FK: message_reactions→messages, date_celebrations→
- *     important_dates, streak_history→photo_streaks, playlist_tracks→playlists,
- *     post_likes/post_comments→circle_posts, circle_story_views→circle_stories,
+ *     important_dates (via date_id), streak_history→photo_streaks (via
+ *     streak_id), playlist_tracks→playlists, post_likes/post_comments→
+ *     circle_posts, circle_story_views→circle_stories (via story_id),
  *     circle_follows→circles, circle_conversations→circles,
  *     circle_conversation_messages/_reads→circle_conversations.
  *
  * NOTE: `media.album_id`→media_albums (ON DELETE SET NULL) means media must be
  * removed before media_albums regardless; it is ordered that way below.
  * Extend this list if a new couple-scoped table is added.
+ *
+ * ⚠️ TASK 4 PREREQUISITE — this array is NOT sufficient on its own. Deleting a
+ * couple's `circles` row, and finally the `couples` row, will hit FK violations
+ * from rows owned by OTHER couples (or from the survivor's own row) that point
+ * at this couple. Before iterating this order, the purge MUST first run the
+ * cross-couple / survivor cleanup described by {@link COUPLE_PURGE_PREREQUISITES}
+ * (see that constant for the exact statements). Skipping them = runtime FK error.
  */
 export const COUPLE_PURGE_ORDER: string[] = [
   // chat
@@ -116,4 +124,55 @@ export const COUPLE_PURGE_ORDER: string[] = [
   'couple_invites',
   // the couple row last
   'couples',
+];
+
+/**
+ * Cross-couple / survivor FK cleanup that MUST run inside the same purge
+ * transaction BEFORE iterating {@link COUPLE_PURGE_ORDER}. These are the dangling
+ * references that the children-before-parents table order does NOT cover, because
+ * they live on OTHER couples' rows (or the surviving partner's own user row) and
+ * point INTO the couple being purged. Without them, deleting this couple's
+ * `circles` row, or finally its `couples` row, raises a Postgres FK violation.
+ *
+ * The Task 4 `purgeCoupleData(tx, coupleId, circleId)` implementation must run,
+ * before the table-order loop:
+ *
+ *   1. Clear the SURVIVOR's archive pointer (users.archived_couple_id → couples.id
+ *      has NO on-delete action; a survivor who chose 'archived_solo' has this set):
+ *        UPDATE users SET archived_couple_id = NULL WHERE archived_couple_id = $coupleId
+ *
+ *   2. Remove cross-couple references into THIS couple's `circles` row (resolve
+ *      $circleId = circles.id WHERE created_by_couple_id = $coupleId first). These
+ *      columns have NO on-delete action, so other couples' rows pointing here block
+ *      the `circles` delete:
+ *        DELETE FROM circle_story_views          WHERE viewer_circle_id = $circleId
+ *        DELETE FROM circle_conversation_reads    WHERE circle_id        = $circleId
+ *        DELETE FROM circle_conversation_messages WHERE sender_circle_id = $circleId
+ *      And the conversations this circle participates in with OTHER circles
+ *      (circle_lo_id / circle_hi_id reference circles.id, no on-delete):
+ *        DELETE FROM circle_conversation_messages WHERE conversation_id IN
+ *          (SELECT id FROM circle_conversations WHERE circle_lo_id=$circleId OR circle_hi_id=$circleId)
+ *        DELETE FROM circle_conversation_reads    WHERE conversation_id IN (…same…)
+ *        DELETE FROM circle_conversations         WHERE circle_lo_id=$circleId OR circle_hi_id=$circleId
+ *
+ *   3. Belt-and-suspenders (already ON DELETE CASCADE, but explicit is safe):
+ *        DELETE FROM circle_follows WHERE follower_circle_id = $circleId
+ *                                      OR following_circle_id = $circleId
+ *
+ * NOTE: circle_conversations.circle_lo_id / circle_hi_id and the *_reads/_messages
+ * rows for THIS couple's own side are also covered by COUPLE_PURGE_ORDER, but the
+ * cross-couple rows above (where the OTHER circle owns the conversation, or another
+ * couple viewed this couple's story) are NOT — hence this prerequisite set.
+ *
+ * Exported as documentation-as-data so the Task 4 implementer can iterate or
+ * assert against it; the order within is intentional (survivor pointer, then
+ * circle-scoped, then follows).
+ */
+export const COUPLE_PURGE_PREREQUISITES: readonly string[] = [
+  'users.archived_couple_id (UPDATE → NULL where = coupleId)',
+  'circle_story_views.viewer_circle_id (DELETE where = circleId)',
+  'circle_conversation_reads.circle_id (DELETE where = circleId)',
+  'circle_conversation_messages.sender_circle_id (DELETE where = circleId)',
+  'circle_conversations.circle_lo_id|circle_hi_id (+ their messages/reads, DELETE where = circleId)',
+  'circle_follows.follower_circle_id|following_circle_id (DELETE where = circleId)',
 ];

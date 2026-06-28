@@ -218,6 +218,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Defense-in-depth: a tombstoned/inactive account can never sign in, even
+    // though its email+passwordHash were already rewritten on deletion. Use the
+    // generic message so the tombstone isn't distinguishable from a wrong password.
+    if (!isUsableAccount(user)) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const tokens = await this.generateTokens(user.id, user.email);
 
     return {
@@ -286,6 +293,14 @@ export class AuthService {
       .from(schema.users)
       .where(eq(schema.users.email, email))
       .limit(1);
+
+    // Defense-in-depth: never resurrect a tombstoned/inactive account via Google.
+    // (A real tombstone's email is rewritten to deleted+<id>@linkup.invalid, so a
+    // Google email won't normally match one — this is a guard, not the primary
+    // defense.) If matched, treat as unverifiable rather than signing them in.
+    if (user && !isUsableAccount(user)) {
+      throw new UnauthorizedException('Could not verify Google sign-in');
+    }
 
     if (!user) {
       const displayName = String(payload.name || email.split('@')[0]).slice(0, 50);

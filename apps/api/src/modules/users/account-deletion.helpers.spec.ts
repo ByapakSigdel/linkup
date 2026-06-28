@@ -2,6 +2,7 @@ import {
   buildAnonymizedUserFields,
   shouldPurgeCoupleData,
   COUPLE_PURGE_ORDER,
+  COUPLE_PURGE_PREREQUISITES,
 } from './account-deletion.helpers';
 
 describe('account-deletion helpers', () => {
@@ -80,5 +81,20 @@ describe('account-deletion helpers', () => {
 
   it('has no duplicate table names', () => {
     expect(new Set(COUPLE_PURGE_ORDER).size).toBe(COUPLE_PURGE_ORDER.length);
+  });
+
+  it('documents the cross-couple / survivor FK prerequisites for purge', () => {
+    // The table-order array alone can't satisfy FKs that point INTO the couple
+    // from other couples' rows or the survivor's own user row. These prerequisite
+    // steps must run before COUPLE_PURGE_ORDER (see Task 4 purgeCoupleData).
+    const joined = COUPLE_PURGE_PREREQUISITES.join('\n');
+    // survivor archive pointer must be cleared before couples row is deleted
+    expect(joined).toContain('users.archived_couple_id');
+    // cross-couple circle references that have no ON DELETE action
+    expect(joined).toContain('circle_story_views.viewer_circle_id');
+    expect(joined).toContain('circle_conversation_reads.circle_id');
+    expect(joined).toContain('circle_conversation_messages.sender_circle_id');
+    expect(joined).toContain('circle_follows.follower_circle_id');
+    expect(COUPLE_PURGE_PREREQUISITES.length).toBeGreaterThanOrEqual(5);
   });
 });
