@@ -237,6 +237,13 @@ export class CouplesService {
       throw new ConflictException('No pending memorial decision');
     }
 
+    // Defensive membership check: the caller's `coupleId` FK already implies
+    // membership, but verify explicitly so a stale/corrupt `coupleId` pointing at
+    // someone else's couple can never let an outsider decide on that couple.
+    if (couple.partner1Id !== userId && couple.partner2Id !== userId) {
+      throw new ForbiddenException('You are not part of this relationship');
+    }
+
     // The partner who left can't make the survivor's choice for them.
     if (couple.endedByUserId === userId) {
       throw new ForbiddenException(
@@ -246,14 +253,29 @@ export class CouplesService {
 
     const now = new Date();
     await this.db.transaction(async (tx) => {
-      await tx
+      // Re-assert `survivorDecision='pending'` INSIDE the transaction (the three
+      // pre-tx guards above are a TOCTOU window: two concurrent requests from the
+      // same survivor — e.g. a rapid double-tap — could both pass them). The
+      // conditional WHERE makes the couple update the single source of truth: the
+      // first request flips `pending → archived_solo` and the loser matches zero
+      // rows, so we abort before unpairing the survivor a second time.
+      const [updated] = await tx
         .update(schema.couples)
         .set({
           survivorDecision: decision,
           survivorDecidedAt: now,
           updatedAt: now,
         })
-        .where(eq(schema.couples.id, couple.id));
+        .where(
+          and(
+            eq(schema.couples.id, couple.id),
+            eq(schema.couples.survivorDecision, 'pending'),
+          ),
+        )
+        .returning({ id: schema.couples.id });
+      if (!updated) {
+        throw new ConflictException('Decision already recorded');
+      }
       await tx
         .update(schema.users)
         .set({ coupleId: null, archivedCoupleId: couple.id, updatedAt: now })

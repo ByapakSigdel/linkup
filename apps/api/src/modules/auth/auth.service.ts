@@ -368,10 +368,19 @@ export class AuthService {
    * gate on — `relationshipStatus`, `survivorDecision`, `endedByUserId`, `endedAt`
    * — so the survivor can be routed to the memorial without a second round-trip.
    *
+   * For an already-solo survivor (`coupleId` null after choosing "keep going
+   * solo") we fall back to their `archivedCoupleId` so the revisiting-memories
+   * flow also gets the couple in the shell payload without a second round-trip.
+   * The active `coupleId` always wins when both are present.
+   *
    * Read directly via `db` (AuthService already injects it) — no new dependency,
    * no circular import. `user` is the JWT-validated principal passed by the guard.
    */
-  async getMe(user: { id: string; coupleId?: string | null }) {
+  async getMe(user: {
+    id: string;
+    coupleId?: string | null;
+    archivedCoupleId?: string | null;
+  }) {
     let couple: {
       id: string;
       relationshipStatus: string | null;
@@ -380,7 +389,11 @@ export class AuthService {
       endedAt: Date | null;
     } | null = null;
 
-    if (user.coupleId) {
+    // Active couple takes precedence; otherwise surface the survivor's archived
+    // couple so the read-only memorial loads without a second fetch.
+    const coupleId = user.coupleId ?? user.archivedCoupleId ?? null;
+
+    if (coupleId) {
       const [row] = await this.db
         .select({
           id: schema.couples.id,
@@ -390,7 +403,7 @@ export class AuthService {
           endedAt: schema.couples.endedAt,
         })
         .from(schema.couples)
-        .where(eq(schema.couples.id, user.coupleId))
+        .where(eq(schema.couples.id, coupleId))
         .limit(1);
       couple = row ?? null;
     }

@@ -83,7 +83,15 @@ export class AuthController {
   @Post('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async me(@CurrentUser() user: any) {
+  async me(
+    @CurrentUser()
+    user: {
+      id: string;
+      coupleId: string | null;
+      archivedCoupleId: string | null;
+      [key: string]: unknown;
+    },
+  ) {
     // Returns the caller plus their couple (lifecycle fields included) so the
     // app shell can gate the survivor into the memorial without a second call.
     // `data.user` is unchanged; `data.couple` is additive.
