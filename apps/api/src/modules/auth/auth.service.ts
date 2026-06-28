@@ -15,6 +15,7 @@ import { eq, and, desc, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../../database/database.module';
 import * as schema from '../../database/schema';
 import { EmailService } from '../email/email.service';
+import { isUsableAccount } from './auth.account-guard';
 
 @Injectable()
 export class AuthService {
@@ -342,7 +343,9 @@ export class AuthService {
       .where(eq(schema.users.id, userId))
       .limit(1);
 
-    if (!user || !user.isActive) {
+    // Reject tombstoned (deletedAt set) or inactive accounts — a deleted partner
+    // from the Relationship Graveyard offboarding can never resolve a token.
+    if (!user || !isUsableAccount(user)) {
       return null;
     }
 
