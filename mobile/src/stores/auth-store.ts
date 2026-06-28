@@ -27,6 +27,12 @@ interface AuthState {
   createCouple: () => Promise<Couple>;
   joinCouple: (pairingCode: string) => Promise<void>;
   refreshCouple: () => Promise<void>;
+  /** Permanently delete this account (anonymized into a tombstone server-side),
+   *  then clear the local session. Re-verifies the password server-side. */
+  deleteAccount: (password: string) => Promise<void>;
+  /** Survivor of an ended couple keeps going solo: archive the relationship
+   *  read-only (unpair) and re-fetch the couple so the shell re-gates. */
+  archiveAndGoSolo: () => Promise<void>;
   logout: () => Promise<void>;
   /** Clear the session locally (no network) — used when a token refresh fails. */
   forceLogout: () => void;
@@ -142,6 +148,18 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      deleteAccount: async (password) => {
+        // axios DELETE carries a body under `data`. The server anonymizes the
+        // account + revokes refresh tokens; locally we just drop the session.
+        await api.delete('/users/me', { data: { confirm: true, password } });
+        get().forceLogout();
+      },
+
+      archiveAndGoSolo: async () => {
+        await api.post('/couples/me/survivor-decision', { decision: 'archived_solo' });
+        await get().refreshCouple();
+      },
+
       hydrate: async () => {
         try {
           const { data: meBody } = await api.post('/auth/me');
@@ -228,3 +246,22 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// ─── Lifecycle selectors (pure; no new data) ─────────────────────────────────
+// Derived from the couple/user already on the auth store. Kept as standalone
+// functions so the app shell + screens can gate consistently.
+
+type LifecycleSlice = Pick<AuthState, 'user' | 'couple'>;
+
+/** "Actively paired" ⇔ has a couple that has NOT ended. */
+export const isActivelyPaired = (s: LifecycleSlice): boolean =>
+  !!s.couple && s.couple.relationshipStatus !== 'ended';
+
+/** The survivor still needs to choose (memorial takeover gate). */
+export const isMemorialPending = (s: LifecycleSlice): boolean =>
+  !!s.couple &&
+  s.couple.relationshipStatus === 'ended' &&
+  s.couple.survivorDecision === 'pending';
+
+/** A past relationship is kept read-only for the now-solo survivor to revisit. */
+export const hasArchive = (s: LifecycleSlice): boolean => !!s.user?.archivedCoupleId;

@@ -19,9 +19,16 @@ export interface User {
   lastSeenAt?: string;
   isVerified: boolean;
   isActive: boolean;
+  /** Pointer to a past couple kept read-only after the survivor chose to go solo. */
+  archivedCoupleId?: string | null;
+  /** Non-null once the account is tombstoned (anonymized after deletion). */
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Survivor's choice on an ended couple (the relationship-memorial fork). */
+export type SurvivorDecision = 'pending' | 'archived_solo' | 'left';
 
 // ─── Couple ─────────────────────────────────────────────────────────────────
 export interface Couple {
@@ -31,7 +38,12 @@ export interface Couple {
   coupleName?: string;
   coupleAvatarUrl?: string;
   anniversaryDate?: string;
-  relationshipStatus: 'dating' | 'engaged' | 'married' | 'other';
+  relationshipStatus: 'dating' | 'engaged' | 'married' | 'other' | 'ended';
+  /** Relationship-lifecycle fields (set once a partner deletes their account). */
+  endedAt?: string | null;
+  endedByUserId?: string | null;
+  survivorDecision?: SurvivorDecision | null;
+  survivorDecidedAt?: string | null;
   pairingCode?: string;
   pairingCodeExpiresAt?: string;
   isPaired: boolean;
