@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and } from 'drizzle-orm';
@@ -183,6 +184,81 @@ export class CouplesService {
     }
 
     return updated;
+  }
+
+  /**
+   * Record the surviving partner's "keep going on your own" decision on an ENDED
+   * couple (the "Relationship Graveyard" memorial fork). After this:
+   *  - the couple is marked `survivorDecision='archived_solo'` (+ decidedAt), and
+   *  - the survivor unpairs (`coupleId → null`) but keeps a read-only archive
+   *    pointer (`archivedCoupleId = couple.id`) so she can revisit the memorial.
+   *
+   * Shared rows are deliberately preserved (read-only forever); they are only
+   * purged later if the survivor also deletes her account while the departing
+   * partner is already tombstoned (see UsersService.deleteAccount).
+   *
+   * Guards (the caller must genuinely be the survivor of a still-pending ended
+   * couple, never the partner who left):
+   *  - caller must be in a couple (else 404),
+   *  - that couple must be `relationshipStatus='ended'` with
+   *    `survivorDecision='pending'` (else 409 — no pending memorial decision),
+   *  - the caller must NOT be the partner who ended it (else 403).
+   *
+   * Both writes run in a single transaction so the couple can never be marked
+   * decided without the survivor actually being unpaired (and vice versa). The
+   * user is read directly via `db` (not UsersService) to avoid adding a cross-
+   * module dependency / circular import.
+   */
+  async recordSurvivorDecision(
+    userId: string,
+    decision: 'archived_solo',
+  ): Promise<void> {
+    const [me] = await this.db
+      .select({ id: schema.users.id, coupleId: schema.users.coupleId })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!me?.coupleId) {
+      throw new NotFoundException('No active relationship');
+    }
+
+    const [couple] = await this.db
+      .select()
+      .from(schema.couples)
+      .where(eq(schema.couples.id, me.coupleId))
+      .limit(1);
+
+    if (
+      !couple ||
+      couple.relationshipStatus !== 'ended' ||
+      couple.survivorDecision !== 'pending'
+    ) {
+      throw new ConflictException('No pending memorial decision');
+    }
+
+    // The partner who left can't make the survivor's choice for them.
+    if (couple.endedByUserId === userId) {
+      throw new ForbiddenException(
+        'Only the surviving partner can make this decision',
+      );
+    }
+
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.couples)
+        .set({
+          survivorDecision: decision,
+          survivorDecidedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(schema.couples.id, couple.id));
+      await tx
+        .update(schema.users)
+        .set({ coupleId: null, archivedCoupleId: couple.id, updatedAt: now })
+        .where(eq(schema.users.id, userId));
+    });
   }
 
   private generatePairingCode(): string {

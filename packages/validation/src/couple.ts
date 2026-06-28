@@ -25,6 +25,16 @@ export const joinCoupleSchema = z.object({
     .max(20, 'Invalid invite code'),
 });
 
+// Survivor's choice on an ENDED couple (the "Relationship Graveyard" memorial
+// fork). Only the "keep going solo" decision is recorded here:
+//  - 'archived_solo' → the survivor unpairs (coupleId → null) but keeps a
+//    read-only archive pointer (archivedCoupleId), preserving shared memories.
+// The other branch — "wind down & leave" — is performed by DELETE /users/me
+// (which records survivorDecision='left'), not this endpoint.
+export const survivorDecisionSchema = z.object({
+  decision: z.literal('archived_solo'),
+});
+
 export const createImportantDateSchema = z.object({
   title: z
     .string()
@@ -43,3 +53,4 @@ export type CreateCoupleInput = z.infer<typeof createCoupleSchema>;
 export type UpdateCoupleInput = z.infer<typeof updateCoupleSchema>;
 export type JoinCoupleInput = z.infer<typeof joinCoupleSchema>;
 export type CreateImportantDateInput = z.infer<typeof createImportantDateSchema>;
+export type SurvivorDecisionInput = z.infer<typeof survivorDecisionSchema>;

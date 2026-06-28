@@ -84,9 +84,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: any) {
+    // Returns the caller plus their couple (lifecycle fields included) so the
+    // app shell can gate the survivor into the memorial without a second call.
+    // `data.user` is unchanged; `data.couple` is additive.
+    const { couple } = await this.authService.getMe(user);
     return {
       success: true,
-      data: { user },
+      data: { user, couple },
     };
   }
 }

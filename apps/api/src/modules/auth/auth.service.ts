@@ -360,6 +360,44 @@ export class AuthService {
     return result;
   }
 
+  /**
+   * Build the `/auth/me` payload the app shell mounts with. Returns the caller's
+   * user (already lifecycle-aware: `validateUser` returns the full row minus
+   * passwordHash, so `archivedCoupleId` and `deletedAt` are included) PLUS their
+   * couple when paired, carrying the relationship-lifecycle fields the clients
+   * gate on — `relationshipStatus`, `survivorDecision`, `endedByUserId`, `endedAt`
+   * — so the survivor can be routed to the memorial without a second round-trip.
+   *
+   * Read directly via `db` (AuthService already injects it) — no new dependency,
+   * no circular import. `user` is the JWT-validated principal passed by the guard.
+   */
+  async getMe(user: { id: string; coupleId?: string | null }) {
+    let couple: {
+      id: string;
+      relationshipStatus: string | null;
+      survivorDecision: string | null;
+      endedByUserId: string | null;
+      endedAt: Date | null;
+    } | null = null;
+
+    if (user.coupleId) {
+      const [row] = await this.db
+        .select({
+          id: schema.couples.id,
+          relationshipStatus: schema.couples.relationshipStatus,
+          survivorDecision: schema.couples.survivorDecision,
+          endedByUserId: schema.couples.endedByUserId,
+          endedAt: schema.couples.endedAt,
+        })
+        .from(schema.couples)
+        .where(eq(schema.couples.id, user.coupleId))
+        .limit(1);
+      couple = row ?? null;
+    }
+
+    return { user, couple };
+  }
+
   private async generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
 

@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { survivorDecisionSchema } from '@linkup/validation';
 import { CouplesService } from './couples.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,6 +30,21 @@ export class CouplesController {
       success: true,
       data: { couple },
     };
+  }
+
+  /**
+   * Record the surviving partner's "keep going on your own" decision on an ended
+   * couple (the "Relationship Graveyard" memorial fork). Must be declared BEFORE
+   * the `:id` catch-all routes so `me/survivor-decision` isn't swallowed as an id.
+   */
+  @Post('me/survivor-decision')
+  async recordSurvivorDecision(
+    @CurrentUser('id') userId: string,
+    @Body() body: unknown,
+  ) {
+    const { decision } = survivorDecisionSchema.parse(body);
+    await this.couplesService.recordSurvivorDecision(userId, decision);
+    return { success: true };
   }
 
   @Get(':id')
