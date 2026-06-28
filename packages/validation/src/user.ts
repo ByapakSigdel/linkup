@@ -42,5 +42,14 @@ export const updateSettingsSchema = z.object({
   highContrast: z.boolean().optional(),
 });
 
+// Account deletion (the "Relationship Graveyard" offboarding). Destructive, so
+// the client must explicitly confirm AND re-enter the password — the API
+// re-verifies the password before anonymizing the account into a tombstone.
+export const deleteAccountSchema = z.object({
+  confirm: z.literal(true),
+  password: z.string().min(1, 'Password is required'),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;

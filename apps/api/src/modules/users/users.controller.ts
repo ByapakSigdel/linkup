@@ -7,11 +7,14 @@ import {
   Query,
   UseGuards,
   Post,
+  Delete,
+  HttpCode,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { deleteAccountSchema } from '@linkup/validation';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -25,6 +28,22 @@ export class UsersController {
   async getMe(@CurrentUser('id') userId: string) {
     const user = await this.usersService.findById(userId);
     return { success: true, data: { user } };
+  }
+
+  /**
+   * Delete (tombstone) the caller's own account — the "Relationship Graveyard"
+   * offboarding. Destructive, so the body must carry `confirm: true` AND the
+   * account password, which the service re-verifies before anonymizing. Returns
+   * 204 with no body; the client clears auth and routes to a goodbye screen.
+   */
+  @Delete('me')
+  @HttpCode(204)
+  async deleteMe(
+    @CurrentUser('id') userId: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    const { password } = deleteAccountSchema.parse(body);
+    await this.usersService.deleteAccount(userId, password);
   }
 
   @Get('me/profile')
