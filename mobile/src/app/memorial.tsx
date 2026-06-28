@@ -20,6 +20,7 @@ import {
 
 import { useTheme } from '@/theme';
 import { AppText, Button, Card, Input, Spinner } from '@/components/ui';
+import { GoogleReauthButton } from '@/components/google-reauth-button';
 import { useAuthStore, hasArchive } from '@/stores/auth-store';
 import { useToastStore } from '@/stores/toast-store';
 import api, { apiErrorMessage } from '@/lib/api';
@@ -280,7 +281,7 @@ function LeaveDialog({
 }: {
   visible: boolean;
   onClose: () => void;
-  deleteAccount: (password: string) => Promise<void>;
+  deleteAccount: (password: string, googleIdToken?: string) => Promise<void>;
 }) {
   const { colors } = useTheme();
   const [password, setPassword] = useState('');
@@ -293,21 +294,39 @@ function LeaveDialog({
     setBusy(false);
   }, []);
 
-  const handleConfirm = useCallback(async () => {
+  // Shared finalizer for both re-auth paths (password + Google).
+  const finalize = useCallback(
+    async (run: () => Promise<void>) => {
+      setBusy(true);
+      setError('');
+      try {
+        await run();
+        router.replace('/goodbye');
+      } catch (e) {
+        setBusy(false);
+        setError(apiErrorMessage(e, 'We could not verify that. Please try again.'));
+      }
+    },
+    [],
+  );
+
+  const handleConfirm = useCallback(() => {
     if (!password) {
-      setError('Enter your password to confirm.');
+      setError('Enter your password, or confirm with Google below.');
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      await deleteAccount(password);
-      router.replace('/goodbye');
-    } catch (e) {
-      setBusy(false);
-      setError(apiErrorMessage(e, 'That password is incorrect.'));
-    }
-  }, [password, deleteAccount]);
+    void finalize(() => deleteAccount(password));
+  }, [password, deleteAccount, finalize]);
+
+  // OAuth-only survivors confirm leaving with a fresh Google ID token instead of
+  // a password (their stored hash is a random value they can never reproduce).
+  const handleGoogleConfirm = useCallback(
+    (idToken: string) => {
+      if (busy) return;
+      void finalize(() => deleteAccount('', idToken));
+    },
+    [busy, finalize, deleteAccount],
+  );
 
   // Always reset local state (password, error, busy) on any dismissal — back
   // button, backdrop tap, or Cancel — so a re-opened dialog never shows a stale
@@ -342,6 +361,20 @@ function LeaveDialog({
               autoCapitalize="none"
               editable={!busy}
               error={error || undefined}
+            />
+            {/* Google sign-in path — the only way an OAuth-only account (no usable
+                password) can re-authenticate. Renders nothing if Google isn't set. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              <AppText variant="caption" muted>
+                or confirm with Google
+              </AppText>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            </View>
+            <GoogleReauthButton
+              onCredential={handleGoogleConfirm}
+              onError={(m) => setError(m)}
+              disabled={busy}
             />
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
               <View style={{ flex: 1 }}>

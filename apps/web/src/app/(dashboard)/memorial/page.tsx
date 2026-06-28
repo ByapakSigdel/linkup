@@ -18,6 +18,7 @@ import { MessageList } from '@/components/chat/message-list';
 import { MediaGrid, MediaLightbox } from '@/components/media';
 import { ConstellationOfUs } from '@/components/games/constellation';
 import { Button, Card, Input, Spinner } from '@/components/ui';
+import { GoogleReauthButton } from '@/components/auth/google-reauth-button';
 import { cn } from '@/lib/cn';
 import api from '@/lib/api';
 
@@ -259,7 +260,7 @@ function LeaveDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  deleteAccount: (password: string) => Promise<void>;
+  deleteAccount: (password: string, googleIdToken?: string) => Promise<void>;
 }) {
   const router = useRouter();
   const [password, setPassword] = useState('');
@@ -289,21 +290,39 @@ function LeaveDialog({
     };
   }, [open, close]);
 
-  const handleConfirm = useCallback(async () => {
+  // Shared finalizer for both re-auth paths (password + Google).
+  const finalize = useCallback(
+    async (run: () => Promise<void>) => {
+      setBusy(true);
+      setError('');
+      try {
+        await run();
+        router.replace('/goodbye');
+      } catch (e) {
+        setBusy(false);
+        setError(errMsg(e, 'We could not verify that. Please try again.'));
+      }
+    },
+    [router],
+  );
+
+  const handleConfirm = useCallback(() => {
     if (!password) {
-      setError('Enter your password to confirm.');
+      setError('Enter your password, or confirm with Google below.');
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      await deleteAccount(password);
-      router.replace('/goodbye');
-    } catch (e) {
-      setBusy(false);
-      setError(errMsg(e, 'That password is incorrect.'));
-    }
-  }, [password, deleteAccount, router]);
+    void finalize(() => deleteAccount(password));
+  }, [password, deleteAccount, finalize]);
+
+  // OAuth-only survivors confirm leaving with a fresh Google ID token instead of
+  // a password (their stored hash is a random value they can never reproduce).
+  const handleGoogleConfirm = useCallback(
+    (credential: string) => {
+      if (busy) return;
+      void finalize(() => deleteAccount('', credential));
+    },
+    [busy, finalize, deleteAccount],
+  );
 
   if (!open) return null;
 
@@ -331,9 +350,17 @@ function LeaveDialog({
             disabled={busy}
             error={error || undefined}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleConfirm();
+              if (e.key === 'Enter') handleConfirm();
             }}
           />
+          {/* Google sign-in path — the only way an OAuth-only account (no usable
+              password) can re-authenticate. Renders nothing if Google isn't set. */}
+          <div className="flex items-center gap-3 text-xs text-text-muted">
+            <span className="h-px flex-1 bg-border" />
+            or confirm with Google
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <GoogleReauthButton onCredential={handleGoogleConfirm} disabled={busy} />
           <div className="mt-1 flex gap-2">
             <Button variant="ghost" className="flex-1" disabled={busy} onClick={close}>
               Cancel

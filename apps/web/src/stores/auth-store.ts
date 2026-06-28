@@ -30,8 +30,11 @@ interface AuthState {
   /** Re-fetch the couple so the shell re-gates (e.g. on a `couple:ended` event). */
   refreshCouple: () => Promise<void>;
   /** Permanently delete this account (anonymized into a tombstone server-side),
-   *  then clear the local session. Re-verifies the password server-side. */
-  deleteAccount: (password: string) => Promise<void>;
+   *  then clear the local session. Re-verifies identity server-side via either the
+   *  password OR a fresh Google ID token (the only way an OAuth-only account — e.g.
+   *  the dean/ayusha test accounts whose passwordHash is a random `google:<sub>`
+   *  value they can never reproduce — can delete itself). */
+  deleteAccount: (password: string, googleIdToken?: string) => Promise<void>;
   /** Survivor of an ended couple keeps going solo: archive the relationship
    *  read-only (unpair) and re-hydrate so the shell re-gates. */
   archiveAndGoSolo: () => Promise<void>;
@@ -160,7 +163,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      deleteAccount: async (password) => {
+      deleteAccount: async (password, googleIdToken) => {
         // axios DELETE carries a body under `data`. The server anonymizes the
         // account + revokes refresh tokens; locally we just drop the session.
         // This action is navigation-agnostic (mirrors mobile): forceLogout()
@@ -168,7 +171,9 @@ export const useAuthStore = create<AuthState>()(
         // /login. Caller MUST router.replace('/goodbye') immediately after this
         // resolves to land on the farewell screen instead — same contract as
         // mobile/src/app/memorial.tsx:305 and (app)/settings.tsx.
-        await api.delete('/users/me', { data: { confirm: true, password } });
+        await api.delete('/users/me', {
+          data: { confirm: true, password, googleIdToken },
+        });
         // Clear the session, then mark winding-down. forceLogout() resets to
         // initialState (isWindingDown:false), so we set the flag AFTER it. Both
         // set() calls batch synchronously before any re-render, so the layout's
@@ -260,11 +265,13 @@ type LifecycleSlice = Pick<AuthState, 'user' | 'couple'>;
 export const isActivelyPaired = (s: LifecycleSlice): boolean =>
   !!s.couple && s.couple.relationshipStatus !== 'ended';
 
-/** The survivor still needs to choose (memorial takeover gate). */
+/** The survivor still needs to choose (memorial takeover gate). A NULL/absent
+ *  survivorDecision on an ended couple is treated as 'pending' — survivor_decision
+ *  has no DB default, so it is NULL until the deletion transaction sets it. */
 export const isMemorialPending = (s: LifecycleSlice): boolean =>
   !!s.couple &&
   s.couple.relationshipStatus === 'ended' &&
-  s.couple.survivorDecision === 'pending';
+  (s.couple.survivorDecision == null || s.couple.survivorDecision === 'pending');
 
 /** A past relationship is kept read-only for the now-solo survivor to revisit. */
 export const hasArchive = (s: LifecycleSlice): boolean => !!s.user?.archivedCoupleId;

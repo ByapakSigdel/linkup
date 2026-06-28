@@ -2,15 +2,22 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Flame, Heart, Image as ImageIcon, Folder, X } from 'lucide-react';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isActivelyPaired } from '@/stores/auth-store';
 import { useMediaStore } from '@/stores/media-store';
 import { UploadDropzone, MediaGrid, MediaLightbox, AlbumCard } from '@/components/media';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 export default function GalleryPage() {
+  const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
   const coupleId = couple?.id;
+
+  // Read-only once the relationship has ended (survivor who chose "keep going
+  // solo" still has a couple with `isPaired === true`). Gate on the lifecycle
+  // helper rather than `isPaired`, which stays true on ended couples. Mirrors
+  // mobile's gallery screen.
+  const readOnly = !isActivelyPaired({ user, couple });
 
   const {
     items,
@@ -70,7 +77,7 @@ export default function GalleryPage() {
   );
 
   const handleCreateAlbum = useCallback(async () => {
-    if (!coupleId || !newAlbumName.trim()) return;
+    if (readOnly || !coupleId || !newAlbumName.trim()) return;
     await createAlbum(coupleId, {
       name: newAlbumName.trim(),
       description: newAlbumDesc.trim() || undefined,
@@ -78,7 +85,7 @@ export default function GalleryPage() {
     setNewAlbumName('');
     setNewAlbumDesc('');
     setShowNewAlbum(false);
-  }, [coupleId, newAlbumName, newAlbumDesc, createAlbum]);
+  }, [readOnly, coupleId, newAlbumName, newAlbumDesc, createAlbum]);
 
   // Not paired state
   if (!couple?.isPaired) {
@@ -109,20 +116,22 @@ export default function GalleryPage() {
             <span className="font-mono tabular-nums">{albums.length}</span> album{albums.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowUpload(!showUpload)}
-          >
-            <Plus className="h-4 w-4" />
-            Upload
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              <Plus className="h-4 w-4" />
+              Upload
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Upload dropzone (toggleable) */}
-      {showUpload && coupleId && (
+      {!readOnly && showUpload && coupleId && (
         <UploadDropzone
           coupleId={coupleId}
           albumId={albumFilter ?? undefined}
@@ -216,6 +225,7 @@ export default function GalleryPage() {
             <>
               <MediaGrid
                 items={items}
+                readOnly={readOnly}
                 onItemClick={(_, index) => openLightbox(index)}
               />
 
@@ -241,18 +251,20 @@ export default function GalleryPage() {
             <p className="text-sm text-text-muted">
               <span className="font-mono tabular-nums">{albums.length}</span> album{albums.length !== 1 ? 's' : ''}
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowNewAlbum(!showNewAlbum)}
-            >
-              <Plus className="h-4 w-4" />
-              New Album
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNewAlbum(!showNewAlbum)}
+              >
+                <Plus className="h-4 w-4" />
+                New Album
+              </Button>
+            )}
           </div>
 
           {/* New album form */}
-          {showNewAlbum && (
+          {!readOnly && showNewAlbum && (
             <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
               <input
                 type="text"
@@ -319,7 +331,7 @@ export default function GalleryPage() {
       )}
 
       {/* Lightbox */}
-      <MediaLightbox />
+      <MediaLightbox readOnly={readOnly} />
     </div>
   );
 }

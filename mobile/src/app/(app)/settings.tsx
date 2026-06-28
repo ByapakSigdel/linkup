@@ -37,6 +37,7 @@ import {
   Row,
 } from '@/components/ui';
 import { ScreenHeader } from '@/components/top-bar';
+import { GoogleReauthButton } from '@/components/google-reauth-button';
 import { useTheme } from '@/theme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { themes, themeIds, type ThemeMeta } from '@/theme/themes';
@@ -476,7 +477,7 @@ function DeleteAccountDialog({
   visible: boolean;
   paired: boolean;
   onClose: () => void;
-  deleteAccount: (password: string) => Promise<void>;
+  deleteAccount: (password: string, googleIdToken?: string) => Promise<void>;
 }) {
   const { colors } = useTheme();
   const [password, setPassword] = useState('');
@@ -490,21 +491,39 @@ function DeleteAccountDialog({
     onClose();
   }, [onClose]);
 
-  const handleConfirm = useCallback(async () => {
+  // Shared finalizer for both re-auth paths (password + Google).
+  const finalize = useCallback(
+    async (run: () => Promise<void>) => {
+      setBusy(true);
+      setError('');
+      try {
+        await run();
+        router.replace('/goodbye');
+      } catch (e) {
+        setBusy(false);
+        setError(apiErrorMessage(e, 'We could not verify that. Please try again.'));
+      }
+    },
+    [],
+  );
+
+  const handleConfirm = useCallback(() => {
     if (!password) {
-      setError('Enter your password to confirm.');
+      setError('Enter your password, or confirm with Google below.');
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      await deleteAccount(password);
-      router.replace('/goodbye');
-    } catch (e) {
-      setBusy(false);
-      setError(apiErrorMessage(e, 'That password is incorrect.'));
-    }
-  }, [password, deleteAccount]);
+    void finalize(() => deleteAccount(password));
+  }, [password, deleteAccount, finalize]);
+
+  // OAuth-only accounts (Google sign-in) can't supply a usable password — confirm
+  // with a fresh Google ID token instead, forwarded as `googleIdToken`.
+  const handleGoogleConfirm = useCallback(
+    (idToken: string) => {
+      if (busy) return;
+      void finalize(() => deleteAccount('', idToken));
+    },
+    [busy, finalize, deleteAccount],
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
@@ -531,6 +550,18 @@ function DeleteAccountDialog({
               autoCapitalize="none"
               editable={!busy}
               error={error || undefined}
+            />
+            {/* Google sign-in path — the only way an OAuth-only account (no usable
+                password, e.g. the dean/ayusha test accounts) can re-authenticate. */}
+            <Row gap={10}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              <Muted variant="caption">or confirm with Google</Muted>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            </Row>
+            <GoogleReauthButton
+              onCredential={handleGoogleConfirm}
+              onError={(m) => setError(m)}
+              disabled={busy}
             />
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
               <View style={{ flex: 1 }}>

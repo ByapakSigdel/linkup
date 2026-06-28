@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isActivelyPaired } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useSocket } from '@/hooks/use-socket';
 import { ChatHeader } from '@/components/chat/chat-header';
@@ -18,6 +18,11 @@ export default function ChatPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
+
+  // Read-only once the relationship has ended (survivor who chose "keep going
+  // solo" lands here on the still-true `isPaired` couple). `isPaired` stays true
+  // on ended couples, so gate on the lifecycle helper instead. Mirrors mobile.
+  const readOnly = !isActivelyPaired({ user, couple });
 
   const messages = useChatStore((s) => s.messages);
   const isLoadingMessages = useChatStore((s) => s.isLoadingMessages);
@@ -94,14 +99,16 @@ export default function ChatPage() {
   // Handler: send
   const handleSend = useCallback(
     (content: string, options?: { threadId?: string; isThreadStarter?: boolean }) => {
+      if (readOnly) return;
       sendMessage(content, options);
     },
-    [sendMessage],
+    [sendMessage, readOnly],
   );
 
   // Handler: edit send
   const handleEditSend = useCallback(
     async (messageId: string, content: string) => {
+      if (readOnly) return;
       try {
         const { data } = await api.patch(`/messages/${messageId}`, { content });
         if (data.success) {
@@ -115,18 +122,22 @@ export default function ChatPage() {
         console.error('Failed to edit message:', error);
       }
     },
-    [],
+    [readOnly],
   );
 
   // Handler: delete
-  const handleDelete = useCallback(async (messageId: string) => {
-    try {
-      await api.delete(`/messages/${messageId}`);
-      useChatStore.getState().removeMessage(messageId);
-    } catch (error) {
-      console.error('Failed to delete message:', error);
-    }
-  }, []);
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      if (readOnly) return;
+      try {
+        await api.delete(`/messages/${messageId}`);
+        useChatStore.getState().removeMessage(messageId);
+      } catch (error) {
+        console.error('Failed to delete message:', error);
+      }
+    },
+    [readOnly],
+  );
 
   // Handler: reply
   const handleReply = useCallback(
@@ -147,15 +158,16 @@ export default function ChatPage() {
   // Handler: highlight
   const handleHighlight = useCallback(
     (message: Message) => {
+      if (readOnly) return;
       setHighlightingMessage(message);
     },
-    [setHighlightingMessage],
+    [setHighlightingMessage, readOnly],
   );
 
   // Handler: highlight select
   const handleHighlightSelect = useCallback(
     async (category: HighlightCategory, color: string) => {
-      if (!highlightingMessage) return;
+      if (readOnly || !highlightingMessage) return;
 
       try {
         await api.post(`/messages/${highlightingMessage.id}/highlight`, {
@@ -171,13 +183,13 @@ export default function ChatPage() {
 
       setHighlightingMessage(null);
     },
-    [highlightingMessage, highlightMessage, setHighlightingMessage],
+    [readOnly, highlightingMessage, highlightMessage, setHighlightingMessage],
   );
 
   // Handler: react
   const handleReact = useCallback(
     async (messageId: string, emoji: string) => {
-      if (!user) return;
+      if (readOnly || !user) return;
       try {
         await api.post(`/messages/${messageId}/reactions`, { emoji });
         useChatStore.getState().addReaction(messageId, {
@@ -189,7 +201,7 @@ export default function ChatPage() {
         console.error('Failed to add reaction:', error);
       }
     },
-    [user],
+    [user, readOnly],
   );
 
   // Not coupled yet
@@ -224,18 +236,19 @@ export default function ChatPage() {
 
       {/* Message list */}
       <MessageList
-        onReply={handleReply}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onHighlight={handleHighlight}
-        onReact={handleReact}
+        onReply={readOnly ? undefined : handleReply}
+        onEdit={readOnly ? undefined : handleEdit}
+        onDelete={readOnly ? undefined : handleDelete}
+        onHighlight={readOnly ? undefined : handleHighlight}
+        onReact={readOnly ? undefined : handleReact}
+        readOnly={readOnly}
       />
 
       {/* Typing indicator */}
-      {isPartnerTyping && <TypingIndicator partnerName={partnerName} />}
+      {!readOnly && isPartnerTyping && <TypingIndicator partnerName={partnerName} />}
 
       {/* Highlight picker overlay */}
-      {highlightingMessage && (
+      {!readOnly && highlightingMessage && (
         <>
           <div
             className="fixed inset-0 z-10"
@@ -250,14 +263,20 @@ export default function ChatPage() {
         </>
       )}
 
-      {/* Message input */}
-      <MessageInput
-        onSend={handleSend}
-        onEditSend={handleEditSend}
-        onTypingStart={startTyping}
-        onTypingStop={stopTyping}
-        partnerName={partnerName}
-      />
+      {/* Message input — hidden once the relationship has ended (read-only). */}
+      {readOnly ? (
+        <div className="border-t border-border px-4 py-3 text-center text-sm text-text-muted">
+          This conversation is read-only.
+        </div>
+      ) : (
+        <MessageInput
+          onSend={handleSend}
+          onEditSend={handleEditSend}
+          onTypingStart={startTyping}
+          onTypingStop={stopTyping}
+          partnerName={partnerName}
+        />
+      )}
     </div>
   );
 }

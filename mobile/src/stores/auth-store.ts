@@ -28,8 +28,11 @@ interface AuthState {
   joinCouple: (pairingCode: string) => Promise<void>;
   refreshCouple: () => Promise<void>;
   /** Permanently delete this account (anonymized into a tombstone server-side),
-   *  then clear the local session. Re-verifies the password server-side. */
-  deleteAccount: (password: string) => Promise<void>;
+   *  then clear the local session. Re-verifies identity server-side via either the
+   *  password OR a fresh Google ID token (the only way an OAuth-only account — e.g.
+   *  the dean/ayusha test accounts whose passwordHash is a random `google:<sub>`
+   *  value they can never reproduce — can delete itself). */
+  deleteAccount: (password: string, googleIdToken?: string) => Promise<void>;
   /** Survivor of an ended couple keeps going solo: archive the relationship
    *  read-only (unpair) and re-fetch the couple so the shell re-gates. */
   archiveAndGoSolo: () => Promise<void>;
@@ -148,10 +151,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      deleteAccount: async (password) => {
+      deleteAccount: async (password, googleIdToken) => {
         // axios DELETE carries a body under `data`. The server anonymizes the
         // account + revokes refresh tokens; locally we just drop the session.
-        await api.delete('/users/me', { data: { confirm: true, password } });
+        // OAuth-only accounts (no usable password) re-auth via a fresh Google ID
+        // token instead — the server matches it to the account email.
+        await api.delete('/users/me', {
+          data: { confirm: true, password, googleIdToken },
+        });
         get().forceLogout();
       },
 
@@ -268,11 +275,13 @@ type LifecycleSlice = Pick<AuthState, 'user' | 'couple'>;
 export const isActivelyPaired = (s: LifecycleSlice): boolean =>
   !!s.couple && s.couple.relationshipStatus !== 'ended';
 
-/** The survivor still needs to choose (memorial takeover gate). */
+/** The survivor still needs to choose (memorial takeover gate). A NULL/absent
+ *  survivorDecision on an ended couple is treated as 'pending' — survivor_decision
+ *  has no DB default, so it is NULL until the deletion transaction sets it. */
 export const isMemorialPending = (s: LifecycleSlice): boolean =>
   !!s.couple &&
   s.couple.relationshipStatus === 'ended' &&
-  s.couple.survivorDecision === 'pending';
+  (s.couple.survivorDecision == null || s.couple.survivorDecision === 'pending');
 
 /** A past relationship is kept read-only for the now-solo survivor to revisit. */
 export const hasArchive = (s: LifecycleSlice): boolean => !!s.user?.archivedCoupleId;

@@ -58,7 +58,12 @@ export const couples = pgTable('couples', {
   relationshipStatus: varchar('relationship_status', { length: 20 }).default('dating'),
   endedAt: timestamp('ended_at'),
   endedByUserId: uuid('ended_by_user_id').references((): AnyPgColumn => users.id),
-  survivorDecision: varchar('survivor_decision', { length: 20 }).default('pending'),
+  // No DB default: an active couple's survivor_decision stays NULL (it only ever
+  // becomes meaningful once relationshipStatus flips to 'ended'). The account-
+  // deletion transaction sets it to 'pending' explicitly when ending a couple, so
+  // a default would only ever plant misleading 'pending' on live, never-ended
+  // rows. Client selectors treat NULL as "pending" under an ended couple.
+  survivorDecision: varchar('survivor_decision', { length: 20 }),
   survivorDecidedAt: timestamp('survivor_decided_at'),
   pairingCode: varchar('pairing_code', { length: 20 }).unique(),
   pairingCodeExpiresAt: timestamp('pairing_code_expires_at'),

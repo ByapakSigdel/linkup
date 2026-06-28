@@ -71,6 +71,13 @@
       "when": 1782621272015,
       "tag": "0009_wise_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782628377516,
+      "tag": "0010_omniscient_arachne",
+      "breakpoints": true
     }
   ]
 }
