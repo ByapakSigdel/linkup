@@ -17,7 +17,7 @@ import * as schema from '../../database/schema';
 import { EventsGateway } from '../../gateway/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../media/storage.service';
-import { isMutualFromRows } from './circle-dm.service';
+import { isMutualFromRows } from './circle-dm.helpers';
 
 // ─── Input shapes (validated upstream by zod schemas in @linkup/validation) ──────
 

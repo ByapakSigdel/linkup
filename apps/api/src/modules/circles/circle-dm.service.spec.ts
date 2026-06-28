@@ -1,4 +1,4 @@
-import { orderPair, isMutualFromRows, type FollowEdgeRow } from './circle-dm.service';
+import { orderPair, isMutualFromRows, type FollowEdgeRow } from './circle-dm.helpers';
 
 describe('orderPair', () => {
   it('returns ids as [lo, hi] regardless of argument order', () => {
