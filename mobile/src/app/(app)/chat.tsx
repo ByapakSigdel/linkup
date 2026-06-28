@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeartCrack } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { AppText, EmptyState } from '@/components/ui';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isActivelyPaired } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useSocket } from '@/hooks/use-socket';
 import { ChatHeader } from '@/components/chat/chat-header';
@@ -36,11 +36,16 @@ function toastError(title: string, error: unknown) {
 // stretch edge-to-edge. Phones (isWide === false) keep full width.
 const CHAT_MAX_WIDTH = 760;
 
-export default function ChatScreen() {
+export default function ChatScreen({ readOnly: readOnlyProp }: { readOnly?: boolean } = {}) {
   const { colors } = useTheme();
   const { isWide } = useResponsive();
   const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
+  // Read-only memorial mode: an ended relationship is browsable but frozen — no
+  // sending, editing, deleting, highlighting or reacting. Defaults to the
+  // store-derived gate so the live (app) screen also freezes once the couple
+  // ends, while the Memorial can pass `readOnly` explicitly.
+  const readOnly = readOnlyProp ?? !isActivelyPaired({ user, couple });
 
   const messages = useChatStore((s) => s.messages);
   const isPartnerTyping = useChatStore((s) => s.isPartnerTyping);
@@ -100,12 +105,14 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(
     (content: string, options?: { threadId?: string; isThreadStarter?: boolean }) => {
+      if (readOnly) return;
       sendMessage(content, options);
     },
-    [sendMessage],
+    [sendMessage, readOnly],
   );
 
   const handleEditSend = useCallback(async (messageId: string, content: string) => {
+    if (readOnly) return;
     try {
       const { data } = await api.patch(`/messages/${messageId}`, { content });
       if (data.success) {
@@ -119,9 +126,10 @@ export default function ChatScreen() {
       console.error('Failed to edit message:', error);
       toastError("Couldn't edit message", error);
     }
-  }, []);
+  }, [readOnly]);
 
   const handleDelete = useCallback(async (messageId: string) => {
+    if (readOnly) return;
     try {
       await api.delete(`/messages/${messageId}`);
       useChatStore.getState().removeMessage(messageId);
@@ -129,7 +137,7 @@ export default function ChatScreen() {
       console.error('Failed to delete message:', error);
       toastError("Couldn't delete message", error);
     }
-  }, []);
+  }, [readOnly]);
 
   const handleReply = useCallback((message: Message) => setReplyingTo(message), [setReplyingTo]);
   const handleEdit = useCallback((message: Message) => setEditingMessage(message), [setEditingMessage]);
@@ -140,6 +148,7 @@ export default function ChatScreen() {
 
   const handleHighlightSelect = useCallback(
     async (category: HighlightCategory, color: string) => {
+      if (readOnly) return;
       const target = useChatStore.getState().highlightingMessage;
       if (!target) return;
       try {
@@ -152,12 +161,12 @@ export default function ChatScreen() {
       }
       setHighlightingMessage(null);
     },
-    [highlightMessage, setHighlightingMessage],
+    [highlightMessage, setHighlightingMessage, readOnly],
   );
 
   const handleReact = useCallback(
     async (messageId: string, emoji: string) => {
-      if (!user) return;
+      if (readOnly || !user) return;
       try {
         await api.post(`/messages/${messageId}/reactions`, { emoji });
         useChatStore.getState().addReaction(messageId, {
@@ -170,7 +179,7 @@ export default function ChatScreen() {
         toastError("Couldn't add reaction", error);
       }
     },
-    [user],
+    [user, readOnly],
   );
 
   // Not coupled yet
@@ -228,15 +237,29 @@ export default function ChatScreen() {
           </Pressable>
         ) : null}
 
-        <View style={isWide ? styles.column : undefined}>
-          <MessageInput
-            onSend={handleSend}
-            onEditSend={handleEditSend}
-            onTypingStart={startTyping}
-            onTypingStop={stopTyping}
-            partnerName={partnerName}
-          />
-        </View>
+        {readOnly ? (
+          <View
+            style={[
+              styles.frozenBar,
+              { borderTopColor: colors.border, backgroundColor: colors.surface },
+              isWide ? styles.column : undefined,
+            ]}
+          >
+            <AppText variant="caption" muted center>
+              This conversation is kept as a memory — it can be read, but not changed.
+            </AppText>
+          </View>
+        ) : (
+          <View style={isWide ? styles.column : undefined}>
+            <MessageInput
+              onSend={handleSend}
+              onEditSend={handleEditSend}
+              onTypingStart={startTyping}
+              onTypingStop={stopTyping}
+              partnerName={partnerName}
+            />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -257,4 +280,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pickerWrap: { alignItems: 'center', justifyContent: 'center' },
+  frozenBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
 });

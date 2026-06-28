@@ -31,19 +31,23 @@ import {
   useGridCellSize,
   MEDIA_GRID_GAP,
 } from '@/components/media';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isActivelyPaired } from '@/stores/auth-store';
 import { useMediaStore } from '@/stores/media-store';
 import { useResponsive } from '@/hooks/use-responsive';
 
-export default function GalleryScreen() {
+export default function GalleryScreen({ readOnly: readOnlyProp }: { readOnly?: boolean } = {}) {
   const { colors, radius } = useTheme();
   const { gridColumns, isTablet } = useResponsive();
   // Photo grid: 3 on phones → up to 5 on wide screens.
   const GRID_COLUMNS = gridColumns;
   // Albums: 2 on phones → up to 4 on wide tablets.
   const ALBUM_COLUMNS = isTablet ? Math.max(2, gridColumns - 1) : 2;
+  const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
   const coupleId = couple?.id;
+  // Read-only memorial mode: shared photos are browsable but frozen — no upload,
+  // favorite, delete or album creation. Defaults to the store-derived gate.
+  const readOnly = readOnlyProp ?? !isActivelyPaired({ user, couple });
 
   const {
     items,
@@ -105,7 +109,7 @@ export default function GalleryScreen() {
   );
 
   const handleCreateAlbum = useCallback(async () => {
-    if (!coupleId || !newAlbumName.trim()) return;
+    if (readOnly || !coupleId || !newAlbumName.trim()) return;
     await createAlbum(coupleId, {
       name: newAlbumName.trim(),
       description: newAlbumDesc.trim() || undefined,
@@ -113,7 +117,7 @@ export default function GalleryScreen() {
     setNewAlbumName('');
     setNewAlbumDesc('');
     setShowNewAlbum(false);
-  }, [coupleId, newAlbumName, newAlbumDesc, createAlbum]);
+  }, [readOnly, coupleId, newAlbumName, newAlbumDesc, createAlbum]);
 
   // ── Not paired ─────────────────────────────────────────────────────────────
   if (!couple?.isPaired) {
@@ -228,16 +232,18 @@ export default function GalleryScreen() {
             {total} photo{total !== 1 ? 's' : ''} · {albums.length} album{albums.length !== 1 ? 's' : ''}
           </AppText>
         </View>
-        <Button
-          variant="outline"
-          size="sm"
-          onPress={() => setShowUpload((v) => !v)}
-          leftIcon={<Plus color={colors.text} size={16} />}
-          label="Upload"
-        />
+        {readOnly ? null : (
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => setShowUpload((v) => !v)}
+            leftIcon={<Plus color={colors.text} size={16} />}
+            label="Upload"
+          />
+        )}
       </View>
 
-      {showUpload && coupleId ? (
+      {!readOnly && showUpload && coupleId ? (
         <Animated.View entering={FadeIn}>
           <Card>
             <UploadControl coupleId={coupleId} albumId={albumFilter ?? undefined} />
@@ -283,9 +289,10 @@ export default function GalleryScreen() {
               <MediaGridItem
                 item={item}
                 size={cellSize}
+                readOnly={readOnly}
                 onPress={() => openLightbox(index)}
-                onToggleFavorite={() => toggleFavorite(item.id)}
-                onDelete={() => deleteMedia(item.id)}
+                onToggleFavorite={readOnly ? undefined : () => toggleFavorite(item.id)}
+                onDelete={readOnly ? undefined : () => deleteMedia(item.id)}
               />
             )}
             ListEmptyComponent={
@@ -307,7 +314,7 @@ export default function GalleryScreen() {
             showsVerticalScrollIndicator={false}
           />
         )}
-        <MediaLightbox />
+        <MediaLightbox readOnly={readOnly} />
       </Screen>
     );
   }
@@ -333,15 +340,17 @@ export default function GalleryScreen() {
               <AppText muted variant="caption">
                 {albums.length} album{albums.length !== 1 ? 's' : ''}
               </AppText>
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => setShowNewAlbum((v) => !v)}
-                leftIcon={<Plus color={colors.text} size={16} />}
-                label="New Album"
-              />
+              {readOnly ? null : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setShowNewAlbum((v) => !v)}
+                  leftIcon={<Plus color={colors.text} size={16} />}
+                  label="New Album"
+                />
+              )}
             </View>
-            {showNewAlbum ? (
+            {!readOnly && showNewAlbum ? (
               <Animated.View entering={FadeIn}>
                 <Card>
                   <View style={{ gap: 10 }}>
@@ -404,7 +413,7 @@ export default function GalleryScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
-      <MediaLightbox />
+      <MediaLightbox readOnly={readOnly} />
     </Screen>
   );
 }

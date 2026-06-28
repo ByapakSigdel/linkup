@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, Button, Spinner } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { getSocket } from '@/lib/socket';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, isActivelyPaired } from '@/stores/auth-store';
 import { useConstellationStore } from '@/stores/constellation-store';
 
 import { SkyView } from './sky-view';
@@ -13,10 +13,14 @@ import { StarDetail } from './star-detail';
 import { dailyPrompt, CONSTELLATIONS, promptsFor } from './deck';
 import type { Star } from './types';
 
-export function ConstellationOfUs(): JSX.Element {
+export function ConstellationOfUs({ readOnly: readOnlyProp }: { readOnly?: boolean } = {}): JSX.Element {
   const { colors } = useTheme();
 
+  const user = useAuthStore((s) => s.user);
   const couple = useAuthStore((s) => s.couple);
+  // Read-only memorial mode: the sky can be wandered but no new stars are lit
+  // and existing ones can't be edited. Defaults to the store-derived gate.
+  const readOnly = readOnlyProp ?? !isActivelyPaired({ user, couple });
   const stars = useConstellationStore((s) => s.stars);
   const loading = useConstellationStore((s) => s.loading);
   const fetchStars = useConstellationStore((s) => s.fetchStars);
@@ -139,7 +143,7 @@ export function ConstellationOfUs(): JSX.Element {
         <SkyView
           stars={stars}
           onPressStar={setSelected}
-          onPressEmpty={() => setSheetOpen(true)}
+          onPressEmpty={readOnly ? () => {} : () => setSheetOpen(true)}
         />
 
         {/* Empty-state invitation, centered over the faint pending field. */}
@@ -147,34 +151,42 @@ export function ConstellationOfUs(): JSX.Element {
           <View pointerEvents="box-none" style={styles.emptyOverlay}>
             <View pointerEvents="box-none" style={styles.emptyCard}>
               <AppText variant="title" center color={colors.text} style={styles.emptyTitle}>
-                Your sky is dark — for now.
+                {readOnly ? 'A quiet sky.' : 'Your sky is dark — for now.'}
               </AppText>
               <AppText variant="body" center color={colors.textMuted} style={styles.emptySub}>
-                Answer a prompt to light your first star.
+                {readOnly
+                  ? 'No stars were lit between you.'
+                  : 'Answer a prompt to light your first star.'}
               </AppText>
-              <Button label="✦ Light your first star" onPress={() => setSheetOpen(true)} />
+              {readOnly ? null : (
+                <Button label="✦ Light your first star" onPress={() => setSheetOpen(true)} />
+              )}
             </View>
           </View>
         )}
       </View>
 
-      {/* Floating CTA — hidden in the empty state (the invitation carries the CTA). */}
-      {hasStars && (
+      {/* Floating CTA — hidden in the empty state (the invitation carries the CTA)
+          and in read-only memorial mode (the sky is frozen). */}
+      {hasStars && !readOnly && (
         <View style={styles.cta}>
           <Button label="✦ Light a new star" onPress={() => setSheetOpen(true)} />
         </View>
       )}
 
-      {/* Prompt sheet */}
-      <PromptSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        dailyPrompt={daily}
-      />
+      {/* Prompt sheet — never reachable in read-only mode (the CTAs that open it
+          are hidden), but guard the render too. */}
+      {!readOnly && (
+        <PromptSheet
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          dailyPrompt={daily}
+        />
+      )}
 
       {/* Star detail */}
       {selected && (
-        <StarDetail star={selected} onClose={() => setSelected(null)} />
+        <StarDetail star={selected} onClose={() => setSelected(null)} readOnly={readOnly} />
       )}
     </View>
   );

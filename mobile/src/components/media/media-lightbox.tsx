@@ -38,7 +38,7 @@ function LightboxVideo({ uri }: { uri: string }) {
   );
 }
 
-export function MediaLightbox() {
+export function MediaLightbox({ readOnly }: { readOnly?: boolean } = {}) {
   const lightboxIndex = useMediaStore((s) => s.lightboxIndex);
   const items = useMediaStore((s) => s.items);
   const closeLightbox = useMediaStore((s) => s.closeLightbox);
@@ -118,16 +118,20 @@ export function MediaLightbox() {
             </AppText>
           </View>
           <View style={styles.topActions}>
-            <Pressable onPress={() => toggleFavorite(currentItem.id)} hitSlop={8} style={styles.iconBtn}>
-              <Heart
-                color={isFavorite ? colors.primary : 'rgba(255,255,255,0.8)'}
-                size={22}
-                fill={isFavorite ? colors.primary : 'none'}
-              />
-            </Pressable>
-            <Pressable onPress={handleDelete} hitSlop={8} style={styles.iconBtn}>
-              <Trash2 color="rgba(255,255,255,0.8)" size={22} />
-            </Pressable>
+            {readOnly ? null : (
+              <>
+                <Pressable onPress={() => toggleFavorite(currentItem.id)} hitSlop={8} style={styles.iconBtn}>
+                  <Heart
+                    color={isFavorite ? colors.primary : 'rgba(255,255,255,0.8)'}
+                    size={22}
+                    fill={isFavorite ? colors.primary : 'none'}
+                  />
+                </Pressable>
+                <Pressable onPress={handleDelete} hitSlop={8} style={styles.iconBtn}>
+                  <Trash2 color="rgba(255,255,255,0.8)" size={22} />
+                </Pressable>
+              </>
+            )}
             <Pressable onPress={closeLightbox} hitSlop={8} style={styles.iconBtn}>
               <X color="rgba(255,255,255,0.9)" size={24} />
             </Pressable>

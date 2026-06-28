@@ -31,10 +31,12 @@ function SharedAnswers({
   star,
   userId,
   partnerName,
+  readOnly,
 }: {
   star: Star;
   userId: string;
   partnerName: string;
+  readOnly?: boolean;
 }): JSX.Element {
   const { colors, radius } = useTheme();
   const patchStar = useConstellationStore((s) => s.patchStar);
@@ -89,7 +91,7 @@ function SharedAnswers({
               <AppText variant="label" color={isMe ? colors.primary : colors.textMuted}>
                 {label}
               </AppText>
-              {isMe && !isEditing && (
+              {isMe && !isEditing && !readOnly && (
                 <Touchable
                   onPress={() => {
                     setEditText(text);
@@ -147,10 +149,12 @@ function GuessAnswers({
   star,
   userId,
   partnerName,
+  readOnly,
 }: {
   star: Star;
   userId: string;
   partnerName: string;
+  readOnly?: boolean;
 }): JSX.Element {
   const { colors, radius } = useTheme();
   const patchStar = useConstellationStore((s) => s.patchStar);
@@ -229,8 +233,9 @@ function GuessAnswers({
           );
         })()}
 
-      {/* Self-judge: show only if I am the subject AND a guess exists AND not yet judged */}
-      {iAmSubject && ans.guess && ans.matched == null && (
+      {/* Self-judge: show only if I am the subject AND a guess exists AND not yet
+          judged — and never in read-only memorial mode. */}
+      {iAmSubject && ans.guess && ans.matched == null && !readOnly && (
         <Card variant="bordered">
           <View style={{ gap: 8 }}>
             <AppText variant="label">Did they nail it?</AppText>
@@ -267,7 +272,7 @@ function GuessAnswers({
 
 /* ─── Photo section ──────────────────────────────────────────────────────── */
 
-function PhotoSection({ star }: { star: Star }): JSX.Element {
+function PhotoSection({ star, readOnly }: { star: Star; readOnly?: boolean }): JSX.Element {
   const { colors, radius } = useTheme();
   const couple = useAuthStore((s) => s.couple);
   const uploadFile = useMediaStore((s) => s.uploadFile);
@@ -304,6 +309,9 @@ function PhotoSection({ star }: { star: Star }): JSX.Element {
 
   const resolvedUrl = resolveMediaUrl(star.photoUrl);
 
+  // Read-only memorial: show an existing photo, but never the add/change control.
+  if (readOnly && !resolvedUrl) return <></>;
+
   return (
     <View style={{ gap: 10 }}>
       {resolvedUrl ? (
@@ -319,13 +327,15 @@ function PhotoSection({ star }: { star: Star }): JSX.Element {
         />
       ) : null}
 
-      <Button
-        label={busy ? 'Uploading…' : star.photoUrl ? 'Change photo' : 'Add a photo'}
-        variant="outline"
-        size="sm"
-        loading={busy}
-        onPress={() => void addPhoto()}
-      />
+      {readOnly ? null : (
+        <Button
+          label={busy ? 'Uploading…' : star.photoUrl ? 'Change photo' : 'Add a photo'}
+          variant="outline"
+          size="sm"
+          loading={busy}
+          onPress={() => void addPhoto()}
+        />
+      )}
     </View>
   );
 }
@@ -335,9 +345,11 @@ function PhotoSection({ star }: { star: Star }): JSX.Element {
 export function StarDetail({
   star,
   onClose,
+  readOnly,
 }: {
   star: Star;
   onClose: () => void;
+  readOnly?: boolean;
 }): JSX.Element {
   const { colors, radius } = useTheme();
   const userId = useAuthStore((s) => s.user?.id ?? '');
@@ -425,13 +437,13 @@ export function StarDetail({
           >
             {/* Answers section */}
             {live.kind === 'guess' ? (
-              <GuessAnswers star={live} userId={userId} partnerName={partnerName} />
+              <GuessAnswers star={live} userId={userId} partnerName={partnerName} readOnly={readOnly} />
             ) : (
-              <SharedAnswers star={live} userId={userId} partnerName={partnerName} />
+              <SharedAnswers star={live} userId={userId} partnerName={partnerName} readOnly={readOnly} />
             )}
 
             {/* Photo section */}
-            <PhotoSection star={live} />
+            <PhotoSection star={live} readOnly={readOnly} />
           </ScrollView>
         </Card>
       </KeyboardAvoidingView>

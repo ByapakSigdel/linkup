@@ -33,6 +33,8 @@ interface MediaGridItemProps {
   onPress?: () => void;
   onToggleFavorite?: () => void;
   onDelete?: () => void;
+  /** Memorial / read-only mode: hide the favorite + delete action overlay. */
+  readOnly?: boolean;
 }
 
 export function MediaGridItem({
@@ -41,6 +43,7 @@ export function MediaGridItem({
   onPress,
   onToggleFavorite,
   onDelete,
+  readOnly,
 }: MediaGridItemProps) {
   const { colors, radius } = useTheme();
   const isVideo = item.type === 'video';
@@ -93,26 +96,28 @@ export function MediaGridItem({
         </View>
       ) : null}
 
-      {/* Action buttons */}
-      <View style={styles.actions}>
-        <Pressable
-          onPress={onToggleFavorite}
-          hitSlop={6}
-          style={[
-            styles.actionBtn,
-            { backgroundColor: isFavorite ? colors.primary : 'rgba(0,0,0,0.45)' },
-          ]}
-        >
-          <Heart color="#fff" size={14} fill={isFavorite ? '#fff' : 'none'} />
-        </Pressable>
-        <Pressable
-          onPress={onDelete}
-          hitSlop={6}
-          style={[styles.actionBtn, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-        >
-          <Trash2 color="#fff" size={14} />
-        </Pressable>
-      </View>
+      {/* Action buttons — hidden in read-only memorial mode. */}
+      {readOnly ? null : (
+        <View style={styles.actions}>
+          <Pressable
+            onPress={onToggleFavorite}
+            hitSlop={6}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: isFavorite ? colors.primary : 'rgba(0,0,0,0.45)' },
+            ]}
+          >
+            <Heart color="#fff" size={14} fill={isFavorite ? '#fff' : 'none'} />
+          </Pressable>
+          <Pressable
+            onPress={onDelete}
+            hitSlop={6}
+            style={[styles.actionBtn, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+          >
+            <Trash2 color="#fff" size={14} />
+          </Pressable>
+        </View>
+      )}
     </Pressable>
   );
 }
